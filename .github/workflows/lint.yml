@@ -1,0 +1,43 @@
+name: Code linting
+on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: '["base", "dind", "2204"]'
+      runner-archs:
+        type: string
+        default: '["amd64"]'
+      runner-arch-map:
+        type: string
+        default: '[{"amd64":"x86_64", "arm64":"aarch64", "arm":"armv7l"}]'
+    secrets:
+      GIT_CLONE_PAT:
+        required: false
+
+permissions:
+  contents: read
+  # allow read access to pull request. Use with `only-new-issues` option.
+  pull-requests: read
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ${{ format('{0}-{1}', join(fromJSON(inputs.runner), '-'), matrix.archconfig) }}
+    strategy:
+      matrix:
+        archconfig: ["${{ fromJSON(inputs.runner-archs) }}"]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          cache: false
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.63
+
+          # show only new issues if it's a pull request. The default value is `false`.
+          only-new-issues: true
