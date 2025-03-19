@@ -115,3 +115,36 @@ jobs:
         with:
           config: .github/linters/licenserc.yml
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  spellcheck:
+    runs-on: ${{ format('{0}-{1}', join(fromJSON(inputs.runner), '-'), matrix.arch) }}
+    strategy:
+      matrix:
+        arch: ["${{ fromJSON(inputs.runner-archs) }}"]
+      fail-fast: false
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Changed Files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: |
+            **/*.md
+
+      - name: Check if any Markdown file was changed
+        if: steps.changed-files.outputs.any_changed == 'false'
+        run: |
+          echo "No Markdown files were changed"
+          exit 0
+
+      - name: Spellcheck
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: rojopolis/spellcheck-github-actions@v0
+        with:
+          config_path: .github/linters/spellcheck.yml
+          source_files: ${{ steps.changed-files.outputs.all_changed_files }}
+          task_name: Markdown
