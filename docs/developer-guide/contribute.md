@@ -4,7 +4,9 @@ title: "Contributing"
 description: "Contributing guidelines"
 ---
 
-Urunc is an open-source project licenced under the [Apache License 2.0](https://github.com/mlsysops-eu/mlsysops-framework/blob/main/LICENSE).
+The MLSysOps framework is an open-source project licensed under the [Apache
+License
+2.0](https://github.com/mlsysops-eu/mlsysops-framework/blob/main/LICENSE).
 We welcome anyone who would be interested in contributing to `MLSysOps framework`.
 As a first step, please take a look at the following document.
 The current document provides a high level overview of `MLSysOps framework`'s code structure, along with a few guidelines regarding contributions to the project.
@@ -21,15 +23,9 @@ The current document provides a high level overview of `MLSysOps framework`'s co
 
 ## Code organization
 
-Urunc is written in Go and we structure the code and other files as follows:
+The MLSysOps framework is structured as follows:
 
-- `/`: The root directory contains the Makefile to build `MLSysOps framework`, along with other non-code files, such as the licence, readme and more.
-- `/docs`: This directory contains all the documentation related to `MLSysOps framework`, such as the installation guide, timestamping and more.
-- `/cmd`: This directory contains handlers for the various command line options of `MLSysOps framework` and the implementation of containerd-shim.
-- `/internal/metrics`: This directory contains the implementation of the metrics logger, which is used for the internal measuring of `MLSysOps framework`'s setup steps.
-- `/pkg`: This directory contains the majority of the code for `MLSysOps framework`. In particular, the subdirectory `/pkg/network/` contains network related code as expected, while the `/pkg/unikontainers/` subdirectory contains the main logic of `MLSysOps framework`, along with the VMM/unikernel related logic.
-
-Therefore, we expect any new documentation related files to be placed under `/docs` and any changes or new files in code to be either in the `/cmd/` or `/pkg/` directory.
+TBC
 
 ## How to contribute
 
@@ -59,8 +55,8 @@ In that context, when opening a new issue regarding a bug, we kindly ask you to:
 
     1. A short description of the bug.
     2. The respective logs both from the output and containerd.
-    3. Urunc's version (either the commit's hash or the version).
-    4. The CPU architecture, VMM and the Unikernel framework used.
+    3. Framework's version manifest (either the commit hash or the version manifest file).
+    4. The execution environment (CPU architecture, VMM etc.).
     5. Any particular steps to reproduce the issue.
 - Keep an eye on the issue for possible questions from the maintainers.
 
@@ -71,10 +67,10 @@ An explanation of the issue
 
 ## System info
 
-- Urunc version:
+- Version:
 - Arch:
 - VMM:
-- Unikernel:
+- ... 
 
 ## Steps to reproduce
 A list of steps that can reproduce the issue.
@@ -117,7 +113,7 @@ In particular, we perform the following workflows tests:
 - Linting of the commit message. Please check the [git commit message style](#git-commit-messages) below for more info.
 - Spell check, since `MLSysOps framework` repository contains its documentation too.
 - License check
-- Code linting for Go.
+- Code linting.
 - Building artifacts for amd64 and aarch64.
 - Unit tests
 - End-to-end tests
@@ -126,7 +122,7 @@ For a better control over the tests and workflows that run in a PR, we define
 three labels which can be used:
 
 - `ok-to-test`: Runs a full CI workflow, meaning all lint tests (commit
-  message, spellcheck, license), Go's linting, building for x86 and aarch64,
+  message, spellcheck, license), Code linting, building for x86 and aarch64,
   unit tests and at last end-to-end tests.
 - `skip-build`: Skips the building workflows along with unit and end-to end tests
   running all the linting tests. This is useful when
@@ -160,22 +156,31 @@ Please follow the below guidelines for your commit messages:
   - *style*: Changes that do not affect the meaning of the code (white-space,
     formatting, missing semi-colons, etc)
   - *refactor*: A code change that neither fixes a bug nor adds a feature
-  - *perf*: A code change that improves performance
+  - *`perf`*: A code change that improves performance
   - *test*: Adding missing tests
   - *build*: Changes that affect the build system or external dependencies
-    (example scopes: gulp, broccoli, npm)
+    (example scopes: gulp, broccoli, `npm`)
   - *ci*: Changes to our CI configuration files and scripts (example scopes:
-    Travis, Circle, BrowserStack, SauceLabs)
+    `Travis`, `Circle`, `BrowserStack`, `SauceLabs`)
   - *chore*: Other changes that don't modify src or test files
   - *revert*: Reverts a previous commit
 - In case the PR is associated with an issue, please refer to it, using the git trailer `Fixes: #Nr_issue`
 - Always sign-off your commit message
 
-### Golang code styde
+Since the MLSysOps framework comprises code written in various programming
+languages we use the following styles for each:
 
-We follow gofmt's rules on formatting GO code. Therefore, we ask all
+### Golang code style
+
+We follow `gofmt`'s rules on formatting GO code. Therefore, we ask all
 contributors to do the same.  Go provides the `gofmt` tool, which can be used
 for formatting your code.
+
+### Python
+TBC 
+
+### C
+TBC
 
 ## Contact
 
