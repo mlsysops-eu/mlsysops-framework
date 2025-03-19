@@ -1,0 +1,276 @@
+---
+- name: Fetch Kubeconfig Files from Clusters
+  hosts: "all:!management_cluster"
+  gather_facts: no
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  tasks:
+    - name: Fetch kubeconfig from cluster master nodes
+      ansible.builtin.fetch:
+        src: "/etc/rancher/k3s/k3s.yaml"
+        dest: "/tmp/{{ inventory_hostname }}-k3s.yaml"
+        flat: yes
+      when: inventory_hostname in groups['master_nodes']
+
+- name: Upload and Adjust Kubeconfig Files on Management VM
+  hosts: management_cluster
+  become: yes
+  become_user: root
+  become_method: sudo
+  gather_facts: no
+
+  tasks:
+    - name: Ensure temporary directory exists
+      ansible.builtin.file:
+        path: /tmp/kubeconfigs
+        state: directory
+        mode: '0755'
+
+    - name: Copy fetched kubeconfig to management vm
+      ansible.builtin.copy:
+        src: "/tmp/{{ item }}-k3s.yaml"
+        dest: "/tmp/kubeconfigs/{{ item }}-k3s.yaml"
+        mode: '0644'
+      loop: "{{ groups['master_nodes'] }}"
+
+    - name: Adjust kubeconfig server address for cluster master nodes
+      ansible.builtin.replace:
+        path: "/tmp/kubeconfigs/{{ item }}-k3s.yaml"
+        regexp: '127.0.0.1'
+        replace: "{{ hostvars[item]['ansible_host'] }}"
+      loop: "{{ groups['master_nodes'] }}"
+
+- name: Install Karmada on Management Cluster
+  hosts: management_cluster
+  become: yes
+  become_user: root
+  become_method: sudo
+  vars:
+    managementvm_ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+    managementvm_hostname: "{{ inventory_hostname }}"
+    karmada_apiserver_nodeport: 32443
+
+  tasks:
+    - name: Gathering Facts
+      ansible.builtin.setup:
+
+    - name: Create values.yml
+      ansible.builtin.copy:
+        dest: "/home/{{ ansible_user }}/mlsysopsansible/values.yml"
+        content: |
+          certs:
+            mode: auto
+            auto:
+              expiry: 43800h
+              hosts:
+                - "kubernetes.default.svc"
+                - "localhost"
+                - "127.0.0.1"
+                - "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+                {% raw %}
+                - "*.etcd.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+                - "*.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+                - "*.{{ .Release.Namespace }}.svc"
+                {% endraw %}
+        mode: '0644'
+      tags: install
+
+    - name: Download Helm install script
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+        dest: "/tmp/get_helm.sh"
+        mode: '0700'
+      tags: install
+
+    - name: Run Helm install script
+      ansible.builtin.command: /tmp/get_helm.sh
+      changed_when: true
+      tags: install
+
+    - name: Clean up Helm install script
+      ansible.builtin.file:
+        path: "/tmp/get_helm.sh"
+        state: absent
+      tags: install
+
+    - name: Ensure .kube directory exists for root
+      ansible.builtin.file:
+        path: "/root/.kube"
+        state: directory
+        mode: '0700'
+      tags: install
+
+    - name: Copy kubeconfig to root
+      ansible.builtin.copy:
+        src: "/home/{{ ansible_user }}/.kube/config"
+        dest: "/root/.kube/config"
+        remote_src: yes
+        mode: '0600'
+      tags: install
+
+    - name: Add Karmada Helm repository
+      ansible.builtin.command: helm repo add karmada-charts https://raw.githubusercontent.com/karmada-io/karmada/master/charts
+      changed_when: true
+      tags: install
+
+    - name: Update Helm repositories
+      ansible.builtin.command: helm repo update
+      changed_when: true
+      tags: install
+
+    - name: Install Karmada using Helm
+      ansible.builtin.command: |
+        helm upgrade --install karmada karmada-charts/karmada \
+          --namespace karmada-system \
+          --create-namespace \
+          --version=1.13.0 \
+          -f values.yml
+      args:
+        chdir: /home/{{ ansible_user }}/mlsysopsansible
+      register: helm_install
+      changed_when: helm_install.rc == 0
+      tags: install
+
+    - name: Check Karmada pods
+      ansible.builtin.shell: |
+        kubectl get pods -n karmada-system --show-labels
+      register: karmada_pods
+      changed_when: false
+      tags: install
+
+    - name: Debug Karmada pods
+      debug:
+        var: karmada_pods.stdout
+      tags: install
+
+    - name: Wait for Karmada API server pod to be ready
+      ansible.builtin.shell: |
+        kubectl wait --for=condition=Ready pod -l app=karmada-apiserver -n karmada-system --timeout=300s
+      changed_when: false
+      tags: install
+
+    - name: Export Karmada kubeconfig
+      ansible.builtin.shell: |
+        kubectl get secret -n karmada-system karmada-kubeconfig -o jsonpath={.data.kubeconfig} | base64 -d > /home/{{ ansible_user }}/karmada-kubeconfig.yaml
+      changed_when: true
+      tags: install
+
+    - name: Set ownership of Karmada kubeconfig
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/karmada-kubeconfig.yaml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      tags: install
+
+- name: Install karmadactl on Management Cluster
+  hosts: management_cluster
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  tasks:
+    - name: Check if karmadactl is already installed
+      ansible.builtin.command: karmadactl version
+      register: karmadactl_version
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install karmadactl using one-click installation
+      ansible.builtin.shell: |
+        curl -s https://raw.githubusercontent.com/karmada-io/karmada/master/hack/install-cli.sh | sudo INSTALL_CLI_VERSION=1.13.0 bash
+      args:
+        executable: /bin/bash
+      register: install_karmadactl
+      changed_when: install_karmadactl.rc == 0
+      failed_when: install_karmadactl.rc != 0
+      retries: 3
+      delay: 5
+      timeout: 300
+      when: karmadactl_version.rc != 0
+
+- name: Configure Karmada API Server Access
+  hosts: management_cluster
+  become: yes
+  become_user: root
+  become_method: sudo
+  vars:
+    karmada_config: "/home/{{ ansible_user }}/karmada-kubeconfig.yaml"
+    managementvm_ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+    karmada_apiserver_nodeport: 32644
+
+  tasks:
+    - name: Patch Karmada API server service to NodePort
+      ansible.builtin.shell: |
+        kubectl patch svc -n karmada-system karmada-apiserver -p '{"spec": {"type": "NodePort", "ports": [{"port": 5443, "nodePort": {{ karmada_apiserver_nodeport }}}]}}'
+      changed_when: true
+
+    - name: Update Karmada kubeconfig server address
+      ansible.builtin.replace:
+        path: "{{ karmada_config }}"
+        regexp: 'https://karmada-apiserver.karmada-system.svc.cluster.local:5443'
+        replace: "https://{{ managementvm_ip }}:{{ karmada_apiserver_nodeport }}"
+      changed_when: true
+
+    - name: Wait for 10 seconds to ensure API server is ready
+      ansible.builtin.pause:
+        seconds: 10
+      tags: join
+
+- name: Join Clusters to Karmada
+  hosts: management_cluster
+  become: yes
+  vars:
+    karmada_config: "/home/{{ ansible_user }}/karmada-kubeconfig.yaml"
+
+  tasks:
+    - name: Get list of all clusters
+      ansible.builtin.set_fact:
+        cluster_list: >-
+          {{
+          groups['master_nodes']
+          | map('extract', hostvars)
+          | map(attribute='k3s_cluster_name')
+          | unique
+          }}
+
+    - name: Create cluster to master node mapping
+      ansible.builtin.set_fact:
+        cluster_masters: >-
+          {{
+            cluster_masters | default({}) |
+            combine({
+              item: (
+                groups['master_nodes']
+                | map('extract', hostvars)
+                | json_query("[?k3s_cluster_name=='" ~ item ~ "'].inventory_hostname")
+                | first
+              )
+            })
+          }}
+      loop: "{{ cluster_list }}"
+      when: (groups['master_nodes'] | map('extract', hostvars)
+         | json_query("[?k3s_cluster_name=='" ~ item ~ "']") | length) > 0
+
+    - name: Join all clusters to Karmada
+      ansible.builtin.command: |
+        karmadactl join {{ item }} \
+          --kubeconfig {{ karmada_config }} \
+          --cluster-kubeconfig /tmp/kubeconfigs/{{ cluster_masters[item] }}-k3s.yaml
+      loop: "{{ cluster_list }}"
+      register: join_clusters
+      failed_when: join_clusters.rc != 0
+      retries: 5
+      delay: 10
+
+    - name: Verify clusters in Karmada
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ karmada_config }} get clusters -o name
+      register: registered_clusters
+      failed_when: >
+        registered_clusters.stdout_lines | length != (cluster_list | length)
+    - name: Debug Karmada clusters
+      debug:
+        var: karmada_clusters.stdout
