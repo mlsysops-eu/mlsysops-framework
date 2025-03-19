@@ -1,0 +1,70 @@
+---
+- name: Install k3s on all clusters
+  hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  gather_facts: true
+
+  vars:
+    k3s_version: "v1.31.6+k3s1"
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: latest
+        update_cache: true
+
+    - name: Install k3s on master nodes
+      shell: >
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - server
+        --cluster-cidr={{ hostvars[inventory_hostname].pod_cidr }}
+        --service-cidr={{ hostvars[inventory_hostname].service_cidr }}
+        --node-ip {{ ansible_host }}
+      args:
+      when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
+
+    - name: Get k3s node token from masters
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: node_token
+      when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
+
+    - name: Install k3s on worker nodes
+      shell: >
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - agent
+        --server https://{{ hostvars[groups['master_nodes'][0]]['ansible_host'] }}:6443
+        --token {{ hostvars[groups['master_nodes'][0]]['node_token']['content'] | b64decode | trim }}
+        --node-ip {{ ansible_host }}
+      args:
+      when: inventory_hostname in groups['worker_nodes']
+
+    - name: Ensure k3s config is readable
+      file:
+        path: /etc/rancher/k3s/k3s.yaml
+        mode: '0644'
+      when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
+
+    - name: Ensure .kube directory exists for user
+      file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0700'
+      when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
+
+    - name: Copy k3s config to user's kube config
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+        remote_src: true
+      when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
