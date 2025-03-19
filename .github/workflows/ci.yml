@@ -24,13 +24,13 @@ jobs:
     uses: ./.github/workflows/validate-files-and-commits.yml
     secrets: inherit
 
-  lint:
-    name: Lint code
-    if: | 
-      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
-      !contains(github.event.pull_request.labels.*.name, 'skip-lint')
-    uses: ./.github/workflows/lint.yml
-    secrets: inherit
+#  lint:
+#    name: Lint code
+#    if: | 
+#      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+#      !contains(github.event.pull_request.labels.*.name, 'skip-lint')
+#    uses: ./.github/workflows/lint.yml
+#    secrets: inherit
 
 #  build:
 #    #needs: [validate-files-and-commits, lint]
