@@ -5,7 +5,7 @@ on:
     inputs:
       agent:
         default: 'node'
-        required: true
+        required: false
         type: string
       registry:
         default: 'harbor.nbfc.io'
@@ -15,7 +15,7 @@ on:
     inputs:
       agent:
         default: 'node'
-        required: true
+        required: false
         type: string
       registry:
         default: 'harbor.nbfc.io'
@@ -24,7 +24,7 @@ on:
 
 env:
   REGISTRY: ${{ github.event.inputs.registry || 'harbor.nbfc.io' }}
-  REGISTRY_IMAGE: ${{ github.event.inputs.registry || 'harbor.nbfc.io' }}/mlsysops/${{ inputs.agent }}-agent
+  REGISTRY_IMAGE: ${{ github.event.inputs.registry || 'harbor.nbfc.io' }}/mlsysops/northbound-api
   RUNNER_ARCH_MAP: '[{"amd64":"x86_64", "arm64":"aarch64", "arm":"armv7l"}]'
 
 jobs:
@@ -66,12 +66,12 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
-          context: ./agents/${{ inputs.agent }}
+          context: ./northbound-api
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/${{ matrix.arch }}
           push: true
-          file: ./agents/${{ inputs.agent }}/Dockerfile
+          file: ./northbound-api/Dockerfile
           provenance: false
           build-args: |
             ARCHTAG=${{ fromJson(env.RUNNER_ARCH_MAP)[0][matrix.arch] }}
