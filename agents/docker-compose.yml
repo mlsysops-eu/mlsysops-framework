@@ -1,0 +1,29 @@
+services:
+  continuum_agent:
+    image: mlsysops-framework/continuum_agent:0.0.1
+    network_mode: host
+    environment:
+      KUBECONFIG: uthprod.kubeconfig
+      NODE_NAME: karmada
+      CLUSTER_NAME: cluster
+      EJABBERD_DOMAIN: karmada.mlsysops.eu
+      NODE_PASSWORD: 1234
+
+  cluster_agent:
+    image: mlsysops-framework/cluster_agent:0.0.1
+    network_mode: host
+    environment:
+      KUBECONFIG: uthprod.kubeconfig
+      NODE_NAME: cluster1
+      CLUSTER_NAME: cluster
+      EJABBERD_DOMAIN: karmada.mlsysops.eu
+      NODE_PASSWORD: 1234
+
+  node_agent:
+    image: mlsysops-framework/node_agent:0.0.1
+    network_mode: host
+    environment:
+      NODE_NAME: csl-rpi5-1
+      CLUSTER_NAME: cluster
+      EJABBERD_DOMAIN: karmada.mlsysops.eu
+      NODE_PASSWORD: 1234

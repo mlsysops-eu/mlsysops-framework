@@ -1,0 +1,46 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:43170"
+      http:
+        cors:
+          allowed_origins:
+            - "https://*"
+            - "http://*"
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: '${env:NODE_HOSTNAME}_node_exporter'
+          scrape_interval: {{ scrape_interval }}
+          scrape_timeout: {{ scrape_timeout }}
+          static_configs:
+            - targets: ['${env:NODE_IP}:9100']
+
+exporters:
+  otlp:
+    endpoint: {{  otlp_export_endpoint }}
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: {{ prometheus_export_endpoint }}
+    send_timestamps: true
+    metric_expiration: 5s
+    enable_open_metrics: false
+    add_metric_suffixes: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+processors:
+  attributes/add_labels:
+    actions:
+      - key: node_name
+        action: insert
+        value: '${env:NODE_HOSTNAME}'
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp,prometheus]
+      processors: [attributes/add_labels]
+      exporters: [otlp, prometheus]

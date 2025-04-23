@@ -1,0 +1,134 @@
+apiVersion: fluidity.gr/v1
+kind: MLSysOpsApp
+metadata:
+  name: uth-demo-app
+clusterPlacement:
+  clusterID: 
+    - "uth-prod-cluster"
+  instances: 1
+components: 
+  - Component:
+      name: camera-app
+    nodePlacement:
+      continuumLayer: 
+        - Edge
+      node: csl-rpi5-1
+      labels:
+        - "node-type:edge"
+      Scaling:
+        scalingMode: manual
+        instances: 1
+    restartPolicy: OnFailure
+    containers:
+      - image: registry.mlsysops.eu/toycase/demo2025/camera:0.3.2
+        imagePullPolicy: IfNotPresent
+        command: ["python", "camera_server.py", "--fps", "20", "--image_width", "640", "--image_height", "480"]
+        env:
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.name=camera-app, service.version=0.3.3, service.experimentid=2"
+          - name: OTEL_SERVICE_NAME
+            value: "camera-app"
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: TELEMETRY_ENDPOINT
+            value: "$(NODE_IP):31050"
+        ports:
+          - containerPort: 8554
+            protocol: TCP
+  - Component:
+      name: detector-app
+    nodePlacement:
+      continuumLayer:
+        - Edge
+      node: csl-jetson1
+      labels:
+        - "node-type:edge"
+      Scaling:
+        scalingMode: manual
+        instances: 1
+    restartPolicy: OnFailure
+    runtimeClassName: nvidia
+    containers:
+      - image: registry.mlsysops.eu/toycase/demo2025/detector:0.3.2
+        imagePullPolicy: Always
+        command: ["python3", "detector.py", "--output", "./", "--mode", "stream", "--input", "rtsp://camera-app.default.svc.cluster.local:8554/video_stream", "--tcp-forward", "--tensorrt"]
+        resources:
+          limits:
+            cpu: "3"
+            memory: "2Gi"
+            nvidia.com/gpu: 1  # Request one GPU
+        securityContext:
+          allowPrivilegeEscalation: true
+        env:
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.name=detector-app, service.version=0.3.3"
+          - name: OTEL_SERVICE_NAME
+            value: "detector-app"
+          - name: TCP_IP
+            value: "classifier-app.default.svc.cluster.local"
+            # value: "10.64.83.10"
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: TELEMETRY_ENDPOINT
+            value: "$(NODE_IP):31050"
+  - Component:
+      name: classifier-app
+    nodePlacement:
+      continuumLayer: 
+        - Edge
+      node: csl-jetson1
+      labels:
+        - "node-type:edge"
+      Scaling:
+        scalingMode: manual
+        instances: 1
+    restartPolicy: OnFailure
+    runtimeClassName: nvidia
+    containers:
+      - image: registry.mlsysops.eu/toycase/demo2025/classifier:0.3.2
+        imagePullPolicy: IfNotPresent
+        command: ["/workspace/build/classify_app"]
+        securityContext:
+          allowPrivilegeEscalation: true
+        env:
+          - name: OTEL_SERVICE_NAME
+            value: "classifier-app"
+          - name: NODE_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: NODE_HOSTNAME  # Custom environment variable
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName  # Retrieves the node hostname
+          - name: LIBRARY_PATH
+            value: "/workspace/lib/$(NODE_HOSTNAME)/mobilenet_v3.so"
+          - name: LD_LIBRARY_PATH
+            value: "/workspace/lib/$(NODE_HOSTNAME):$LD_LIBRARY_PATH"
+          - name: OPERATING_MODE
+            value: "network"
+          - name: TELEMETRY_ENDPOINT
+            value: "$(NODE_IP):31050"
+          - name: "ARCH"
+            value: "CUDA"  
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "service.name=classifier-app, service.version=0.3.3, service.experimentid=1, service.hostname=$(NODE_HOSTNAME)"
+        ports:
+          - containerPort: 5005
+            protocol: TCP
+        resources:
+          limits:
+            cpu: "3"
+            memory: "2Gi"
+            nvidia.com/gpu: 1  # Request one GPU
+componentInteractions:
+  - componentName1: detector-app 
+    type: egress
+    componentName2: camera-app
+  - componentName1: detector-app
+    type: egress
+    componentName2: classifier-app

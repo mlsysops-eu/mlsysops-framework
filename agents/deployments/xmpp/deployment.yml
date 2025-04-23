@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ejabberd-deployment
+  namespace: mlsysops-framework
+  labels:
+    app: ejabberd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ejabberd
+  template:
+    metadata:
+      labels:
+        app: ejabberd
+    spec:
+      containers:
+        - name: ejabberd
+          image: ghcr.io/processone/ejabberd
+          env:
+            - name: ERLANG_NODE_ARG
+              value: "ejabberd@${IP_SEL}"
+            - name: ERLANG_COOKIE
+              value: "dummycookie123"
+            - name: CTL_ON_CREATE
+              value: "! register admin ${IP_SEL} 1234"
+          ports:
+            - containerPort: 5210
+              hostPort: 5210
+            - containerPort: 5222
+              hostPort: 5222
+            - containerPort: 5269
+              hostPort: 5269
+            - containerPort: 5280
+              hostPort: 5280
+            - containerPort: 5443
+              hostPort: 5443
+            - containerPort: 4369
+              hostPort: 4369
+          volumeMounts:
+            - name: ejabberd-config-volume
+              mountPath: /opt/ejabberd/conf/ejabberd.yml
+              subPath: ejabberd.yml
+      volumes:
+        - name: ejabberd-config-volume
+          configMap:
+            name: ejabberd-config

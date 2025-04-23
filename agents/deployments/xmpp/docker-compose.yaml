@@ -1,0 +1,19 @@
+services:
+  main:
+    image: ghcr.io/processone/ejabberd
+    container_name: ejabberd
+    hostname: ${IP_SEL}
+    ports:
+      - "5210:5210"
+      - "5222:5222"
+      - "5269:5269"
+      - "5280:5280"
+      - "5443:5443"
+      - "4369-4399:4369-4399"
+      - "4200-4210:4200-4210"
+    environment:
+      - ERLANG_NODE_ARG=ejabberd@${IP_SEL}
+      - ERLANG_COOKIE=dummycookie123
+      - CTL_ON_CREATE=! register admin ${IP_SEL} 1234
+    volumes:
+      - ./ejabberd.yml:/opt/ejabberd/conf/ejabberd.yml
