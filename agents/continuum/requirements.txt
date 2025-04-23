@@ -1,0 +1,14 @@
+mlsysops
+mlstelemetry
+opentelemetry-exporter-otlp
+opentelemetry-api
+opentelemetry-sdk
+prometheus_client
+python-dotenv
+asyncio
+pandas
+pynvml
+nvidia-pyindex
+cpufreq
+cachetools
+kubernetes

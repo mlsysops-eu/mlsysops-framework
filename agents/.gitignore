@@ -1,0 +1,9 @@
+/agents_venv/
+/create/
+/.idea
+/*.egg-info
+/dist
+/build
+*.log
+
+*pycache
