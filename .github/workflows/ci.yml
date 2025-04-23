@@ -13,6 +13,8 @@ concurrency:
 permissions:
   pull-requests: read
   contents: read
+  id-token: write
+
 
 
 jobs:
@@ -26,12 +28,29 @@ jobs:
 
   build-agent-pkg:
     #needs: [validate-files-and-commits, lint]
-    name: Build
+    name: Build python pkg
     if: | 
       contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
-      !contains(github.event.pull_request.labels.*.name, 'skip-build')
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-pkg')
     uses: ./.github/workflows/build-mlsysops-pkg.yml
     secrets: inherit
+
+  build-agent-containers:
+    #needs: [build-agent-pkg]
+    name: Build containers
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    strategy:
+      matrix:
+        agent: ["node", "cluster", "continuum"]
+        fail-fast: false
+    uses: ./.github/workflows/build-containers.yml
+    secrets: inherit
+    with:
+      agent: ${{ matrix.agent }} 
+
+
 
 #  lint:
 #    name: Lint code
