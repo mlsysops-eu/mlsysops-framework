@@ -24,6 +24,15 @@ jobs:
     uses: ./.github/workflows/validate-files-and-commits.yml
     secrets: inherit
 
+  build-agent-pkg:
+    #needs: [validate-files-and-commits, lint]
+    name: Build
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build')
+    uses: ./.github/workflows/build-mlsysops-pkg.yml
+    secrets: inherit
+
 #  lint:
 #    name: Lint code
 #    if: | 
