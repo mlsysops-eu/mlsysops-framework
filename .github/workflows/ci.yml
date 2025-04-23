@@ -36,7 +36,7 @@ jobs:
     secrets: inherit
 
   build-agent-containers:
-    #needs: [build-agent-pkg]
+    needs: [build-agent-pkg]
     name: Build containers
     if: | 
       contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
@@ -51,7 +51,7 @@ jobs:
       agent: ${{ matrix.agent }} 
 
   build-northbound-api:
-    #needs: [build-agent-pkg]
+    needs: [build-agent-pkg]
     name: Build Northbound API 
     if: | 
       contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
