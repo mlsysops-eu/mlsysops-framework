@@ -44,12 +44,20 @@ jobs:
     strategy:
       matrix:
         agent: ["node", "cluster", "continuum"]
-        fail-fast: false
+      fail-fast: false
     uses: ./.github/workflows/build-containers.yml
     secrets: inherit
     with:
       agent: ${{ matrix.agent }} 
 
+  build-northbound-api:
+    #needs: [build-agent-pkg]
+    name: Build Northbound API 
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    uses: ./.github/workflows/build-northbound-api.yml
+    secrets: inherit
 
 
 #  lint:
