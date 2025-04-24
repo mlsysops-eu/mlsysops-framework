@@ -1,0 +1,9 @@
+dash
+plotly
+pandas
+python-dotenv
+sqlalchemy 
+psycopg2-binary
+apscheduler
+scikit-learn
+boto3 ==1.16.47

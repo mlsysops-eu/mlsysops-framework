@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+prometheus_client
+mlstelemetry
+opentelemetry-exporter-otlp
+opentelemetry-api
+opentelemetry-sdk
+cachetools
