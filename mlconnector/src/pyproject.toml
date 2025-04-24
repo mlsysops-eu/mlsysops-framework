@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "MLSysOps"
+version = "0.1.0"
+description = "MLSysOps ML Integration API"
+authors = ["John Byabazaire <john.byabazaire@ucd.ie>"]
+license = "Copy Right"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.110.0"
+uvicorn = "^0.28.0"
+sqlalchemy = "2.0.28"
+python-dotenv = "^1.0.1"
+psycopg2-binary = "^2.9.9"
+alembic = "^1.13.1"
+asyncpg = "^0.29.0"
+greenlet = "^3.0.3"
+python-multipart = "^0.0.9"
+python-jose = "^3.3.0"
+passlib = "^1.7.4"
+fastapi-csrf-protect = "^0.3.4"
+itsdangerous = "^2.2.0"
+fastsession = "^0.3.0"
+fastapi-sessions = "^0.3.2"
+vonage = "^3.17.1"
+aioredis = "^2.0.1"
+asyncio-redis = "^0.16.0"
+pyyaml = "^6.0.2"
+boto3 = "1.16.47"
+docker = "7.1.0"
+urllib3 = "^1.20"
+
+#[tool.poetry.overrides]
+#urllib3 = { version = ">=1.26.0,<2.0.0" }
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
