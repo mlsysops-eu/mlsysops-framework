@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Model",
+        "description": "ML model initialization related endpoints"
+    },
+    {
+        "name": "Training",
+        "description": "ML model training related endpoints"
+    },
+    {
+        "name": "Deployments",
+        "description": "ML model deployment related endpoints"
+    }
+]

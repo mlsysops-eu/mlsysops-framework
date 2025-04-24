@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+scikit-learn==1.5.2
+prometheus_client
+mlstelemetry
+opentelemetry-exporter-otlp
+opentelemetry-api
+opentelemetry-sdk
+cachetools
