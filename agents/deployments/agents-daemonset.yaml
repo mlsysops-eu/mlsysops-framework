@@ -27,8 +27,6 @@ spec:
         - name: node-agent
           image: registry.mlsysops.eu/agent/agents/node:0.0.2
           env:
-            - name: KUBECONFIG
-              value: uthprod.kubeconfig
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -63,6 +61,7 @@ spec:
       labels:
         app: cluster-agent
     spec:
+      serviceAccountName: mlsysops-framework-sa
       # Use nodeSelector to target nodes with mlsysops/continuumLayer=cluster
       nodeSelector:
         mlsysops/continuumLayer: "cluster"
@@ -70,8 +69,6 @@ spec:
         - name: cluster-agent
           image: registry.mlsysops.eu/agent/agents/cluster:0.0.2
           env:
-            - name: KUBECONFIG
-              value: uthprod.kubeconfig
             - name: NODE_NAME
               value: cluster1
             - name: CLUSTER_NAME
