@@ -1,6 +1,16 @@
 import os
 import docker
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_URL = os.getenv('SIDE_API_ENDPOINT')
+if not BASE_URL:
+    raise ValueError("SIDE_API_ENDPOINT is not set in the .env file")
+
+# Build the full URL
+url = f"{BASE_URL}/deployment/add/operation"
 
 template = """#!/usr/bin/python3
 # Author John Byabazaire
@@ -11,12 +21,13 @@ from typing import List
 import pandas as pd
 import joblib
 import os
+import requests
 import json
 from pydantic import create_model
-import requests
 from io import BytesIO
 import base64
 import urllib.parse
+from datetime import datetime, timezone
 
 from mlstelemetry import MLSTelemetry
 
@@ -71,7 +82,13 @@ def get_single_explanation(model_id, data):
 async def make_prediction(request: DynamicSchema):
     data_source = {data_source}
     model_id = "{model_id}"
-    
+    owner = "{owner}"
+    url = "{url}"
+    headers = {{
+        'accept': 'application/json',
+        'Content-Type': 'application/json'
+    }}
+    current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     try:
         loaded_model = joblib.load("{model}")
         print("Model loaded successfully!")
@@ -79,6 +96,20 @@ async def make_prediction(request: DynamicSchema):
             data_dict = request.data.dict()
             df = pd.DataFrame([data_dict])
             result_pred = loaded_model.predict(df)
+            data = {{
+                "ownerid": owner,
+                "deploymentid": "{deploymentid}",
+                "modelid": model_id,
+                "data": str(data_dict),
+                "result": str(result_pred),
+                "timestamp": current_timestamp
+            }}
+            response = requests.post(url, headers=headers, json=data)
+            print(f"Status Code: {{response.status_code}}")
+            try:
+                print("Response JSON:", response.json())
+            except ValueError:
+                print("No JSON response returned.")
             if request.explanation:
                 explanation_res = get_single_explanation(model_id,data_dict)
                 if explanation_res:
@@ -122,14 +153,17 @@ def generate_dockerfile():
     print("Dockerfile generated successfully!")
 
 
-def build_and_push_image(model, registry_url, image_name, registry_username, registry_password, inference_data, datasource, model_id):
+def build_and_push_image(model, registry_url, image_name, registry_username, registry_password, inference_data, datasource, model_id,model_owner, deploymentid):
     params = {
         #"model_filename": model_name,
         "port": 8000,
         "schema_code":inference_data,
         "data_source":datasource,
         "model_id":model_id,
-        "model":model
+        "model":model,
+        "owner":model_owner,
+        "url":url,
+        "deploymentid":deploymentid
     }
     generated_code = template.format(**params)
 

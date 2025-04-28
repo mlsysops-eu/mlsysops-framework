@@ -4,10 +4,12 @@
 
 import fastapi
 from schema.mldeployment import MLDeploymentReturn, MLDeploymentCreate
+from schema.mloperations import MLDeploymentOposReturn, MLDeploymentOposCreate
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from db.db_setup import get_db
 import utils.mldeployments as utl
+import utils.mloperations as utility
 from typing import List
 
 
@@ -39,6 +41,16 @@ async def add_new_deployment(
     return deploy_obj
 
 
+@router.post("/deployment/add/operation", response_model=MLDeploymentOposReturn, status_code=201, tags=["Deployments"])
+async def add_new_opos_deployment(
+        request: Request,
+        deploy_ops: MLDeploymentOposCreate, 
+        db: Session = Depends(get_db)
+    ):
+    deploy_obj = await utility.save_opos(db=db, mloperation=deploy_ops)
+    return deploy_obj
+
+
 @router.get("/deployment/get/status/{deployment_id}", tags=["Deployments"])
 async def get_deployment_status(
         request: Request,
@@ -52,19 +64,19 @@ async def get_deployment_status(
     return {"response": str(deployment)}
 
 
-"""@router.get("/deployment/get/{deployment_id}", tags=["Deployments"])
-async def get_deployment_by_id(
+@router.get("/deployment/get/opos/{ownerid}", response_model=List[MLDeploymentOposReturn], tags=["Deployments"])
+async def get_deployment_ops_by_owner(
         request: Request,
-        deployment_id: str,
+        ownerid: str,
         db: Session = Depends(get_db)
     ):
-    deployment = await utl.get_deployment_by_id(db, deployment_id=deployment_id)
-    if deployment is False:
+    opos = await utility.get_deployment_ops_by_owner(db, ownerid=ownerid)
+    if len(opos) == 0:
             raise HTTPException(status_code=404, detail="No deployment with matching id was found")
             #return {"status": "Pending"}
-    return deployment
+    return opos
 
-@router.patch("/deployment/{deployment_id}", tags=["Deployments"])
+"""@router.patch("/deployment/{deployment_id}", tags=["Deployments"])
 async def update_deployment(
         request: Request,
         deploy: MLDeploymentCreate, 

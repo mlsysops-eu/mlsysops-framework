@@ -177,7 +177,9 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate):
             os.getenv("DOCKER_PASSWORD"),
             inference_data=schema_code,
             datasource=deployment.inference_data,
-            model_id=deployment.modelid
+            model_id=deployment.modelid,
+            model_owner=deployment.ownerid,
+            deploymentid=deployment_id
         )
         new_deployment = generate_yaml(
             deployment_id=deployment_id,
