@@ -168,9 +168,9 @@ class ShapExplainer:
             img_buf = io.BytesIO()
             plt.figure()  # Create a new figure
             shap.plots.waterfall(shap_explainer_single[0])  
-        return self.expliner_to_json_converter(shap_explainer_single[0]), img_base64
+        return self.explainer_to_json_converter(shap_explainer_single[0]), img_base64
 
-    def expliner_to_json_converter(self, shap_values):
+    def explainer_to_json_converter(self, shap_values):
         """  """
         shap_values_dict = {"values": shap_values.values.tolist(),  # Convert NumPy array to list
             "base_values": shap_values.base_values.tolist() if isinstance(shap_values.base_values, np.ndarray) else shap_values.base_values,

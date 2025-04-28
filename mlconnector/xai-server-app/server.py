@@ -2,18 +2,16 @@ import threading
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import pandas as pd
-from database import getModelDataById
+from database import getModelByManager, getModelDataById
 from ShapExplainer import ShapExplainer  # Assuming your class is in shap_explainer.py
 from typing import Optional
 
 app = FastAPI()
 
-# Input model for initializing ShapExplainer
 class InitRequest(BaseModel):
     model_path: str
     test_data_path: str
 
-# Input model for explaining a single instance
 class SingleInstanceRequest(BaseModel):
     model_id: str
     data: dict
@@ -28,9 +26,9 @@ class InitFromStorageRequest(BaseModel):
 
 class InitFromRepoRequest(BaseModel):
     model_id:str
-    wait_for_traning:Optional[bool] = True
+    wait_for_trining:Optional[bool] = True
 
-# Global variable to hold the ShapExplainer instance
+
 models = {}
 # @app.post("/init")
 # def initialize_explainer(request: InitRequest):
@@ -61,7 +59,29 @@ models = {}
 #         return {"message": "ShapExplainer initialized successfully."}
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
-        
+#@app.post("/initFromRepo")
+# def initFromRepo(request: InitFromRepoRequest):
+#     global models
+#     try:
+#         model_data, test_data,_ = getModelDataById(request.model_id)
+#         for v in ["local_time", "download_time_ms"]:
+#             if v in test_data.keys():
+#                 test_data = test_data.head(1000).drop(v, axis=1)
+#         print("-I- Data Downloaded Successfully")
+#         models[request.model_id] = {"shap_explainer_instance":None, "test_data":test_data, "status":"Processing"}
+#         shap_explainer_instance = ShapExplainer(model_path=model_data, test_data=test_data)
+#         if not request.wait_for_trining:
+#             thread = threading.Thread(target=initModelThread, args=(shap_explainer_instance, request.model_id,))
+#             thread.start()
+#             return {"message": "ShapExplainer is being initialized now."}
+#         else:
+#             shap_explainer_instance.explain_model()
+#             models[request.model_id] = {"shap_explainer_instance":shap_explainer_instance, "test_data":test_data, "status":"Ready"}
+#             return {"message": "ShapExplainer initialized successfully."}
+#     except Exception as e:
+#         models[request.model_id] = {"shap_explainer_instance":None, "test_data":None, "status":"Failed", "error":str(e)}
+#         raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/explain_single")
 def explain_single(request: SingleInstanceRequest):
     try:
@@ -96,19 +116,18 @@ def initModelThread(shap_explainer_instance, model_id):
     models[model_id]["status"] = "Ready"
     models[model_id]["shap_explainer_instance"] = shap_explainer_instance
 
-@app.post("/initFromRepo")
-def initFromRepo(request: InitFromRepoRequest):
+@app.post("/initFromManager")
+def initFromManager(request: InitFromRepoRequest):
     global models
     try:
-        model_data, test_data, features = getModelDataById(request.model_id)
-        print(features)
+        model_data, test_data = getModelByManager(request.model_id)
         for v in ["local_time", "download_time_ms"]:
             if v in test_data.keys():
                 test_data = test_data.head(1000).drop(v, axis=1)
         print("-I- Data Downloaded Successfully")
         models[request.model_id] = {"shap_explainer_instance":None, "test_data":test_data, "status":"Processing"}
         shap_explainer_instance = ShapExplainer(model_path=model_data, test_data=test_data)
-        if not request.wait_for_traning:
+        if not request.wait_for_trining:
             thread = threading.Thread(target=initModelThread, args=(shap_explainer_instance, request.model_id,))
             thread.start()
             return {"message": "ShapExplainer is being initialized now."}
@@ -119,6 +138,7 @@ def initFromRepo(request: InitFromRepoRequest):
     except Exception as e:
         models[request.model_id] = {"shap_explainer_instance":None, "test_data":None, "status":"Failed", "error":str(e)}
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/getModelTrainingStatus/{model_id}")
 def getModelTraningStatus(model_id:str):
