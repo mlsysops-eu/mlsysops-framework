@@ -2,52 +2,110 @@ all:
   children:
     management_cluster:
       hosts:
-        mls00:
-          ansible_host: 192.168.5.79
+        testvm00:
+          ansible_host: 192.168.5.12
           ansible_user: mlsysops
           ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
           ansible_python_interpreter: /usr/bin/python3
           k3s_cluster_name: management
           pod_cidr: "10.10.0.0/16"
           service_cidr: "10.11.0.0/16"
+          labels:
+            is_vm: true
+            continuumLayer: continuum
+            vaccel: "false"
 
     cluster1:
       children:
         master_nodes:
           hosts:
-            mls01:
-              ansible_host: 192.168.5.25
+            testvm01:
+              ansible_host: 192.168.5.55
               ansible_user: mlsysops
               ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
               ansible_python_interpreter: /usr/bin/python3
               k3s_cluster_name: cluster1
               pod_cidr: "10.12.0.0/16"
               service_cidr: "10.13.0.0/16"
+              labels:
+                is_vm: true
+                continuumLayer: cluster
+                vaccel: "false"
         worker_nodes:
           hosts:
-            mls02:
-              ansible_host: 192.168.5.55
+            testvm02:
+              ansible_host: 192.168.5.7
               ansible_user: mlsysops
               ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
               ansible_python_interpreter: /usr/bin/python3
               k3s_cluster_name: cluster1
-            mls03:
-              ansible_host: 192.168.5.80
+              labels:
+                is_vm: true
+                continuumLayer: node
+                vaccel: "false"
+            testvm03:
+              ansible_host: 192.168.5.79
               ansible_user: mlsysops
               ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
               ansible_python_interpreter: /usr/bin/python3
               k3s_cluster_name: cluster1
-#    cluster2:
- #     children:
-  #      master_nodes:
-   #       hosts:
-    #        mls04:
-     #         ansible_host: 192.168.5.56
-      #        ansible_user: mlsysops
-       #       ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
-        #      ansible_python_interpreter: /usr/bin/python3
-         #     k3s_cluster_name: cluster2
-          #    pod_cidr: "10.14.0.0/16"
-           #   service_cidr: "10.15.0.0/16"
-        #worker_nodes:
-         # hosts: {}
+              labels:
+                is_vm: true
+                continuumLayer: node
+                vaccel: "false"
+    cluster2:
+      children:
+        master_nodes:
+          hosts:
+            testvm04:
+              ansible_host: 192.168.5.41
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: cluster2
+              pod_cidr: "10.14.0.0/16"
+              service_cidr: "10.15.0.0/16"
+              labels:
+                is_vm: true
+                continuumLayer: cluster
+                vaccel: "false"
+        worker_nodes:
+          hosts: 
+            testvm05:
+              ansible_host: 192.168.5.29
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: cluster2
+              labels:
+                is_vm: true
+                continuumLayer: node
+                vaccel: "false"
+    cluster3:
+      children:
+        master_nodes:
+          hosts:
+            testvm06:
+              ansible_host: 192.168.5.9
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: test1
+              pod_cidr: "10.14.0.0/16"
+              service_cidr: "10.15.0.0/16"
+              labels:
+                is_vm: true
+                continuumLayer: cluster
+                vaccel: "false"
+        worker_nodes:
+          hosts: 
+            testvm07:
+              ansible_host: 192.168.5.63
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: test1
+              labels:
+                is_vm: true
+                continuumLayer: node
+                vaccel: "false"  

@@ -5,12 +5,14 @@
   become: yes
   become_user: root
   become_method: sudo
+  vars:
+    kubeconfig_dir: "/home/{{ ansible_user }}/kubeconfigs"
 
   tasks:
     - name: Fetch kubeconfig from cluster master nodes
       ansible.builtin.fetch:
         src: "/etc/rancher/k3s/k3s.yaml"
-        dest: "/tmp/{{ inventory_hostname }}-k3s.yaml"
+        dest: "{{kubeconfig_dir}}/{{ inventory_hostname }}-k3s.yaml"
         flat: yes
       when: inventory_hostname in groups['master_nodes']
 
@@ -20,25 +22,29 @@
   become_user: root
   become_method: sudo
   gather_facts: no
+  vars:
+    kubeconfig_dir: "/home/{{ ansible_user }}/kubeconfigs"
 
   tasks:
     - name: Ensure temporary directory exists
       ansible.builtin.file:
-        path: /tmp/kubeconfigs
+        path: "{{ kubeconfig_dir }}"
         state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
         mode: '0755'
 
     - name: Copy fetched kubeconfig to management vm
       ansible.builtin.copy:
-        src: "/tmp/{{ item }}-k3s.yaml"
-        dest: "/tmp/kubeconfigs/{{ item }}-k3s.yaml"
+        src: "{{ kubeconfig_dir }}/{{ item }}-k3s.yaml"
+        dest: "{{ kubeconfig_dir }}/{{ item }}-k3s.yaml"
         mode: '0644'
       loop: "{{ groups['master_nodes'] }}"
 
     - name: Adjust kubeconfig server address for cluster master nodes
       ansible.builtin.replace:
-        path: "/tmp/kubeconfigs/{{ item }}-k3s.yaml"
-        regexp: '127.0.0.1'
+        path: "{{ kubeconfig_dir }}/{{ item }}-k3s.yaml"
+        regexp: '127\.0\.0\.1'
         replace: "{{ hostvars[item]['ansible_host'] }}"
       loop: "{{ groups['master_nodes'] }}"
 
@@ -51,10 +57,19 @@
     managementvm_ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
     managementvm_hostname: "{{ inventory_hostname }}"
     karmada_apiserver_nodeport: 32443
+    kubeconfig_dir: "/home/{{ ansible_user }}/kubeconfigs"
 
   tasks:
     - name: Gathering Facts
       ansible.builtin.setup:
+
+    - name: Ensure working directory exists
+      file:
+        path: "/home/{{ ansible_user }}/mlsysopsansible"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
 
     - name: Create values.yml
       ansible.builtin.copy:
@@ -200,6 +215,7 @@
     karmada_config: "/home/{{ ansible_user }}/karmada-kubeconfig.yaml"
     managementvm_ip: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
     karmada_apiserver_nodeport: 32644
+    kubeconfig_dir: "/home/{{ ansible_user }}/kubeconfigs"
 
   tasks:
     - name: Patch Karmada API server service to NodePort
@@ -224,7 +240,7 @@
   become: yes
   vars:
     karmada_config: "/home/{{ ansible_user }}/karmada-kubeconfig.yaml"
-
+    kubeconfig_dir: "/home/{{ ansible_user }}/kubeconfigs"
   tasks:
     - name: Get list of all clusters
       ansible.builtin.set_fact:
@@ -258,7 +274,7 @@
       ansible.builtin.command: |
         karmadactl join {{ item }} \
           --kubeconfig {{ karmada_config }} \
-          --cluster-kubeconfig /tmp/kubeconfigs/{{ cluster_masters[item] }}-k3s.yaml
+          --cluster-kubeconfig {{ kubeconfig_dir }}/{{ cluster_masters[item] }}-k3s.yaml
       loop: "{{ cluster_list }}"
       register: join_clusters
       failed_when: join_clusters.rc != 0
@@ -274,3 +290,79 @@
     - name: Debug Karmada clusters
       debug:
         var: karmada_clusters.stdout
+
+- name: Merge kubeconfig files into Karmada config
+  hosts: management_cluster
+  become: yes
+  become_user: root
+  become_method: sudo
+  vars:
+    karmada_config: "/home/{{ ansible_user }}/karmada-kubeconfig.yaml"
+    kubeconfig_dir: "/home/{{ ansible_user }}/kubeconfigs"
+    temp_dir: "/tmp/kubeconfigs"
+
+  tasks:
+    - name: Ensure temporary directory exists
+      ansible.builtin.file:
+        path: "{{ temp_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Find all cluster kubeconfig files
+      ansible.builtin.find:
+        paths: "{{ kubeconfig_dir }}"
+        patterns: "*-k3s.yaml"
+      register: found_configs
+
+    - name: Copy kubeconfigs to temporary directory
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ temp_dir }}/{{ item.path | basename }}"
+        remote_src: yes
+        mode: '0644'
+      loop: "{{ found_configs.files }}"
+      when: found_configs.files | length > 0
+
+    - name: Normalize context and cluster names in temporary kubeconfigs
+      ansible.builtin.shell: |
+        name={{ item.path | basename | regex_replace('-k3s.yaml','') }}
+       
+        kubectl --kubeconfig={{ temp_dir }}/{{ item.path | basename }} config rename-context default ${name} || true
+       
+        sed -i "s/name: default/name: ${name}/" {{ temp_dir }}/{{ item.path | basename }}
+        sed -i "s/cluster: default/cluster: ${name}/" {{ temp_dir }}/{{ item.path | basename }}
+      args:
+        executable: /bin/bash
+      loop: "{{ found_configs.files }}"
+      when: found_configs.files | length > 0
+
+    - name: Merge all kubeconfigs into Karmada config
+      ansible.builtin.shell: |
+        export KUBECONFIG=$(find {{ temp_dir }} -name '*-k3s.yaml' | tr '\n' ':' | sed 's/:$//'):{{ karmada_config }}
+        kubectl config view --flatten > /tmp/merged-karmada.yaml
+      args:
+        executable: /bin/bash
+      when: found_configs.files | length > 0
+
+    - name: Validate merged kubeconfig
+      ansible.builtin.shell: |
+        kubectl --kubeconfig=/tmp/merged-karmada.yaml config view
+      register: validate_result
+      failed_when: validate_result.rc != 0
+      when: found_configs.files | length > 0
+
+    - name: Replace original Karmada config with merged one
+      ansible.builtin.copy:
+        src: "/tmp/merged-karmada.yaml"
+        remote_src: yes
+        dest: "{{ karmada_config }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      when: found_configs.files | length > 0 and validate_result.rc == 0
+
+    - name: Clean up temporary files and directory
+      ansible.builtin.file:
+        path: "{{ temp_dir }}"
+        state: absent
+      when: found_configs.files | length > 0
