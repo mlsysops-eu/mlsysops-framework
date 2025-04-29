@@ -21,11 +21,15 @@
         update_cache: true
 
     - name: Install k3s on master nodes
-      shell: >
-        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - server
-        --cluster-cidr={{ hostvars[inventory_hostname].pod_cidr }}
-        --service-cidr={{ hostvars[inventory_hostname].service_cidr }}
-        --node-ip {{ ansible_host }}
+      shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - server \
+          --cluster-cidr={{ hostvars[inventory_hostname].pod_cidr }} \
+          --service-cidr={{ hostvars[inventory_hostname].service_cidr }} \
+          --node-ip {{ ansible_host }} \
+          {%- for item in labels | dict2items %}
+          --node-label {{ item.key }}={{ item.value }} \
+          {%- endfor %}
+
       args:
       when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
 
@@ -36,12 +40,14 @@
       when: inventory_hostname in groups['master_nodes'] or 'management_cluster' in group_names
 
     - name: Install k3s on worker nodes
-      shell: >
-        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - agent
-        --server https://{{ hostvars[groups['master_nodes'][0]]['ansible_host'] }}:6443
-        --token {{ hostvars[groups['master_nodes'][0]]['node_token']['content'] | b64decode | trim }}
-        --node-ip {{ ansible_host }}
+      shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={{ k3s_version }} sh -s - agent \
+        --server https://{{ (groups['master_nodes'] | map('extract', hostvars) | selectattr('k3s_cluster_name', 'eq', k3s_cluster_name) | first).ansible_host }}:6443 \
+        --token {{ (groups['master_nodes'] | map('extract', hostvars) | selectattr('k3s_cluster_name', 'eq', k3s_cluster_name) | first).node_token['content'] | b64decode | trim }} \
+        --node-ip {{ ansible_host }} \
+        {% for item in labels | dict2items %}--node-label {{ item.key }}={{ item.value }} {% endfor %}
       args:
+        executable: /bin/bash
       when: inventory_hostname in groups['worker_nodes']
 
     - name: Ensure k3s config is readable
