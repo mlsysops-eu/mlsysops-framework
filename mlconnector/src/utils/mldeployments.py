@@ -11,7 +11,7 @@ from models.mldeployment import MLDeployment
 from schema.mldeployment import MLDeploymentCreate, MLDeploymentReturn
 import json
 from db.redis_setup import create_redis_connection
-from utils.api.generate_dockerfile import build_and_push_image, generate_yaml
+from utils.api.generate_dockerfile import build_and_push_image, generate_json
 from dotenv import load_dotenv
 from utils.mlmodels import get_model_by_id, get_model_join_by_id
 from pydantic import create_model
@@ -181,16 +181,20 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate):
             model_owner=deployment.ownerid,
             deploymentid=deployment_id
         )
-        new_deployment = generate_yaml(
+        placement_as_dict = {
+            "clusterID": deployment.placement.clusterID,
+            "node": deployment.placement.node,
+            "continuum": deployment.placement.continuum
+        }
+        new_deployment = generate_json(
             deployment_id=deployment_id,
             image=image_name,
-            clusterID=deployment.placement.clusterID,
-            node=deployment.placement.node,
-            continuum=deployment.placement.continuum
+            placement=placement_as_dict,
+            port=8000
         )
        
         deployment_json = json.dumps(new_deployment)
-        print(str(deployment_json))
+        #print(str(deployment_json))
         
         #con = await create_redis_connection()
         #await con.rpush(os.getenv("DEPLOYMENT_QUEUE"), [str(deployment_json)])
@@ -204,12 +208,6 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate):
             deployment_id = deployment_id,
             status = "waiting"
         )
-        # async with db.begin():
-        placement_as_dict = {
-            "clusterID": deployment.placement.clusterID,
-            "node": deployment.placement.node,
-            "continuum": deployment.placement.continuum
-        }
         deployment = MLDeployment(
             modelid = deployment.modelid,
             ownerid = deployment.ownerid,

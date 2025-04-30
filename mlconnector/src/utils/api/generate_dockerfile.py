@@ -195,6 +195,49 @@ def build_and_push_image(model, registry_url, image_name, registry_username, reg
     except docker.errors.APIError as e:
         print(f"Error pushing image: {e}")
 
+def generate_json(deployment_id: str, image: str, placement, port: int = 8000):
+    app = {
+        "MLSysOpsApplication": {
+            "name": "ml-app-1",
+            "mlsysops-id": deployment_id
+        }
+    }
+
+    # clusterPlacement if clusterID present
+    if placement.get("clusterID") != "":
+        app["MLSysOpsApplication"]["clusterPlacement"] = {
+            "clusterID": [placement["clusterID"]],
+            "instances": 1
+        }
+
+    # component definition
+    comp = {
+        "name": "ml-comp",
+        "uid": deployment_id,
+        "restartPolicy": "OnFailure",
+        "containers": [
+            {
+                "image": image,
+                "imagePullPolicy": "IfNotPresent",
+                "ports": [{"containerPort": port}]
+            }
+        ]
+    }
+
+    # nodePlacement / continuumLayer
+    node_placement = {}
+    if placement.get("continuum") is not False:
+        node_placement["continuumLayer"] = ["*"]
+    elif placement.get("node") != "":
+        node_placement["node"] = placement["node"]
+
+    if node_placement:
+        comp["nodePlacement"] = node_placement
+
+    # attach component
+    app["MLSysOpsApplication"]["components"] = [{"Component": comp}]
+    return app
+
 def generate_yaml(
         deployment_id: str, 
         image: str,
