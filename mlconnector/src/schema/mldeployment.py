@@ -30,6 +30,7 @@ class MLDeploymentBase(BaseModel):
 
 
 class MLDeploymentCreate(MLDeploymentBase):
+    deployment_id:Optional[str]
     inference_data:int = Field(..., description="How the inference data will be passed eg. 0 for values, 1 for link to data. The link MUST return .csv file")
     
 

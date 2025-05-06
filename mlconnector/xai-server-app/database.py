@@ -10,7 +10,7 @@ from manage_s3 import S3Manager
 from dotenv import load_dotenv
 import os
 
-load_dotenv(verbose=True, override=True,dotenv_path='../src/.env')
+load_dotenv(verbose=True, override=True,dotenv_path='/.env')
 manager = S3Manager(
             os.getenv("AWS_S3_BUCKET_DATA"),
             os.getenv("AWS_ACCESS_KEY_ID"),

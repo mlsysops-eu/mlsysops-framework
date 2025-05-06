@@ -19,8 +19,10 @@ import os
 import uuid
 import requests
 import json
+import ast
 from textwrap import dedent
 from utils.manage_s3 import S3Manager
+from sqlalchemy import update
 #myuuid = uuid.uuid4()
 
 load_dotenv(verbose=True, override=True)
@@ -113,8 +115,37 @@ async def get_deployment_by_id(db: AsyncSession, deployment_id: str):
 
 
 async def get_deployment_status(db: AsyncSession, deployment_id: str):
-    BASE_URL = os.getenv('NORTHBOUND_API_ENDPOINT', 'http://localhost:8000')
+    BASE_URL = os.getenv('NOTHBOUND_API_ENDPOINT')
     url = f"{BASE_URL}/ml/status/{deployment_id}"
+    #print(url)
+    headers = {"Accept": "application/json"}
+    
+    try:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Status fetch failed: {e}")
+        return False
+
+    try:
+        data_dict = ast.literal_eval(resp.json()["status"])
+        #update MLDeployment model status
+        query = (
+            update(MLDeployment)
+            .where(MLDeployment.deployment_id == deployment_id)
+            .values(status=data_dict["status"])
+        )
+        await db.execute(query)
+        await db.commit()
+        return resp.json()
+    except ValueError:
+        return resp.text
+    
+
+async def return_all_deployments(db: AsyncSession):
+    BASE_URL = os.getenv('NOTHBOUND_API_ENDPOINT')
+    url = f"{BASE_URL}/ml/list_all/"
+    #print(url)
     headers = {"Accept": "application/json"}
     
     try:
@@ -128,12 +159,8 @@ async def get_deployment_status(db: AsyncSession, deployment_id: str):
         return resp.json()
     except ValueError:
         return resp.text
-    
 
-async def return_all_deployments(db: AsyncSession, skip: int = 0, limit: int = 100):
-    query = select(MLDeployment).offset(skip).limit(limit)
-    result = await db.execute(query)
-    return result.scalars().all()
+#return_all_deployments
 
 async def update_deployment(
         db: AsyncSession,
@@ -149,9 +176,12 @@ async def update_deployment(
     await db.refresh(existing_deployment)
     return existing_deployment
 
-async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate):
+async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, create_new=False):
     model = await get_model_join_by_id(db, model_id=deployment.modelid)
-    deployment_id = str(uuid.uuid4())
+    if(deployment.deployment_id ==""):
+        deployment_id = str(uuid.uuid4())
+    else:
+        deployment_id = deployment.deployment_id
     #print(str(extract_feature_names(model.featurelist)))
     #print(type(extract_feature_names(model.featurelist)))
     schema_code = ""
@@ -193,12 +223,12 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate):
             port=8000
         )
        
-        deployment_json = json.dumps(new_deployment)
+        #deployment_json = json.dumps(new_deployment)
         #print(str(deployment_json))
         
         #con = await create_redis_connection()
         #await con.rpush(os.getenv("DEPLOYMENT_QUEUE"), [str(deployment_json)])
-        await deploy_ml_application(os.getenv("NOTHBOUND_API_ENDPOINT"), deployment_json)
+        await deploy_ml_application(os.getenv("NOTHBOUND_API_ENDPOINT"), new_deployment)
     #return deployment
         res = MLDeploymentReturn (
             modelid = deployment.modelid,
@@ -215,7 +245,18 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate):
             deployment_id = deployment_id,
             status = "waiting"
         )
-        db.add(deployment)
-        await db.commit()
-        await db.refresh(deployment)
+        if create_new:
+            existing_deployment = await get_deployment_by_id(db=db, deployment_id=deployment_id)
+            if existing_deployment:
+                # Update the existing deployment
+                for key, value in deployment.model_dump(exclude_unset=True).items():
+                    setattr(existing_deployment, key, value)
+                db.add(existing_deployment)
+                await db.commit()
+                await db.refresh(existing_deployment)
+        else:
+            # Add new deployment
+            db.add(deployment)
+            await db.commit()
+            await db.refresh(deployment)
         return res

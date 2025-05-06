@@ -195,7 +195,7 @@ def build_and_push_image(model, registry_url, image_name, registry_username, reg
     except docker.errors.APIError as e:
         print(f"Error pushing image: {e}")
 
-def generate_json(deployment_id: str, image: str, placement, port: int = 8000):
+"""def generate_json(deployment_id: str, image: str, placement, port: int = 8000):
     app = {
         "MLSysOpsApplication": {
             "name": "ml-app-1",
@@ -236,7 +236,57 @@ def generate_json(deployment_id: str, image: str, placement, port: int = 8000):
 
     # attach component
     app["MLSysOpsApplication"]["components"] = [{"Component": comp}]
+    return app"""
+
+def generate_json(
+    deployment_id: str,
+    image: str,
+    placement: dict,
+    app_name: str = "ml-app-1",
+    port: int = 8000
+):
+    app = {
+        "MLSysOpsApplication": {
+            "name": app_name,
+            "mlsysops-id": deployment_id
+        }
+    }
+    cluster_id = placement.get("clusterID", "")
+    if cluster_id:
+        app["MLSysOpsApplication"]["clusterPlacement"] = {
+            "clusterID": [cluster_id],
+            "instances": 1
+        }
+    component = {
+        "Component": {
+            "name": "ml-comp",
+            "uid": deployment_id
+        }
+    }
+    node_conf = {}
+    node_name = placement.get("node", "")
+    if node_name:
+        node_conf["node"] = node_name
+    elif placement.get("continuum", False):
+        node_conf["continuumLayer"] = ["*"]
+
+    if node_conf:
+        component["nodePlacement"] = node_conf
+
+    component["restartPolicy"] = "OnFailure"
+    component["containers"] = [
+        {
+            "image": image,
+            "imagePullPolicy": "IfNotPresent",
+            "ports": [
+                {"containerPort": port}
+            ]
+        }
+    ]
+
+    app["MLSysOpsApplication"]["components"] = [component]
     return app
+
 
 def generate_yaml(
         deployment_id: str, 

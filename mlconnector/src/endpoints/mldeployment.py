@@ -15,14 +15,14 @@ from typing import List
 
 router = fastapi.APIRouter()
 
-@router.get("/deployment/all",  response_model=List[MLDeploymentReturn], tags=["Deployments"])
+@router.get("/deployment/all",  tags=["Deployments"])
 async def get_all_deployments(
         request: Request,
         skip: int = 0, 
         limit: int = 100, 
         db: Session = Depends(get_db)
     ):
-    deployment = await utl.return_all_deployments(db, skip=skip, limit=limit)
+    deployment = await utl.return_all_deployments(db)
     if len(deployment) == 0:
         raise HTTPException(status_code=404, detail="No deployments were not found")
     return deployment

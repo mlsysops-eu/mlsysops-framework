@@ -84,17 +84,17 @@ services:
         networks:
             - api_network
 
-    xai:
+    #xai:
         #image: registry.mlsysops.eu/usecases/augmenta-demo-testbed/side-api:0.0.1
-        build: ./xai-server-app
-        container_name: xai
+    #    build: ./xai-server-app
+    #    container_name: xai
         #env_file:
         #    - .env
-        restart: always
-        ports:
-            - "34567:8091"
-        networks:
-            - api_network
+    #    restart: always
+    #    ports:
+    #        - "34567:8091"
+    #    networks:
+    #        - api_network
 
 volumes:
     db_data:

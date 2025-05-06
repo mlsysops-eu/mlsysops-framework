@@ -5,14 +5,19 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import inspect
 from typing import List, Optional
 from fastapi import UploadFile
 
 from models.mlmodels import MLModels, MLModelFiles
+from models.mldeployment import MLDeployment
+from schema.mldeployment import MLDeploymentCreate
 from schema.mlmodels import MLModelCreate, MLModelDeploy, MLModelDeployRes, FileSchema
 import uuid
 import os
+import json
 from utils.manage_s3 import S3Manager
+import utils.mldeployments
 #myuuid = uuid.uuid4()
 
 
@@ -22,6 +27,46 @@ s3_manager = S3Manager(
     os.getenv("AWS_SECRET_ACCESS_KEY"),
     os.getenv("AWS_ACCESS_URL")
 )
+def _serialize(obj):
+    """
+    Turn a SQLAlchemy ORM object into a plain dict by inspecting its columns.
+    """
+    return {
+        col.key: getattr(obj, col.key)
+        for col in inspect(obj).mapper.column_attrs
+    }
+
+async def update_deployments(db: AsyncSession, deployments: List[dict]):
+    count = 1
+    for row in deployments:
+        print("Processing deployment: ", count, " of ", len(deployments))
+        print("*"*20)
+        # Convert the dictionary to a Pydantic model
+        ml_deployment = MLDeploymentCreate(
+            modelid=row['modelid'],
+            ownerid=row['ownerid'],
+            placement=row['placement'],
+            deployment_id=row['deployment_id'],
+            inference_data=0,  
+        )
+        results = await utils.mldeployments.create_deployment(db=db, deployment=ml_deployment)
+        print("Deployment created: ", results)
+        count += 1
+       
+        """# Check if the deployment is already in the database
+        existing_deployment = await db.execute(
+            select(MLDeployment).where(MLDeployment.deploymentid == row.deploymentid)
+        )
+        existing_deployment = existing_deployment.scalar_one_or_none()
+
+        if existing_deployment:
+            # Update the existing deployment
+            for key, value in row.__dict__.items():
+                setattr(existing_deployment, key, value)
+            db.add(existing_deployment)
+        else:
+            # Add new deployment
+            db.add(row)"""
 
 async def get_model_by_id(db: AsyncSession, model_id: str):
     query = select(MLModels).where(MLModels.modelid == model_id)
@@ -39,7 +84,7 @@ async def get_model_join_by_id(db: AsyncSession, model_id: str):
     return result.all()
 
 async def get_file_details(db: AsyncSession, file_id: str):
-    query = select(MLModelFiles).where(MLModelFiles.fiileid == file_id)
+    query = select(MLModelFiles).where(MLModelFiles.fileid == file_id)
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
@@ -57,46 +102,74 @@ async def get_model_file_by_id_type(db: AsyncSession, modelid: str, filetype: st
     result = await db.execute(query)
     return result.scalars().all()
 
-async def upload_models(db: AsyncSession, file: UploadFile, file_data: FileSchema):
-    # Extract the extension from the original file name, if any
+async def upload_models(
+    db: AsyncSession,
+    file: UploadFile,
+    file_data: FileSchema
+) -> bool:
+    """
+    Save or update a model file record, upload to S3, then—
+    only if S3 upload succeeded and it’s a `model` file—
+    update any pending deployments for that model.
+    """
+    # 1) Prepare temp filename
     _, ext = os.path.splitext(file_data.filename)
-    new_filename = file_data.modelid + ext if ext else file_data.modelid
+    file_data.filename = f"{file_data.modelid}{ext or ''}"
+    temp_path = os.path.join("/tmp", file_data.filename)
 
-    temp_file_path = os.path.join("/tmp", new_filename)
-    
     try:
-        with open(temp_file_path, "wb") as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            file_data.filename = new_filename
-            # check if the its model update..
-            old_model = await get_model_file_by_id_type(db, file_data.modelid, file_data.filekind)
-            #print(old_model)
-            if len(old_model)==0:
-                await save_model_file(db, file_data)
-            else:
-                update_data = FileSchema(
-                        modelid=old_model[0].modelid,
-                        filekind=old_model[0].filekind,
-                        filename=old_model[0].filename,
-                        contenttype=old_model[0].contenttype
-                    )
-                if file_data.file_kind =="model":
-                    # after update trigger regeneration of application.
-                    await update_model_file(db, old_model[0].fileid, update_data)
-                    print("trigger")
-                else:
-                    await update_model_file(db, old_model[0].fileid, update_data)
-    
-        if not s3_manager.upload_file(temp_file_path):
+        # 2) Write upload to disk
+        content = await file.read()
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
+        # 3) Insert or update file record
+        existing = (await get_model_file_by_id_type(db, file_data.modelid, file_data.filekind)) or []
+        is_new = not existing
+        if is_new:
+            await save_model_file(db, file_data)
+        else:
+            old = existing[0]
+            # preserve existing metadata but bump filename if needed
+            update_data = FileSchema(
+                modelid=old.modelid,
+                filekind=old.filekind,
+                filename=file_data.filename,
+                contenttype=old.contenttype,
+            )
+            await update_model_file(db, old.fileid, update_data)
+
+        # 4) Upload to S3
+        uploaded = s3_manager.upload_file(temp_path)
+        if not uploaded:
             return False
+
+        # 5) Only for model‐kind updates, update deployments
+        if not is_new and file_data.filekind == "model":
+            stmt = (
+                select(MLDeployment)
+                .where(
+                    MLDeployment.modelid == file_data.modelid,
+                    MLDeployment.status  != "deployed"
+                )
+            )
+            result = await db.execute(stmt)
+            pending = result.scalars().all()
+
+            # serialize and push to your update_deployments routine
+            payload = [_serialize(dep) for dep in pending]
+            await update_deployments(db, payload)
+
+        return True
+
     except Exception as e:
-        #print(e)
+        print(f"[ERROR] upload_models failed: {e}")
         return False
+
     finally:
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-    return True
+        # 6) Cleanup temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 async def get_models_by_tags(db: AsyncSession, tags: Optional[List[str]]):
