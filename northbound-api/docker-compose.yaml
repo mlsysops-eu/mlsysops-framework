@@ -5,8 +5,6 @@ services:
       dockerfile: Dockerfile
     container_name: api_service
     restart: always
-    ports:
-      - "8000:8000"
     environment:
       - REDIS_HOST=172.25.27.72
       - REDIS_PORT=6379
@@ -15,6 +13,13 @@ services:
       - REDIS_PASSWORD=secret
       - REDIS_CHANNEL_NAME=my_channel
       - REDIS_DICT_NAME=system_app_hash
+      # Include all kubeconfig files for kubectl commands
+      - KUBECONFIG=/root/.kube/karmada-api.kubeconfig:/root/.kube/uth-dev.kubeconfig:/root/.kube/uth-prod.kubeconfig
     volumes:
-      - ./config:/app/config
+      - ./config:/app/config  # Existing app config directory
+      # Mount kubeconfig files
+      - /home/runner/karmada_management/karmada-api.kubeconfig:/root/.kube/karmada-api.kubeconfig:ro
+      - /home/runner/karmada_management/uth-dev.kubeconfig:/root/.kube/uth-dev.kubeconfig:ro
+      - /home/runner/karmada_management/uth-prod.kubeconfig:/root/.kube/uth-prod.kubeconfig:ro
+    network_mode: host  # Use the host network to access localhost services on the VM
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
