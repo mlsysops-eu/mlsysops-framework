@@ -1,7 +1,7 @@
+import json
+
 import redis
 from redis_setup import redis_config as rc
-import json
-import time
 
 
 class RedisManager:
@@ -35,13 +35,13 @@ class RedisManager:
             self.redis_conn = None
 
     # Queue methods
-    def push(self, q_name, value: str):
+    def push(self, q_name, value):
         """
         Adds a value to the queue (push).
         """
         if self.redis_conn:
             self.redis_conn.rpush(q_name, value)
-            print(f"'{value}' added to the queue '{q_name}'.")
+            print(f"File successfully  added to the queue '{q_name}'.")
         else:
             print("Redis connection not established. Use the 'connect' method first.")
 
@@ -76,7 +76,7 @@ class RedisManager:
         Empties the queue by removing all elements.
         """
         while not self.is_empty(q_name):
-            self.pop(q_name)
+            self.pop()
 
     # Publish/Subscribe methods
     def pub_ping(self, message):
@@ -107,14 +107,12 @@ class RedisManager:
             print("Redis connection not established. Use the 'connect' method first.")
 
     # Dictionary (Hash map) methods
-    def update_dict_value(self, dict_name, key, value: str):
+    def update_dict_value(self, dict_name, key, value):
         """
         Updates the value of a key in a Redis dictionary (hash).
-        :param dict_name:
         :param key: Key to update.
         :param value: New value to set.
         """
-
         if self.redis_conn:
             self.redis_conn.hset(dict_name, key, value)
             print(f"Value for key '{key}' updated to '{value}' in dictionary '{dict_name}'.")
@@ -140,7 +138,7 @@ class RedisManager:
 
     def get_dict(self, dict_name):
         """
-        Retrieves all key-value pairs from the Redis hash.
+        Retrieves all key-value pairs from the Redis hash named 'app_dict'.
         """
         try:
             redis_dict = self.redis_conn.hgetall(dict_name)
@@ -150,171 +148,230 @@ class RedisManager:
             print(f"Error retrieving Redis dictionary: {e}")
             return None
 
-    def remove_key(self, dict_name, key):
+    def value_in_hash(self, hash_name, key):
         """
-        Deletes a key-value pair from the Redis hash.
+        Checks if a specific key exists in a Redis hash.
 
         Parameters:
-        - dict_name (str): The name of the hash.
-        - key (str): The key to delete from the hash.
+        - hash_name (str): The name of the hash.
+        - key (str): The key to check for existence in the hash.
 
         Returns:
-        - bool: True if the key was deleted, False if the key does not exist or an error occurred.
+        - bool: True if the key exists in the hash, False otherwise.
         """
         try:
-            # Attempt to delete the key from the hash
-            result = self.redis_conn.hdel(dict_name, key)
-
-            # Return True if a key was deleted (hdel returns the number of keys deleted)
-            return bool(result)
+            # Check if the key exists in the specified hash
+            return self.redis_conn.hexists(hash_name, key)
         except Exception as e:
-            print(f"Error deleting key from Redis hash: {e}")
+            print(f"Error checking key existence in Redis hash: {e}")
             return False
 
-    def value_in_hash(self, dict_name, app_id):
+    # --- Infrastructure Management Functions ---
+    def add_continuum(self, continuum_id, clusters):
         """
-        Checks if a given app_id exists as a key in the specified Redis hash.
+        Adds a new continuum and associates it with a list of clusters.
 
-        :param dict_name: The name of the Redis hash.
-        :param app_id: The key to check in the hash.
-        :return: True if the app_id exists, False otherwise.
+        :param continuum_id: Unique identifier for the continuum.
+        :param clusters: List of cluster IDs to associate with this continuum.
+        :return: Confirmation message.
         """
-        if self.redis_conn:
-            exists = self.redis_conn.hexists(dict_name, app_id)
-            if exists:
-                print(f"The key '{app_id}' exists in the dictionary '{dict_name}'.")
+        if not clusters or not isinstance(clusters, list):
+            return {"error": "Clusters must be a non-empty list."}
+
+        # Store the continuum in Redis
+        self.redis_conn.sadd("MLSysOpsContinuum:ContinuumIDs", continuum_id)
+        for cluster in clusters:
+            self.redis_conn.sadd(f"MLSysOpsContinuum:{continuum_id}:Clusters", cluster)
+
+        return {"message": f"Continuum {continuum_id} added with clusters: {clusters}"}
+
+    def add_cluster_to_continuum(self, cluster_id):
+        self.redis_conn.sadd("MLSysOpsContinuum:Continuum:Clusters", cluster_id)
+        return {"message": f"Cluster {cluster_id} added to continuum."}
+
+    def add_node_to_cluster(self, cluster_id, node_id, node_data):
+        """
+        Adds a node to a cluster and stores its configuration.
+
+        :param cluster_id: The ID of the cluster.
+        :param node_id: The ID of the node.
+        :param node_data: Full node configuration.
+        :return: Confirmation message.
+        """
+        # Store node configuration
+        self.redis_conn.hset(f"MLSysOpsNode:{node_id}", mapping=node_data)
+
+        # Add the node to the cluster's node set
+        self.redis_conn.sadd(f"MLSysOpsCluster:{cluster_id}:Nodes", node_id)
+
+        return {"message": f"Node {node_id} added to Cluster {cluster_id}."}
+
+    def add_datacenter(self, datacenter_id, cluster_id, continuum, nodes):
+        """
+        Registers a datacenter within a cluster.
+
+        :param datacenter_id: Unique identifier for the datacenter.
+        :param cluster_id: Cluster to which the datacenter belongs.
+        :param continuum: Continuum layer (Cloud, Edge, etc.).
+        :param nodes: List of node IDs in the datacenter.
+        :return: Confirmation message.
+        """
+        # Check if the cluster exists
+        if not self.redis_conn.exists(f"MLSysOpsCluster:{cluster_id}"):
+            return {"error": f"ErrorInvalidDatacenterID: Cluster {cluster_id} is not registered."}
+
+        # Register datacenter
+        self.redis_conn.hset(f"MLSysOpsDatacenter:{datacenter_id}", mapping={
+            "datacenterID": datacenter_id,
+            "clusterID": cluster_id,
+            "continuum": continuum
+        })
+
+        # Add nodes to the datacenter
+        for node in nodes:
+            self.redis_conn.sadd(f"MLSysOpsDatacenter:{datacenter_id}:Nodes", node)
+
+        return {"message": f"Datacenter {datacenter_id} registered in Cluster {cluster_id} with nodes: {nodes}"}
+
+    def list_infrastructure(self, identifier):
+        if identifier == "0":
+            datacenters = self.redis_conn.keys("MLSysOpsDatacenter:*")
+            datacenter_ids = [dc.split(":")[-1] for dc in datacenters]
+            return datacenter_ids if datacenter_ids else "ErrorInvalidDatacenterID"
+        elif self.redis_conn.exists(f"MLSysOpsDatacenter:{identifier}"):
+            clusters = self.redis_conn.smembers(f"MLSysOpsCluster:{identifier}:Datacenters")
+            return clusters if clusters else "ErrorInvalidDatacenterID"
+        elif self.redis_conn.exists(f"MLSysOpsCluster:{identifier}"):
+            nodes = self.redis_conn.smembers(f"MLSysOpsCluster:{identifier}:Nodes")
+            return nodes if nodes else "ErrorInvalidClusterID"
+        else:
+            return "ErrorInvalidClusterID"
+
+    def unregister_infrastructure(self, ids):
+        for identifier in ids:
+            if self.redis_conn.exists(f"MLSysOpsDatacenter:{identifier}"):
+                self.redis_conn.delete(f"MLSysOpsDatacenter:{identifier}")
+                return 0
+            elif self.redis_conn.exists(f"MLSysOpsCluster:{identifier}"):
+                self.redis_conn.delete(f"MLSysOpsCluster:{identifier}")
+                return 0
+            elif self.redis_conn.exists(f"MLSysOpsNode:{identifier}"):
+                self.redis_conn.delete(f"MLSysOpsNode:{identifier}")
+                return 0
             else:
-                print(f"The key '{app_id}' does not exist in the dictionary '{dict_name}'.")
-            return exists
-        else:
-            print("Redis connection not established. Use the 'connect' method first.")
-            return False
+                return "ErrorInvalidID"
+        return 0
 
-    def json_update(self, key, path, json_data):
+    def add_standalone_node(self, node_id, node_data):
         """
-        Updates an existing JSON object at the specified key and path.
-        """
-        try:
-            # Retrieve the existing JSON data
-            existing_data = self.redis_conn.execute_command("JSON.GET", key, "$")
-            if not existing_data:
-                return f"No existing data found for key: {key}. Cannot update."
+        Adds a standalone node (not associated with any cluster or datacenter).
 
-            # Decode and clean the JSON string
-            existing_data = existing_data.decode('utf-8') if isinstance(existing_data, bytes) else existing_data
-            if existing_data.startswith("[") and existing_data.endswith("]"):
-                existing_data = existing_data[1:-1]
+        :param node_id: The ID of the standalone node.
+        :param node_data: Full node configuration.
+        :return: Confirmation message.
+        """
+        standalone_nodes_key = "MLSysOpsStandaloneNodes"
 
-            # Convert the existing JSON to a dictionary
-            existing_dict = json.loads(existing_data)
+        # Store the standalone node's configuration
+        self.redis_conn.hset(f"MLSysOpsNode:{node_id}", mapping=node_data)
 
-            # Ensure json_data is a dictionary
-            if isinstance(json_data, str):
-                json_data = json.loads(json_data)
+        # Add the node to the standalone nodes set
+        self.redis_conn.sadd(standalone_nodes_key, node_id)
 
-            # Merge the dictionaries
-            continuum_id = json_data.get("MLSysOpsContinuum", {}).get("continuumID")
-            if continuum_id:
-                for cluster in json_data["MLSysOpsContinuum"].get("clusters", []):
-                    if cluster in existing_dict.get("MLSysOpsContinuum", {}).get("clusters", []):
-                        # Perform cluster-specific updates here
-                        pass
-                    else:
-                        existing_dict["MLSysOpsContinuum"].setdefault("clusters", []).append(cluster)
-            else:
-                existing_dict.update(json_data)
+        return {"message": f"Standalone node {node_id} registered successfully."}
 
-            # Update the JSON data in Redis
-            self.redis_conn.execute_command("JSON.SET", key, path, json.dumps(existing_dict))
-            return f"JSON data updated successfully at key: {key}, path: {path}"
-        except redis.RedisError as e:
-            return f"Error updating JSON data: {e}"
-        except json.JSONDecodeError as e:
-            return f"Error decoding JSON data: {e}"
+    def add_node_to_datacenter(self, datacenter_id, node_id, node_data):
+        """
+        Adds a node to a datacenter and stores its configuration.
 
-    def json_set(self, key, path, json_data):
+        :param datacenter_id: The ID of the datacenter.
+        :param node_id: The ID of the node.
+        :param node_data: Full node configuration.
+        :return: Confirmation message.
         """
-        Sets or updates a JSON object at the specified key and path.
-        """
-        try:
-            # Check if the JSON key already exists
-            existing_data = self.redis_conn.execute_command("JSON.GET", key, "$")
+        # Store node configuration
+        self.redis_conn.hset(f"MLSysOpsNode:{node_id}", mapping=node_data)
 
-            if not existing_data:
-                # If no existing data, create the new JSON structure
-                self.redis_conn.execute_command("JSON.SET", key, path, json_data)
-                return f"JSON data created successfully at key: {key}, path: {path}"
-            else:
-                self.json_update(key, path, json_data)
-        except redis.RedisError as e:
-            return f"Error setting JSON data: {e}"
+        # Add the node to the datacenter's node set
+        self.redis_conn.sadd(f"MLSysOpsDatacenter:{datacenter_id}:Nodes", node_id)
 
-    def json_get(self, key, path="$"):
-        """
-        Retrieves JSON data from the specified key and path.
-        """
-        try:
-            result = self.redis_conn.execute_command("JSON.GET", key, path)
-            return result if result else f"No data found at key: {key}, path: {path}"
-        except redis.RedisError as e:
-            return f"Error retrieving JSON data: {e}"
+        return {"message": f"Node {node_id} added to Datacenter {datacenter_id}."}
 
-    def json_delete(self, key, path="$"):
+    def add_cluster(self, cluster_id, nodes):
         """
-        Deletes JSON data at the specified key and path.
-        """
-        try:
-            result = self.redis_conn.execute_command("JSON.DEL", key, path)
-            return f"Deleted JSON at key: {key}, path: {path}" if result else f"No JSON data found to delete at key: {key}, path: {path}"
-        except redis.RedisError as e:
-            return f"Error deleting JSON data: {e}"
+        Registers a cluster and associates nodes with it.
 
-    def add_components(self, app_id, component_ids):
+        :param cluster_id: The unique identifier for the cluster.
+        :param nodes: List of node IDs to associate with this cluster.
+        :return: Confirmation message.
         """
-        Adds a list of components to the component list of an application in Redis.
+        # Check if cluster exists in a registered continuum
+        continuum_keys = self.redis_conn.keys("MLSysOpsContinuum:*")
+        found_continuum = None
+        for continuum_key in continuum_keys:
+            continuum_id = continuum_key.decode().split(":")[-1]
+            clusters_in_continuum = {c.decode() for c in
+                                     self.redis_conn.smembers(f"MLSysOpsContinuum:Continuum:Clusters")}
+            if cluster_id in clusters_in_continuum:
+                found_continuum = continuum_id
+                break
 
-        Parameters:
-            app_id (str): The ID of the application.
-            component_ids (list): A list of component IDs to be added.
-        """
-        if self.redis_conn:
-            if isinstance(component_ids, list):
-                for component_id in component_ids:
-                    self.redis_conn.rpush(f"app_components_list:{app_id}", component_id)
-                print(f"Components {component_ids} added to application '{app_id}'.")
-            else:
-                print("Error: component_ids should be a list.")
-        else:
-            print("Redis connection not established.")
+        if not found_continuum:
+            return {
+                "error": f"ErrorInvalidClusterID: Cluster {cluster_id} is not associated with any registered continuum."}
 
-    def get_components(self, app_id):
-        """
-        Retrieves all components associated with an application.
-        """
-        if self.redis_conn:
-            components = self.redis_conn.lrange(f"app_components_list:{app_id}", 0, -1)
-            return [c.decode('utf-8') for c in components]
-        else:
-            print("Redis connection not established.")
-            return []
+        # Register cluster
+        #self.redis_conn.sadd(f"MLSysOpsContinuum:{found_continuum}:Clusters", cluster_id)
 
-    def update_component(self, component_id, details):
-        """
-        Updates the details of a component in a hash.
-        """
-        if self.redis_conn:
-            self.redis_conn.hset(f"component_hash:{component_id}", mapping=details)
-            print(f"Component '{component_id}' updated with details: {details}")
-        else:
-            print("Redis connection not established.")
+        # Add nodes to the cluster
+        for node in nodes:
+            self.redis_conn.sadd(f"MLSysOpsCluster:{cluster_id}:Nodes", node)
 
-    def get_component_details(self, component_id):
+        return {"message": f"Cluster {cluster_id} registered in Continuum {found_continuum} with nodes: {nodes}"}
+
+    def list_datacenters(self):
         """
-        Retrieves the details of a component.
+        Retrieves all datacenter IDs in the system.
+
+        :return: List of datacenter IDs.
         """
-        if self.redis_conn:
-            details = self.redis_conn.hgetall(f"component_hash:{component_id}")
-            return {k.decode('utf-8'): v.decode('utf-8') for k, v in details.items()}
-        else:
-            print("Redis connection not established.")
-            return {}
+        datacenter_keys = self.redis_conn.keys("MLSysOpsDatacenter:*")
+
+        # Extract only valid Datacenter IDs (excluding node sets)
+        datacenter_ids = [key.decode().split(":")[1] for key in datacenter_keys if b'Nodes' not in key]
+
+        return {"Datacenters": datacenter_ids}
+
+    def list_clusters_in_continuum(self, continuum_id):
+        """
+        Lists all clusters in a given continuum.
+
+        :param continuum_id: The unique identifier for the continuum.
+        :return: List of cluster IDs in the continuum or an error message.
+        """
+        continuum_clusters_key = f"MLSysOpsContinuum:{continuum_id}:Clusters"
+
+        # Check if the continuum exists
+        if not self.redis_conn.exists(continuum_clusters_key):
+            return {"error": "ErrorInvalidContinuumID: Continuum does not exist."}
+
+        # Retrieve clusters from the set
+        clusters = {cluster.decode() for cluster in self.redis_conn.smembers(continuum_clusters_key)}
+        return {"ContinuumID": continuum_id, "Clusters": list(clusters)}
+
+    def list_nodes_in_cluster(self, cluster_id):
+        """
+        Lists all nodes in a given cluster.
+
+        :param cluster_id: The unique identifier for the cluster.
+        :return: List of node IDs in the cluster or an error message.
+        """
+        cluster_nodes_key = f"MLSysOpsCluster:{cluster_id}:Nodes"
+
+        # Check if the cluster exists
+        if not self.redis_conn.exists(cluster_nodes_key):
+            return {"error": "ErrorInvalidClusterID: Cluster does not exist."}
+
+        # Retrieve nodes from the set
+        nodes = {node.decode() for node in self.redis_conn.smembers(cluster_nodes_key)}
+        return {"ClusterID": cluster_id, "Nodes": list(nodes)}

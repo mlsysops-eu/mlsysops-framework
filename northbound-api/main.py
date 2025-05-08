@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
-from endpoints import applications, infrastructure, management
+from endpoints import applications, infrastructure, management, ml_models
 
 
 app = FastAPI(title="MLSysOps NorthBound API",
@@ -9,5 +9,6 @@ app = FastAPI(title="MLSysOps NorthBound API",
 
 # Register each router with a prefix to organize routes
 app.include_router(applications.router, prefix="/apps")
+app.include_router(ml_models.router, prefix="/ml")
 app.include_router(infrastructure.router, prefix="/infra")
 app.include_router(management.router, prefix="/manage")
