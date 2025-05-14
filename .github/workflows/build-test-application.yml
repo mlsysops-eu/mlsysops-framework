@@ -66,12 +66,12 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6
         with:
-          context: ./tests/application
+          context: ./agents/tests/application
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/${{ matrix.arch }}
           push: true
-          file: ./tests/application/Dockerfile
+          file: ./agents/tests/application/Dockerfile
           provenance: false
           build-args: |
             ARCHTAG=${{ fromJson(env.RUNNER_ARCH_MAP)[0][matrix.arch] }}
