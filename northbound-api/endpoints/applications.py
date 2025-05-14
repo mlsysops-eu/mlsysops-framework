@@ -1,145 +1,150 @@
-import yaml
-from fastapi import APIRouter, HTTPException, Request
 import json
-from redis_setup import redis_mgt as rm
-from jsonschema import validate, ValidationError
-import requests
-from MLSysOps_Schemas.mlsysops_schemas import app_schema
 import subprocess
-from kubernetes import client, config
+from pydantic import BaseModel
+import requests
+import yaml
+from fastapi import APIRouter, HTTPException, Request, Body
+from jsonschema import validate, ValidationError
+from typing import List, Optional
+from pydantic import BaseModel, Field
+from MLSysOps_Schemas.mlsysops_schemas import app_schema
+from redis_setup import redis_mgt as rm
+
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 
 # JSON schema with enum validation for the city
 # Update the required fields in the JSON schema
 schema = app_schema
 
+import os
 
+# os.environ["LOCAL_OTEL_ENDPOINT"] = "http://172.25.27.228:9999/metrics"
+# os.environ["TELEMETRY_ENDPOINT"] = "172.25.27.228:4317"
+
+os.environ["LOCAL_OTEL_ENDPOINT"] = "http://172.25.27.4:9464/metrics"
+os.environ["TELEMETRY_ENDPOINT"] = "172.25.27.4:4317"
 
 karmada_api_kubeconfig = "/home/runner/karmada_management/karmada-api.kubeconfig"
-uth_dev_kubeconfig ="/home/runner/karmada_management/uth-dev.kubeconfig"
+uth_dev_kubeconfig = "/home/runner/karmada_management/uth-dev.kubeconfig"
 uth_prod_kubeconfig = "/home/runner/karmada_management/uth-prod.kubeconfig"
+# List of kubeconfig files to check
+kubeconfigs = [
+    os.getenv("KARMADA_KUBECONFIG", "/root/.kube/karmada-api.kubeconfig"),
+    os.getenv("UTH_DEV_KUBECONFIG", "/root/.kube/uth-dev.kubeconfig"),
+    os.getenv("UTH_PROD_KUBECONFIG", "/root/.kube/uth-prod.kubeconfig"),
+]
 
-def get_contexts_and_pods():
+
+def get_pods_from_kubeconfigs():
     """
-    Retrieve all available contexts and fetch pod information for each, including pod name, status, node, and cluster.
+    Retrieve all pods from multiple clusters using specified kubeconfig files.
 
     Returns:
         list: A list of dictionaries containing pod details (name, status, node, cluster).
     """
-    try:
-        # Retrieve contexts using kubectl
-        result = subprocess.run(
-            ["kubectl", "config", "get-contexts", "-o", "name"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    pod_details = []
 
-        if result.returncode != 0:
-            return {"error": f"Error fetching contexts: {result.stderr.strip()}"}
+    for kubeconfig in kubeconfigs:
+        try:
+            # Retrieve contexts for the given kubeconfig
+            result = subprocess.run(
+                ["kubectl", "config", "get-contexts", "-o", "name", "--kubeconfig", kubeconfig],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
-        contexts = result.stdout.strip().split("\n")
-        pod_details = []
-
-        # Fetch pod information for each context
-        for context_name in contexts:
-            try:
-                pod_result = subprocess.run(
-                    [
-                        "kubectl",
-                        "get",
-                        "pods",
-                        "--context",
-                        context_name,
-                        "-o",
-                        "custom-columns=NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName",
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-
-                if pod_result.returncode != 0:
-                    pod_details.append({"error": f"Error fetching pods for context {context_name}: {pod_result.stderr.strip()}"})
-                    continue
-
-                # Parse the output and collect pod details
-                lines = pod_result.stdout.strip().split("\n")
-                if len(lines) > 1:  # Skip header row
-                    for line in lines[1:]:
-                        name, status, node = line.split()
-                        pod_details.append({
-                            "pod_name": name,
-                            "pod_status": status,
-                            "node_name": node,
-                            "cluster_name": context_name,
-                        })
-
-            except Exception as e:
-                pod_details.append({"error": f"Error while listing pods for context {context_name}: {str(e)}"})
-
-        return pod_details
-
-    except Exception as e:
-        return {"error": f"Error while retrieving contexts: {str(e)}"}
-def list_clusters_and_pods_from_karmada():
-    """
-    Retrieve the list of clusters and their pods from Karmada.
-
-    :return: Dictionary with cluster names as keys and pod details as values.
-    """
-    try:
-        # Load Karmada control plane kubeconfig
-        config.load_kube_config(config_file=karmada_api_kubeconfig)
-
-        # Karmada clusters API endpoint
-        group = "cluster.karmada.io"
-        version = "v1alpha1"
-        plural = "clusters"
-
-        # Create Karmada Custom Objects API client
-        custom_object_api = client.CustomObjectsApi()
-
-        # Retrieve the list of clusters registered to Karmada
-        clusters = custom_object_api.list_cluster_custom_object(group, version, plural)
-
-        clusters_and_pods = {}
-
-        for cluster in clusters.get("items", []):
-            cluster_name = cluster.get("metadata", {}).get("name", "Unknown")
-
-            if cluster_name == 'uth-dev-cluster':
-                config.load_kube_config(config_file=uth_dev_kubeconfig)
-            elif cluster_name == 'uth-prod-cluster':
-                config.load_kube_config(config_file=uth_prod_kubeconfig)
-            else:
-                print(f"Cluster {cluster_name} does not have kubeconfig information.")
+            if result.returncode != 0:
+                pod_details.append({"error": f"Error fetching contexts from {kubeconfig}: {result.stderr.strip()}"})
                 continue
 
-            # Create a CoreV1Api client to access the cluster
-            core_v1_api = client.CoreV1Api()
+            contexts = result.stdout.strip().split("\n")
 
-            pods_in_cluster = []
+            # Fetch pod information for each context
+            for context_name in contexts:
+                try:
+                    pod_result = subprocess.run(
+                        [
+                            "kubectl",
+                            "get",
+                            "pods",
+                            "--context",
+                            context_name,
+                            "--kubeconfig",
+                            kubeconfig,
+                            "-o",
+                            "custom-columns=NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName",
+                        ],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
 
-            try:
-                # List pods for the default namespace
-                pods = core_v1_api.list_namespaced_pod(namespace='default')
-                for pod in pods.items:
-                    pod_details = {
-                        "namespace": pod.metadata.namespace,
-                        "name": pod.metadata.name,
-                        "status": pod.status.phase
-                    }
-                    pods_in_cluster.append(pod_details)
-            except client.ApiException as e:
-                print(f"  Error retrieving pods for cluster {cluster_name}: {e}")
+                    if pod_result.returncode != 0:
+                        pod_details.append({
+                            "error": f"Error fetching pods for context {context_name} ({kubeconfig}): {pod_result.stderr.strip()}"})
+                        continue
 
-            clusters_and_pods[cluster_name] = pods_in_cluster
+                    # Parse the output and collect pod details
+                    lines = pod_result.stdout.strip().split("\n")
+                    if len(lines) > 1:  # Skip header row
+                        for line in lines[1:]:
+                            parts = line.split()
+                            if len(parts) >= 3:  # Ensure there are enough columns
+                                name, status, node = parts
+                                pod_details.append({
+                                    "pod_name": name,
+                                    "pod_status": status,
+                                    "node_name": node,
+                                    "cluster_name": context_name,
+                                    "kubeconfig": kubeconfig,
+                                })
 
-        return clusters_and_pods
+                except Exception as e:
+                    pod_details.append(
+                        {"error": f"Error while listing pods for context {context_name} ({kubeconfig}): {str(e)}"})
 
-    except Exception as e:
-        print(f"Error: {e}")
-        return {}  # Return an empty dictionary in case of errors
+        except Exception as e:
+            pod_details.append({"error": f"Error while retrieving contexts from {kubeconfig}: {str(e)}"})
+
+    return pod_details
+
+
+def store_qos_metrics(app_id, app_description):
+    """
+    Parses the application description and stores QoS metrics in Redis.
+
+    :param app_id: The unique identifier of the application.
+    :param app_description: JSON application description.
+    """
+    try:
+        # Extract components
+        components = app_description.get("MLSysOpsApplication", {}).get("components", [])
+
+        for component in components:
+            component_data = component.get("Component", {})
+            component_name = component_data.get("name")
+
+            if not component_name:
+                continue  # Skip if component name is missing
+
+            qos_metrics = component.get("QoS-Metrics", [])
+
+            if not qos_metrics:
+                continue  # Skip if no QoS metrics are found
+
+            redis_key = f"{app_id}:{component_name}"
+
+            # Store QoS metrics in a Redis hash
+            for metric in qos_metrics:
+                metric_id = metric.get("ApplicationMetricID")
+                r.update_dict_value("component_metrics", redis_key, metric_id)
+
+    except:
+        print(f"Error updating metrics in redis : ")
+
+
 def get_yaml_info(data):
     """
     Extracts the application name and components from a dictionary.
@@ -167,37 +172,6 @@ def get_yaml_info(data):
         return None, []
 
 
-def get_karmada_pods(cluster_name):
-    """
-    Retrieves the pods in a specific cluster using kubectl and the Karmada context.
-    """
-    try:
-        # Execute the `kubectl get pods` command
-        result = subprocess.run(
-            ["kubectl", "get", "pods", "--context", cluster_name, "-o", "json"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        # Parse the JSON output
-        return json.loads(result.stdout)
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"Error fetching pods from cluster '{cluster_name}': {e}")
-
-
-def mock_karmada_pods():
-    return [
-        {
-            "metadata": {"name": "tractor-app-pod", "labels": {"app": "tractor-app"}},
-            "status": {"phase": "Running"}
-        },
-        {
-            "metadata": {"name": "drone-app-pod", "labels": {"app": "drone-app"}},
-            "status": {"phase": "Pending"}
-        }
-    ]
-
-
 def validate_yaml(json_data):
     try:
         validate(instance=json_data, schema=schema)
@@ -217,65 +191,63 @@ r.connect()
 # Global variable to store the last connection time
 last_connection_time = None
 
+# Define Pydantic Model for Validation
+class ComponentModel(BaseModel):
+    Component: Dict[str, Any]
+    externalAccess: Optional[bool] = None
+    nodePlacement: Optional[Dict[str, Any]] = None
+    restartPolicy: Optional[str] = None
+    containers: Optional[List[Dict[str, Any]]] = None
+
+class MLSysOpsApplicationModel(BaseModel):
+    name: str = Field(..., title="Application Name")
+    clusterPlacement: Optional[Dict[str, Any]] = None
+    components: Optional[List[ComponentModel]] = None
+
+class RootModel(BaseModel):
+    MLSysOpsApplication: MLSysOpsApplicationModel
+
 "----------------------------------------------------------------------------------------"
 "            DEPLOY APP                                                                  "
 "----------------------------------------------------------------------------------------"
-
-
-@router.post("/deploy", tags=["Apps"])
-async def deploy_app(request: Request):
+@router.post("/deploy", tags=["Applications"])
+async def deploy_app(payload: RootModel):
     try:
-        data = await request.json()
-    except json.JSONDecodeError:
-        return HTTPException(status_code=400, detail="Invalid JSON payload")
+        # Convert Pydantic object to dict
+        parsed_data = payload.dict(by_alias=True)
 
-    if 'uri' in data:
-        # Retrieve and process the application configuration from the URI
-        uri = data['uri']
-        print(f"The path URI received is {uri}")
+        validation_error = validate_yaml(parsed_data)
+
+        # Extract app_id and components
+        app_id, components = get_yaml_info(parsed_data)
+
+        # Check if app_id already exists in Redis
+        if r.value_in_hash("system_app_hash", app_id):
+            raise HTTPException(status_code=400, detail="Error: app_id already exists in the system")
 
         try:
-            response = requests.get(uri)
-            response.raise_for_status()
-            yaml_data = response.text
-            json_data = yaml.safe_load(yaml_data)
-        except requests.RequestException as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch data from URI: {e}")
-    else:
-        # The YAML data is in the request
-        json_data = data['yaml']
+            # Store in Redis
+            r.push("valid_descriptions_queue", json.dumps(parsed_data))
+            r.update_dict_value('system_app_hash', app_id, "Queued")
+            r.add_components(app_id, components)
+            store_qos_metrics(app_id, parsed_data)
 
-    validation_error = validate_yaml(json_data)
+            return {"app_id": app_id, "status": "Queued successfully"}
 
-    if validation_error is None:
-        try:
-            app_id, components = get_yaml_info(json_data)
-
-            if r.value_in_hash("system_app_hash", app_id):
-                raise HTTPException(status_code=400,
-                                    detail="Error: app_id already exists in the system")
-            else:
-                try:
-                    r.push("valid_descriptions_queue", json.dumps(json_data))
-                    r.update_dict_value('system_app_hash', app_id, "Queued")
-                    r.add_components(app_id, components)
-                except:
-                    raise HTTPException(status_code=400,
-                                        detail="Error pushing to the queue")
         except Exception as e:
-            print(f"Error checking the app in Redis: {e}")
-            raise e
+            raise HTTPException(status_code=400, detail=f"Error updating the info in Redis: {str(e)}")
 
-    else:
-        raise HTTPException(status_code=400, detail=validation_error)
-
+    except yaml.YAMLError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML format: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Unexpected error: {str(e)}")
 
 "----------------------------------------------------------------------------------------"
 "            LIST ALL APPS                                                              "
 "----------------------------------------------------------------------------------------"
 
 
-@router.get("/list_all/", tags=["Apps"])
+@router.get("/list_all/", tags=["Applications"])
 async def list_all():
     """
     Endpoint to return the current Redis dictionary values.
@@ -295,7 +267,7 @@ async def list_all():
 "----------------------------------------------------------------------------------------"
 
 
-@router.get("/status/{app_id}", tags=["Apps"])
+@router.get("/status/{app_id}", tags=["Applications"])
 async def get_app_status(app_id: str):
     """
     Endpoint to check the status of a specific application based on its app_id.
@@ -326,13 +298,11 @@ async def get_app_status(app_id: str):
 "----------------------------------------------------------------------------------------"
 
 
-@router.get("/apps/details/{app_id}", tags=["Apps"])
+@router.get("/apps/details/{app_id}", tags=["Applications"])
 async def get_app_details(app_id: str):
     """
     Returns the details of an application, including its components and the status of pods in Karmada.
     """
-
-
 
     try:
         # Get the application state
@@ -347,7 +317,7 @@ async def get_app_details(app_id: str):
 
         print(components)
         print("--------------------")
-        pods_info = get_contexts_and_pods()
+        pods_info = get_pods_from_kubeconfigs()
         print(pods_info)
 
         component_details = []
@@ -379,16 +349,49 @@ async def get_app_details(app_id: str):
         return {"error": f"Error retrieving application details: {str(e)}"}
 
 
-
 "----------------------------------------------------------------------------------------"
 "            APP PERFORMANCE                                                            "
 "----------------------------------------------------------------------------------------"
 
 
-@router.get("/performance/{app_id}", tags=["Apps"])
+@router.get("/performance/{app_id}", tags=["Applications"])
 async def get_app_performance(app_id: str):
+    """
+    Retrieves performance metrics for a given app_id from the 'component_metrics' hash.
+
+    :param app_id: The application ID to filter metrics.
+    :return: A list of tuples [(metric_name, metric_value), ...]
+    """
     print("Returning the app mQoS metric for", app_id)
-    return (json.dumps(app_id))
+
+    if not r.redis_conn:
+        return {"error": "Redis connection not established"}
+
+    try:
+        #  Get all keys from the hash "component_metrics"
+        hash_keys = r.redis_conn.hkeys("component_metrics")
+
+        #  Filter keys that contain the app_id
+        metric_keys = [key.decode("utf-8") for key in hash_keys if app_id in key.decode("utf-8")]
+
+        if not metric_keys:
+            return {"message": f"No metrics found for app_id '{app_id}'"}
+
+        # Get metric values from Redis
+        metric_values = r.redis_conn.hmget("component_metrics", metric_keys)
+
+        # Execute `mlsTelemetryClient.get_metric_value_with_label` for each metric
+        results = []
+        for metric_key, metric_value in zip(metric_keys, metric_values):
+            if metric_value:
+                metric_name = metric_value.decode("utf-8")  # Decode Redis stored value
+                metric_name = str(metric_name).lower()
+                print(metric_name)
+
+        return results  # Returns a list of tuples [(metric_name, metric_value), ...]
+
+    except Exception as e:
+        return {"error": f"Error retrieving performance metrics: {e}"}
 
 
 "----------------------------------------------------------------------------------------"
@@ -396,7 +399,7 @@ async def get_app_performance(app_id: str):
 "----------------------------------------------------------------------------------------"
 
 
-@router.delete("/remove/{app_id}", tags=["Apps"])
+@router.delete("/remove/{app_id}", tags=["Applications"])
 async def update_app_status(app_id: str):
     """
     Endpoint to update the status of an application to 'removed' based on its app_id.
@@ -418,6 +421,8 @@ async def update_app_status(app_id: str):
 
         # If the app_id exists, update the status to 'removed'
         r.update_dict_value('system_app_hash', app_id, "To_be_removed")
+        r.delete_component(app_id)
+        r.delete_app_components_from_hash("component_metrics", app_id)
         json_data = {"MLSysOpsApplication": {"name": app_id}}
         r.push('valid_descriptions_queue', json.dumps(json_data))
         return {"app_id": app_id, "message": "Application status updated to 'To_be_removed'."}
