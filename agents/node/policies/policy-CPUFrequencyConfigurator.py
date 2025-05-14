@@ -59,7 +59,7 @@ def initialize():
     initialContext = {
         "telemetry": {
             "metrics": ["node_load1"],
-            "system_scrape_internval": "1s"
+            "system_scrape_interval": "1s"
         },
         "mechanisms": [
             "CPUFrequencyConfigurator"
@@ -71,6 +71,8 @@ def initialize():
             "analyze_interval": "4s"
         },
         "latest_timestamp": None,
+        "core": False,
+        "scope": "global"
     }
 
     return initialContext
@@ -79,7 +81,7 @@ def initialize():
 def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
     # a simple policy that periodically changes the frequency of the node
     # Analyze
-    print("Called analyze")
+    print("Called analyze of cpufreq", context)
     current_timestamp = time.time()
 
     # The first time called
@@ -99,7 +101,7 @@ def analyze(context, application_description, system_description, current_plan, 
 
 
 def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
-    print("Called plan  ----- ", current_plan)
+    print("Called plan of cpurfreq ----- ", current_plan)
     # if "CPUFrequencyConfigurator" not in context['mechanisms'] and "CPUFrequencyConfigurator" not in available_assets:
     #     return {}, context
 
@@ -130,10 +132,10 @@ def plan(context, application_description, system_description, current_plan, tel
 
     new_plan = {
         "CPUFrequencyConfigurator": cpu_command,
-        "vAccel": {
-            "command": "set",
-            "plugin": "cpu"
-        },
-        "runtimeClass": "vaccel"
+        # "vAccel": {
+        #     "command": "set",
+        #     "plugin": "cpu"
+        # },
+        # "runtimeClass": "vaccel"
     }
     return new_plan, context

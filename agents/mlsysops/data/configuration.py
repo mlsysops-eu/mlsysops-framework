@@ -32,6 +32,8 @@ class AgentConfig:
     continuum_layer: str = ""
     behaviours: Dict[str, bool] = field(default_factory=dict)
 
+    system_description: dict = field(default_factory=dict)
+
     # Telemetry
     node_exporter_scrape_interval: str = "5s"
 
@@ -39,8 +41,8 @@ class AgentConfig:
     cluster: str = field(default_factory=lambda: os.getenv("CLUSTER_NAME", ""))
     domain: str = field(default_factory=lambda: os.getenv("EJABBERD_DOMAIN", ""))
     n_pass: str = field(default_factory=lambda: os.getenv("NODE_PASSWORD", ""))
-    n_jid: str = field(init=False)  # Node Jabber ID
-    c_jid: str = field(init=False)  # Cluster Jabber ID
+    n_jid: str = field(init=False)
+    c_jid: str = field(init=False)
 
     def __post_init__(self):
         """

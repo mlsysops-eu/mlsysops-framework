@@ -1,0 +1,16 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsNode
+metadata:
+  #NOTE: The node name must match the actual node's hostname.
+  name: csl-vader
+  labels:
+    node-type: edge
+labels:
+  - "node-type:edge"
+continuumLayer: Edge
+hardware:
+  CPU:
+    model: ARM 
+networkResources:
+  BasicInterface:
+    name: Ethernet

@@ -16,6 +16,8 @@
 import importlib
 import os
 
+import asyncio
+
 from mlsysops.data.state import MLSState
 
 from mlsysops.logger_util import logger
@@ -25,6 +27,7 @@ class MechanismsController:
     _instance = None
     __initialized = False  # Tracks whether __init__ has already run
     _state: MLSState
+    queues = {}
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
@@ -62,30 +65,40 @@ class MechanismsController:
         directory = self._state.configuration.mechanisms_directory
         # List all files in the directory
         for filename in os.listdir(directory):
-            # Extract the policy name (string between '-' and '.py')
-            mechanism_name = filename.rsplit('.py', 1)[0]
+            if filename.endswith(".py"):
+                # Extract the policy name (string between '-' and '.py')
+                mechanism_name = filename.rsplit('.py', 1)[0]
 
-            # Construct the full file path
-            file_path = os.path.join(directory, filename)
+                # Construct the full file path
+                file_path = os.path.join(directory, filename)
 
-            # Dynamically import the policy module
-            spec = importlib.util.spec_from_file_location(mechanism_name, file_path)
-            module = importlib.util.module_from_spec(spec)
+                # Dynamically import the policy module
+                spec = importlib.util.spec_from_file_location(mechanism_name, file_path)
+                module = importlib.util.module_from_spec(spec)
 
-            try:
-                # Load the module
-                spec.loader.exec_module(module)
+                try:
+                    # Load the module
+                    spec.loader.exec_module(module)
 
-                # Verify required methods exist in the module
-                required_methods = ['apply', 'get_options', 'get_state']
-                for method in required_methods:
-                    if not hasattr(module, method):
-                        raise AttributeError(f"Module {mechanism_name} is missing required method: {method}")
+                    # Verify required methods exist in the module
+                    required_methods = ['initialize','apply', 'get_options', 'get_state']
+                    for method in required_methods:
+                        if not hasattr(module, method):
+                            raise AttributeError(f"Module {mechanism_name} is missing required method: {method}")
 
-                # Add the policy in the module
-                self._state.assets[mechanism_name] = module
+                    # Add the policy in the module
+                    self._state.assets[mechanism_name] = module
 
-                logger.info(f"Loaded module {mechanism_name} from {file_path}")
+                    logger.info(f"Loaded module {mechanism_name} from {file_path}, calling initialize")
 
-            except Exception as e:
-                logger.error(f"Failed to load module {mechanism_name} from {file_path}: {e}")
+                    # create two queues
+                    self.queues[mechanism_name] = {
+                        "inbound": asyncio.Queue(),
+                        "outbound": asyncio.Queue(),
+                    }
+                    self._state.assets[mechanism_name].initialize(
+                        inbound_queue=self.queues[mechanism_name]["inbound"],
+                        outbound_queue=self.queues[mechanism_name]["outbound"])
+
+                except Exception as e:
+                    logger.error(f"Failed to load module {mechanism_name} from {file_path}: {e}")

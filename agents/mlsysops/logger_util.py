@@ -57,6 +57,10 @@ def setup_logger(logger_name: str, log_file: str) -> logging.Logger:
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)
 
+        # if os.getenv("LOKI_LOG_ENABLED", "true"):
+        #     import mlstelemetry
+        #
+
     return logger
 
 

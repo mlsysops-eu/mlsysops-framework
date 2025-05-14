@@ -16,6 +16,8 @@
 
 import asyncio
 
+from mlsysops.data.task_log import Status
+from mlsysops.events import MessageEvents
 from mlsysops.controllers.application import ApplicationController
 from mlsysops.controllers.configuration import ConfigurationController
 from mlsysops.controllers.policy import PolicyController
@@ -71,14 +73,12 @@ class MLSAgent:
         except Exception as e:
             logger.error(f"Error loading mechanisms: {e}")
             logger.debug(self.state.assets)
+
         # ##--------- Scheduler --------------#
         logger.debug("Initializing scheduler...")
         self.scheduler = PlanScheduler(self.state)
         scheduler_async_task = asyncio.create_task(self.scheduler.run())
         self.running_tasks.append(scheduler_async_task)
-
-        # #---------- Assets / Mechanisms ----------#
-        # logger.debug("Initializing assets...")
 
         # ## -------- SPADE ------------------#
         logger.debug("Initializing SPADE...")
@@ -154,11 +154,6 @@ class MLSAgent:
         """
         Sends a message to a specified recipient node with a designated event and payload.
 
-        This asynchronous method utilizes the instance of Spade to send a custom
-        message to the recipient node. It requires the recipient's identifier, an
-        associated event, and the payload to be sent. The function ensures the
-        message delivery through the Spade framework.
-
         Args:
             recipient (str): The identifier of the recipient node to which the message
             is being sent.
@@ -172,12 +167,56 @@ class MLSAgent:
         """
         await self.spade_instance.send_message(recipient, event, payload)
 
+    async def update_plan_status(self, plan_uuid, asset, status):
+        """
+        Update the status of a specific asset in the task log and determine the overall plan status.
+
+        Args:
+            plan_uuid: The unique identifier of the plan.
+            asset: The asset for which the status is being set.
+            status: True or False - the status to assign to the asset.
+        """
+        # Get the current task log
+        task_log = self.state.get_task_log(plan_uuid)
+
+        # Update the specific asset's status
+        if asset in task_log["assets"]:
+            task_log["assets"][asset] = status  # Set the status for the specific asset
+
+            # Check if all assets are True
+            all_assets_status = all(value != "Pending" for value in task_log["assets"].values())
+
+            if all_assets_status:
+                # Send updates to the task log
+                self.state.update_task_log(plan_uuid, updates={"status": Status.COMPLETED, "assets": task_log["assets"]})
+
     async def run(self):
         """
         Main process of the MLSAgent.
         """
+        # Apply MLS System description
+        try:
+            if self.state.configuration.continuum_layer == 'cluster':
+                logger.debug(f"Applying system description")
+                await self.state.assets["fluidity"].send_message({
+                    "event": MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value,
+                    "payload": self.state.configuration.system_description
+                })
+            if self.state.configuration.continuum_layer == 'node':
+                logger.debug(f"Send my {self.state.configuration.node} description to cluster")
+                await self.send_message_to_node(
+                    self.state.configuration.cluster,
+                     MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value,
+                    self.state.configuration.system_description)
+        except Exception as e:
+            logger.error(f"Error executing command: {e}")
+
         await self.telemetry_controller.apply_configuration_telemetry()
         await self.telemetry_controller.initialize()
         await self.spade_instance.start()
 
-        # raise NotImplementedError("This method must be implemented in a subclass.")
+        # Start global policies
+        self.policy_controller.start_global_policies()
+
+        return True
+
