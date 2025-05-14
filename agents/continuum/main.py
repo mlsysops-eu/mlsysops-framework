@@ -21,7 +21,7 @@ import os
 from dotenv import load_dotenv
 
 from mlsysops.logger_util import logger
-from continuum_agent import MLSContinuumAgent
+from MLSContinuumAgent import MLSContinuumAgent
 
 # Path to your .env file
 dotenv_path = '.env'

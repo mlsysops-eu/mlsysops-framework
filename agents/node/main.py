@@ -21,7 +21,7 @@ import os
 from dotenv import load_dotenv
 
 from mlsysops.logger_util import logger
-from node_agent import MLSNodeAgent
+from MLSNodeAgent import MLSNodeAgent
 
 # Path to your .env file
 dotenv_path = '.env'

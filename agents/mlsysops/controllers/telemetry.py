@@ -58,7 +58,7 @@ class TelemetryController(BaseController):
                     # Send the parsed content to the cluster
                     # TODO spade seems to shutdown - no message goes out.
                     payload = {"node": self.agent.state.hostname}
-                    asyncio.create_task(self.agent.send_message_to_node("cluster1",mlsysops.events.MessageEvents.OTEL_REMOVE.value,payload))
+                    asyncio.create_task(self.agent.send_message_to_node(self.agent_state.configuration.cluster,mlsysops.events.MessageEvents.OTEL_REMOVE.value,payload))
             case "continuum":
                 delete_otel_pod(self.agent.state.hostname)
                 remove_service()
@@ -132,7 +132,7 @@ class TelemetryController(BaseController):
                     )
                     # Send the parsed content to the cluster
                     payload = {"node": self.agent.state.hostname, "otel_config": parsed_otel_config}
-                    await self.agent.send_message_to_node("cluster1",mlsysops.events.MessageEvents.OTEL_DEPLOY.value,payload)
+                    await self.agent.send_message_to_node(self.agent_state.configuration.cluster,mlsysops.events.MessageEvents.OTEL_DEPLOY.value,payload)
                 case "continuum":
                     logger.debug("Applying continuum default telemetry configuration.")
                     # Render the template with the `otlp_export_endpoint`

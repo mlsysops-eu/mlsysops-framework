@@ -12,3 +12,6 @@ nvidia-pyindex
 cpufreq
 cachetools
 kubernetes
+kubernetes_asyncio
+ruamel.yaml
+jsonschema

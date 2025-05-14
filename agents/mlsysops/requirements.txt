@@ -1,8 +1,8 @@
+attrs==21.2.0
 Jinja2==3.0.3
 kubernetes==32.0.1
-mlstelemetry==2.2.3
-mlsysops==0.1.0
+mlstelemetry==0.3.2
 pandas==2.2.3
 python-dotenv==1.1.0
-PyYAML==5.4.1
 PyYAML==6.0.2
+redis==5.2.1

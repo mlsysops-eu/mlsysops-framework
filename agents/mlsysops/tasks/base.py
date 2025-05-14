@@ -14,5 +14,19 @@
 #
 
 class BaseTask:
-    def __init__(self):
-        pass # placeholder
+    def __init__(self, state):
+        self.state = state
+
+    def get_telemetry_argument(self):
+        argument = {
+            "endpoint": "localhost:9100/metrics",
+            "data": self.state.monitor_data
+        }
+
+        return argument
+
+    def get_system_description_argument(self):
+        return self.state.configuration.system_description
+
+    def get_available_assets(self):
+        return self.state.configuration.mechanisms

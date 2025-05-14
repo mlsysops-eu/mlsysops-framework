@@ -86,8 +86,8 @@ async def main():
         logger.info("Agent stoped. Performing cleanup...")
         if agent:
             await agent.stop()  # Stop the agent during cleanup
-    except Exception as e:
-        logger.error(f"An error occurred in the main task: {e}")
+    # except Exception as e:
+    #     logger.error(f"An error occurred in the main task: {e}")
 
 
 if __name__ == "__main__":

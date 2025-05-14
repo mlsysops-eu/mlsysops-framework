@@ -1,0 +1,76 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsApp
+metadata:
+  name: test-application
+clusterPlacement:
+  clusterID:
+    - "uth-prod-cluster"
+  instances: 1
+components:
+  - Component:
+      name: server-app
+    nodePlacement:
+      continuumLayer:
+        - Edge
+      node: csl-rpi5-1
+      labels:
+        - "node-type:edge"
+      Scaling:
+        scalingMode: manual
+        instances: 1
+    restartPolicy: OnFailure
+    containers:
+    - image: registry.mlsysops.eu/agent/agents/test_app:0.0.0
+      imagePullPolicy: IfNotPresent
+      command: ["python", "TcpServer.py"]
+      env:
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.name=server-app, service.version=0.0.0, service.experimentid=test"
+        - name: OTEL_SERVICE_NAME
+          value: "server-app"
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: TELEMETRY_ENDPOINT
+          value: "$(NODE_IP):43170"
+      ports:
+        - containerPort: 10000
+          protocol: TCP
+  - Component:
+      name: client-app
+    nodePlacement:
+      continuumLayer:
+        - Edge
+      node: csl-rpi5-1
+      labels:
+        - "node-type:edge"
+      Scaling:
+        scalingMode: manual
+        instances: 1
+    restartPolicy: OnFailure
+    containers:
+    - image: registry.mlsysops.eu/agent/agents/test_app:0.0.0
+      imagePullPolicy: IfNotPresent
+      command: ["python", "TcpClient.py"]
+      env:
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.name=server-app, service.version=0.0.0, service.experimentid=test"
+        - name: OTEL_SERVICE_NAME
+          value: "server-app"
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: TELEMETRY_ENDPOINT
+          value: "$(NODE_IP):43170"
+        - name: TCP_SERVER_IP
+          value: "server-app"
+      ports:
+        - containerPort: 10000
+          protocol: TCP
+componentInteractions:
+  - componentName1: client-app
+    type: egress
+    componentName2: server-app
+

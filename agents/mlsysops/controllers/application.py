@@ -16,6 +16,7 @@
 import asyncio
 from typing import List, Dict, Any
 
+from ..logger_util import logger
 from ..application import MLSApplication
 from ..data.state import MLSState
 from ..tasks.monitor import MonitorTask
@@ -51,22 +52,23 @@ class ApplicationController:
             KeyError: If the required keys are missing in the application_data.
 
         """
-        print(f"Received application: {application_data}")
+        logger.debug(f"Received application: {application_data}")
 
         # Create and store a new MLSApplication instance
         new_application = MLSApplication(
-            application_id=application_data["component_name"],
-            component_spec=application_data["comp_specs"]
+            application_id=application_data["name"], # We use the CR name as id - unique in K8S
+            component_spec=application_data["spec"]["components"],
+            app_desc=application_data
         )
         self.state.add_application(new_application.application_id, new_application)
 
-        # # Update the monitoring list for the application's metrics
+        # # Update the monitoring list for the application's metrics TODO
         # for metric_name in application_data["component_spec"]["metrics"]:
         #     await self.monitor_task.add_metric(metric_name)
 
         # Start an analyze task for this application
-        analyze_task = AnalyzeTask(new_application,self.state)
-        asyncio.create_task(analyze_task.run())
+        analyze_object = AnalyzeTask(new_application.application_id,self.state, "application")
+        analyze_task = asyncio.create_task(analyze_object.run())
 
         self.application_tasks_running[new_application.application_id] = analyze_task
 
@@ -82,11 +84,19 @@ class ApplicationController:
             application_id (str): The unique identifier of the application
                                   being terminated.
         """
-        # terminate task
         if application_id in self.application_tasks_running:
+            logger.debug(f"Terminating application {application_id} with list {self.application_tasks_running}")
+            # NOTE: Does this only cancel analyze tasks?
             self.application_tasks_running[application_id].cancel()
             del self.application_tasks_running[application_id]
+            self.state.remove_application(application_id)
 
+    async def on_application_updated(self, data):
+        #logger.info('App %s updated %s', data['name'], )
+        if data['name'] in self.application_tasks_running:
+            self.state.update_application(data['name'],data['spec'])
+        # else:
+        #     logger.error('No app name specified. Will not update app desc.')
     async def run(self):
         """
         Continuously checks the state for new applications and handles them.

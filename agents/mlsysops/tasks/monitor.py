@@ -97,10 +97,9 @@ class MonitorTask:
 
     async def run(self):
 
-        while True:
-            await asyncio.sleep(self.period)
-            # logger.debug("Execute get telemetry from OTEL")
-            try:
+        try:
+            while True:
+                await asyncio.sleep(self.period)
                 async with self.__lock:  # Locking ensures safe iteration if list is modified concurrently
                     current_time = time.time()
                     for metric_name in self.metrics_list:
@@ -116,5 +115,7 @@ class MonitorTask:
                             await self.__data.add_entry(entry)
                         except Exception as e:
                             logger.error(f"Error fetching telemetry for metric '{metric_name}': {str(e)}")
-            except Exception as e:
-               logger.error(f"Unexpected error during telemetry collection: {str(e)}")
+        except asyncio.CancelledError:
+            logger.debug(f"Monitor task cancelled.")
+        except Exception as e:
+           logger.error(f"Unexpected error during telemetry collection: {str(e)}")

@@ -1,0 +1,3 @@
+MLSysOpsCluster:
+  clusterID: UTH-PROD
+  nodes: ["csl-rpi5-1", "csl-jetson1", "csl-vader"]

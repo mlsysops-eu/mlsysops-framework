@@ -47,8 +47,17 @@ class MessageReceivingBehavior(CyclicBehaviour):
             resp.thread = msg.thread
             logger.debug(f"Received {event} from {sender} of performative {performative}")
             match (performative, event):
-                case ("request", "application_component_placed"):
-                    print("Application Component Placed")
+                case ("request", MessageEvents.COMPONENT_PLACED.value):
+                    logger.debug("Application Component Placed")
+                    # Decode payload
+                    payload = {
+                        "event": event,
+                        "payload": json.loads(msg.body)
+                    }
+                    # inform agent for receiving
+                    await self.message_queue.put(payload)
+                case ("request", MessageEvents.COMPONENT_REMOVED.value):
+                    logger.debug("Application Component Removed")
                     # Decode payload
                     payload = {
                         "event": event,
@@ -72,5 +81,20 @@ class MessageReceivingBehavior(CyclicBehaviour):
                         "payload": json.loads(msg.body)
                     }
                     await self.message_queue.put(payload)
+                case ("request", MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value):
+                    logger.debug(f"Received node sys desc update from {sender}")
+                    payload = {
+                        "event": event,
+                        "payload": json.loads(msg.body)
+                    }
+                    await self.message_queue.put(payload)
+                case ("request", MessageEvents.MESSAGE_TO_FLUIDITY.value):
+                    logger.debug(f"Received {event} from {sender}")
+                    payload = {
+                        "event": event,
+                        "payload": json.loads(msg.body)
+                    }
+                    await self.message_queue.put(payload)
+
         else:
             print("Did not received any message after 10 seconds")
