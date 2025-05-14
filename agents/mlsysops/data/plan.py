@@ -21,7 +21,9 @@ from attr import dataclass
 
 @dataclass
 class Plan:
+    application_id: str
     asset_new_plan: dict
+    core: bool = False
     # name: str
     # command: str
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))

@@ -1,0 +1,16 @@
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: {{ name }}
+spec:
+  resourceSelectors:
+    - apiVersion: mlsysops.eu/v1
+      kind: MLSysOpsApp
+  conflictResolution: Overwrite
+  placement:
+    clusterAffinity:
+      clusterNames:
+        {% for cluster in cluster_names %}
+        - {{ cluster }}
+        {% endfor %}
+

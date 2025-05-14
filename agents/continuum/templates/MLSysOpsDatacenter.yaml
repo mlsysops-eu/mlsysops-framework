@@ -1,0 +1,90 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: mlsysopsdatacenters.mlsysops.eu
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: mlsysops.eu
+  scope:  Namespaced #Cluster
+  names:
+    plural: mlsysopsdatacenters
+    singular: mlsysopsdatacenter
+    kind: MLSysOpsDatacenter
+    shortNames:
+    - mlsdatacenter
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: MLSysOps datacenter formal specification.
+          properties:
+            datacenterID:
+              type: string
+              description: The unique datacenter identifier.
+            clusterID:
+              type: string
+              description: The clusterID that the given datacenter is a member.
+            continuum:
+              type:  string
+              description: The continuum layer that the datacenter belongs to.
+              enum:
+                - Cloud
+                - EdgeInfrastructure
+                - Edge
+                - FarEdge
+            nodes:
+              type: array
+              items:
+                type: string
+              description: The set of registered nodes.
+            continent:
+              type: string
+              enum:
+                - Europe
+                - Asia
+                - Africa
+                - Australia
+                - North America
+                - South America
+                - Antarctica
+              description: The desired continent (optional)
+            country:
+              type: string
+              enum:
+                - GR
+                - IT
+                - FRA
+                - ENG
+                - POR
+              description: The desired country (optional)
+            city:
+              type: string
+              enum:
+                - Volos
+                - Milan
+                - Paris
+                - London
+                - Lisbon
+              description: The desired city (optional)
+            location:
+              type: array
+              description: The location of the datacenter.
+              items:
+                type: number
+            cloudProvider:
+              type: string
+              enum:
+                - private
+                - AWS
+                - MicrosoftAzure
+                - GCP
+              description: The name of the desired provider (optional)
+          required:
+          - clusterID
+          - datacenterID
+          - continuum
+          - nodes

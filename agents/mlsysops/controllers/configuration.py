@@ -14,15 +14,15 @@
 #
 
 import os
+import socket
+
 import yaml
 
 from dotenv import load_dotenv
 import os
 
 from mlsysops.data.configuration import AgentConfig
-
 from mlsysops.logger_util import logger
-
 from mlsysops.data.state import MLSState
 
 
@@ -41,14 +41,16 @@ class ConfigurationController:
         # Load environment variables from the .env file
         load_dotenv()
 
-        config_path = os.getenv("CONFIG_PATH", "config.yaml")
 
-        logger.info(f"Using configuration file: {config_path}")
 
-        self.config_path = config_path
+        self.config_path = os.getenv("CONFIG_PATH", "config.yaml")
+        self.description_path = os.getenv("DESCRIPTION_PATH", "descriptions")
+        logger.info(f"Using configuration file: {self.config_path}")
+
         self.agent_state = agent_state
         self.agent_state.configuration = AgentConfig()
         self.load_config()
+        self.load_system_description()
 
     def load_config(self) -> AgentConfig:
         """
@@ -66,7 +68,37 @@ class ConfigurationController:
                 setattr(self.agent_state.configuration, key, value)
         self.agent_state.configuration.__post_init__()  # Recalculate derived fields
 
-        logger.debug(f"Configuration file loaded. Agent configured")
+    def load_system_description(self) -> AgentConfig:
+        """
+        Loads the system description file for the agent configuration. The system
+        description file is expected to be a YAML file, and its location is determined
+        based on the provided description path and the system's node name.
+
+        Attributes:
+            description_path: str
+                Path to the folder where the system description YAML file is located.
+
+        Raises:
+            Exception
+                If the system description file cannot be loaded due to any error.
+
+        Returns:
+            AgentConfig
+                Updated configuration containing the loaded system description.
+        """
+        if not os.path.exists(self.description_path):
+            logger.error(f"System description file '{self.config_path}' not found.")
+
+        try :
+            description_file_path = os.path.join(self.description_path, os.getenv("NODE_NAME", socket.gethostname())+".yaml")
+            with open(description_file_path, "r") as file:
+                data = yaml.safe_load(file)
+                self.agent_state.configuration.system_description = data
+
+            logger.debug(f"System description file loaded: {description_file_path}")
+            print(data)
+        except Exception as e:
+            logger.error(f"Error loading system description file: {e}")
 
     def save_config(self):
         """
@@ -90,3 +122,16 @@ class ConfigurationController:
         :return: The current AppConfig instance.
         """
         return self.agent_state.configuration
+
+    def get_system_description(self) -> dict:
+        """
+        Retrieve the system description from the configuration.
+
+        This method accesses the system configuration to extract and return
+        a detailed description of the system. It is intended to provide
+        system-related metadata or information.
+
+        Returns:
+            dict: A dictionary containing the detailed system description.
+        """
+        return self.get_config().system_description

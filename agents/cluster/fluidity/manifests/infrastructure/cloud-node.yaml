@@ -1,0 +1,16 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsNode
+metadata:
+  #NOTE: The node name must match the actual node's hostname.
+  name: csl-jetson1
+  labels:
+    node-type: cloud
+labels:
+  - "node-type:cloud"
+continuumLayer: Cloud
+hardware:
+  CPU:
+    model: Intel 
+networkResources:
+  BasicInterface:
+    name: Ethernet

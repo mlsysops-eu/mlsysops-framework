@@ -16,15 +16,26 @@
 import importlib
 import os
 
-from mlsysops.data.state import MLSState
-from mlsysops.policy import Policy
+import asyncio
 
-from mlsysops.logger_util import logger
+import mlsysops.tasks.analyze as AnalyzeClass
+from ..data.state import MLSState
+from ..policy import Policy
+from ..logger_util import logger
+
+from enum import Enum
+
+
+class PolicyScopes(Enum):
+    APPLICATION = "application"
+    GLOBAL = "global"
 
 
 class PolicyController:
     _instance = None
     __initialized = False  # Tracks whether __init__ has already run
+    state = None
+    active_policies = {"global" : {}, "application": {}}
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
@@ -42,6 +53,83 @@ class PolicyController:
             # development - always fetch the first one loaded
             logger.debug(f"returning policy {policy.name}")
             return policy
+        return None
+
+    def get_policy_instance(self, scope: str, id: str ):
+        """
+        Retrieves a specific policy instance based on the given scope and ID.
+
+        Args:
+            scope (PolicyScopes): The scope of the policy to be retrieved.
+            id: The unique identifier associated with the policy within the given scope.
+
+        Returns:
+            The policy instance corresponding to the provided scope and ID if found.
+            None if no matching policy exists or an error occurs.
+        """
+        try:
+            logger.debug(f"Getting policy instance for scope: {scope} and id: {id} list {self.active_policies[scope]}")
+            return self.active_policies[scope][id]
+        except Exception as e:
+            logger.error(f"Invalid policy instance: {e}")
+            return None
+
+    def start_global_policies(self):
+        logger.debug(f"Starting Global Policies {self.state.policies}")
+
+        for policy_template in self.state.policies:
+            if policy_template.scope == PolicyScopes.GLOBAL.value:
+                print("Got  global for ", policy_template)
+                new_policy_object = policy_template.clone()
+                new_policy_object.load_module()
+                new_policy_object.initialize()
+                # TODO put some check, if the policies handle mechanism that are not available
+                new_analyze_task = AnalyzeClass.AnalyzeTask(
+                    id=new_policy_object.name,
+                    state=self.state,
+                    scope=new_policy_object.scope)
+                asyncio.create_task(new_analyze_task.run())
+
+                # there should one instance of this policy, with its corresponding analyze task
+                self.active_policies[PolicyScopes.GLOBAL.value][new_policy_object.name] = new_policy_object
+
+    async def start_application_policies(self,application_id):
+        logger.debug(f"Starting Application Policies {self.state.policies}")
+
+        for policy_template in self.state.policies:
+            if policy_template.scope == PolicyScopes.APPLICATION.value:
+                new_policy_object = policy_template.clone()
+                new_policy_object.load_module()
+                new_policy_object.initialize()
+                logger.debug(f"-----------------> {self.active_policies[PolicyScopes.APPLICATION.value]}")
+                if not self.active_policies[PolicyScopes.APPLICATION.value].get(application_id):
+                    self.active_policies[PolicyScopes.APPLICATION.value][application_id] = {}
+
+                self.active_policies[PolicyScopes.APPLICATION.value][application_id][new_policy_object.name] = new_policy_object
+                logger.debug(f"Started Application Policy {new_policy_object.name}")
+
+
+    async def delete_application_policies(self, application_id):
+        """
+        Deletes all active application policies for the given application ID.
+
+        Args:
+            application_id (str): The ID of the application whose policies should be deleted.
+
+        Returns:
+            bool: True if policies were successfully deleted, False if no policies existed for the given application ID.
+        """
+        logger.debug(f"Deleting Application Policies for application_id: {application_id}")
+
+        # Check if the application has any active policies
+        if application_id in self.active_policies[PolicyScopes.APPLICATION.value]:
+            # Remove the application-specific policies
+            del self.active_policies[PolicyScopes.APPLICATION.value][application_id]
+            logger.info(f"Deleted Application Policies for application_id: {application_id}")
+            return True
+        else:
+            logger.warning(f"No Application Policies found for application_id: {application_id}")
+            return False
 
     def load_policy_modules(self):
         """
@@ -67,24 +155,17 @@ class PolicyController:
                 # Construct the full file path
                 file_path = os.path.join(directory, filename)
 
-                # Dynamically import the policy module
-                spec = importlib.util.spec_from_file_location(policy_name, file_path)
-                module = importlib.util.module_from_spec(spec)
+                policy_object = Policy(policy_name, file_path)
+                policy_object.load_module()
+                policy_object.validate()
+                policy_object.initialize()
+                print(policy_object.module)
+                # policy_object.module = None
 
-                try:
-                    # Load the module
-                    spec.loader.exec_module(module)
+                # Add the policy in the module
+                self.state.add_policy(policy_object) # add the global policies as templates
 
-                    # Verify required methods exist in the module
-                    required_methods = ['initialize', 'analyze', 'plan']
-                    for method in required_methods:
-                        if not hasattr(module, method):
-                            raise AttributeError(f"Module {policy_name} is missing required method: {method}")
+                logger.info(f"Loaded module {policy_name} from {file_path}")
 
-                    # Add the policy in the module
-                    self.state.add_policy(Policy(policy_name, module))
 
-                    logger.info(f"Loaded module {policy_name} from {file_path}")
 
-                except Exception as e:
-                    logger.error(f"Failed to load module {policy_name} from {file_path}: {e}")

@@ -19,21 +19,18 @@ import asyncio
 
 
 class MLSApplication:
-    def __init__(self, application_id, component_spec=None, pod_spec=None,policies=None): # TODO What should we include in the general one
+    def __init__(self, application_id, app_desc, component_spec=None, pod_spec=None,policies=None): # TODO What should we include in the general one
         self.application_id = application_id
         self.component_spec = component_spec
         self.pod_spec = pod_spec
         self.policies = policies
+        self.app_desc = app_desc
         # self.active_policy = component_spec.get("policy")
-
-        # # start analyze tasks
-        # self.analyze_task = AnalyzeTask()
-        # asyncio.create_task(self.analyze_task.run(self))
 
         # Parse component spec into MLSComponent instances
         self.components = [
-            MLSComponent(component['name'], component['spec'])
-            for component in component_spec
+            # MLSComponent(component['name'], component['spec'])
+            # for component in component_spec
         ]
 
     def get_component_by_name(self, component_name):

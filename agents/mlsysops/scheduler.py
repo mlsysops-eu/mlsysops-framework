@@ -14,16 +14,25 @@
 #
 
 import asyncio
+import json
 import time
 
 from .tasks import ExecuteTask
 from .logger_util import logger
 from .data.plan import Plan
+from .data.task_log import Status
 
 class PlanScheduler:
     def __init__(self, state):
         self.state = state
         self.period = 5
+        self.pending_plans = []
+
+    async def update_pending_plans(self):
+        for pending_plan in self.pending_plans:
+            task_log = self.state.get_task_log(pending_plan.uuid)
+            if task_log.status != Status.PENDING:
+                self.pending_plans.remove(pending_plan) # remove it
 
     async def run(self):
         logger.debug("PlanScheduler started")
@@ -32,6 +41,9 @@ class PlanScheduler:
             current_plan_list: list[Plan] = []
 
             logger.debug("--------------Scheduler Loop------")
+
+            # check for previous plans
+            await self.update_pending_plans()
 
             # Empty the queue
             while not self.state.plans.empty():
@@ -49,7 +61,7 @@ class PlanScheduler:
                     logger.debug(f"Processing {str(plan.uuid)} plan")
 
                     # Use FIFO logic - execute the first plan, and save the mechanisms touched.
-                    # TODO declare mechanisms as singletons or multi-instnaced.
+                    # TODO declare mechanisms as singletons or multi-instanced.
                     # Singletons (e.g. CPU Freq): Can be configured once per Planning/Execution cycle, as they have
                     # global effect
                     # Multi-instance (e.g. component placement): Configure different parts of the system, that do not
@@ -59,16 +71,39 @@ class PlanScheduler:
                     for asset, command in plan.asset_new_plan.items():
                         print(f"asset: {asset}")
                         print(f"command: {command}")
+                        should_discard = False
+
+                        # if was executed a plan earlier, then discard it.
                         if asset in assets_touched:
-                            # if was executed a plan earlier, then discard it.
+                            should_discard = True
+
+                        task_log = self.state.get_task_log(plan.uuid)
+
+                        # Check if there is a pending task log from previous runs
+                        if task_log:
+                            if (task_log['status'] == Status.PENDING.value
+                                    and task_log['asset'][asset] == Status.PENDING.value):
+                                should_discard = True
+
+                        # check if the application has been removed for this application scoped plan
+                        if plan.application_id not in self.state.applications:
+                            should_discard = True
+
+                        # TODO: check for fluidity debug
+                        # Check if it is core, should override the discard mechanism
+                        logger.debug(f"_-------------------> {plan}")
+                        if not plan.core and should_discard:
+                            logger.debug(f"Discarding plan {str(plan.uuid)}")
                             self.state.update_task_log(plan.uuid,updates={"status": "Discarded"})
                             continue
+
 
                         self.state.update_task_log(plan.uuid,updates={"status": "Scheduled"})
 
                         # mark asset touched
                         assets_touched[asset] = {
                             "timestamp": time.time(),
+                            "plan_uuid": plan.uuid,
                             "plan": command
                         }
 

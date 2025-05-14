@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-
+import json
 import socket
 import time
 import types
@@ -66,6 +66,7 @@ class MLSState:
     policies: List[Policy] = field(default_factory=list)
     hostname: str = field(default_factory=lambda: os.getenv("NODE_NAME", socket.gethostname()))
     configuration: AgentConfig = None
+    agent: object = None
     _save_period: int = 300  # Period (in seconds) for saving the state
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)  # Lock for thread safety
     _save_task: asyncio.Task = field(default=None, init=False)  # Task for periodic saving
@@ -83,7 +84,7 @@ class MLSState:
             raise ValueError(f"Application with ID '{app_id}' already exists.")
 
         self.applications[app_id] = application
-        print(f"Application '{app_id}' added successfully.")
+        logger.debug(f"Application '{app_id}' added successfully.")
 
     def remove_application(self, app_id: str):
         """
@@ -94,7 +95,14 @@ class MLSState:
         if app_id not in self.applications:
             raise KeyError(f"Application with ID '{app_id}' does not exist.")
         del self.applications[app_id]
-        print(f"Application '{app_id}' removed successfully.")
+        logger.debug(f"Application '{app_id}' removed successfully.")
+
+    def update_application(self, app_id:str, app_desc: any):
+
+        if app_id not in self.applications:
+            raise KeyError(f"Application with ID '{app_id}' does not exist.")
+        self.applications[app_id].app_desc = app_desc
+        logger.info(f"Application '{app_id}' updated successfully.")
 
     def add_policy(self, policy: Policy):
         """
@@ -177,7 +185,6 @@ class MLSState:
         while True:
             await asyncio.sleep(10)
             logger.debug("Dumping task log...")
-            print(self.task_log.head())
             self.task_log.to_csv("task_log.csv",index=False)
 
     def start_period_log_dump(self):
@@ -186,7 +193,7 @@ class MLSState:
 
 
     def add_task_log(self, new_uuid: str, application_id: str, task_name: str, arguments: Dict[str, Any], start_time: float,
-                     end_time: float, status: Optional[str] = None, result: Optional[Any] = None):
+                     end_time: float, status: Optional[str] = None, result: Optional[Any] = None, assets: Optional[Dict] = None):
         """
         Adds a new task log entry to the task_log list.
         """
@@ -199,7 +206,8 @@ class MLSState:
             start_time=start_time,
             end_time=end_time,
             status=status,
-            result=arguments
+            result=json.dumps(result),
+            asset=json.dumps(assets) if assets else None
         )
 
         new_row = pd.DataFrame([entry.to_dict()])
@@ -238,5 +246,13 @@ class MLSState:
             logger.debug(f"Updated task log entry for uuid={uuid} with updates: {updates}")
         else:
             logger.warning(f"No task log entry found with uuid={uuid}")
+
+    def get_task_log(self, uuid: str):
+        result = self.task_log[self.task_log['uuid'] == uuid].reset_index(drop=True).to_dict(orient='records')
+        row =  result[0] if result else None
+        row["asset"] = json.loads(row['asset'])
+        return row
+
+
 
     

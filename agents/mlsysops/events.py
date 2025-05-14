@@ -17,6 +17,13 @@ from enum import Enum
 
 
 class MessageEvents(Enum):
+    APP_CREATED = "application_created"
+    APP_UPDATED = "application_updated"
+    APP_DELETED = "application_deleted"
+    APP_SUBMIT = "application_submitted"
+    APP_REMOVED = "application_removed"
+    PLAN_SUBMITTED = "plan_submitted"
+    PLAN_EXECUTED = "plan_executed"
     COMPONENT_PLACED = "application_component_placed"
     COMPONENT_REMOVED = "application_component_removed"
     RECONFIGURATION = "reconfiguration"
@@ -27,3 +34,8 @@ class MessageEvents(Enum):
     OTEL_DEPLOY = "otel_deploy"
     OTEL_UPDATE = "otel_update"
     OTEL_REMOVE = "otel_remove"
+    NODE_SYSTEM_DESCRIPTION_SUBMIT = "node_sys_desc_submitted"
+    NODE_SYSTEM_DESCRIPTION_UPDATE = "node_sys_desc_updated"
+    MESSAGE_TO_NODE = "message_to_node"
+    MESSAGE_TO_FLUIDITY = "message_to_fluidity"
+    PLAN_STATUS_UPDATE = "plan_status_update"

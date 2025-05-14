@@ -16,7 +16,18 @@
 import copy
 from dataclasses import dataclass, field, fields
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from enum import Enum
+
+# Define explicit values for status using an Enum
+class Status(Enum):
+    COMPLETED = "Completed"
+    PENDING = "Pending"
+    FAILED = "Failed"
+    SCHEDULED = "Scheduled"
+    CANCELLED = "Cancelled"
+    DISCARDED = "Discarded"
+    UNKNOWN = "Unknown"
 
 @dataclass
 class TaskLogEntry:
@@ -26,15 +37,11 @@ class TaskLogEntry:
     task_name: str
     start_time: float
     end_time: float
+    asset: Optional[Dict[str, str]]
     arguments: Optional[Dict[str, Any]] = None
-    status: Optional[str] = None  # e.g., "Success", "Failed"
+    status: Optional[Status] = None  # e.g., "Success", "Failed"
     result: Optional[Any] = None  # Optional field for task result
     plan: Optional[Dict[str, Any]] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Converts the dataclass into a dictionary, ensuring all fields are serializable.
-        """
 
     def to_dict(self) -> Dict[str, Any]:
         """

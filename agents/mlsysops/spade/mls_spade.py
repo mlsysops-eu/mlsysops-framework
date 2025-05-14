@@ -36,7 +36,7 @@ from .behaviors.SubscribeBehavior import Subscribe
 from .behaviors.APIPingBehaviour import APIPingBehaviour
 from .behaviors.ManageSubscriptionBehaviour import ManageSubscriptionBehaviour
 from ..data.state import MLSState
-from .redis_mgt import RedisManager
+from mlsysops.spade.redis_mgt import RedisManager
 
 class MLSSpade(Agent):
 

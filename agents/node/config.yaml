@@ -1,5 +1,6 @@
   mechanisms:
     - "CPUFrequencyConfigurator"
+    - "fluidity_proxy"
   default_telemetry_metrics: "None"
   policy_directory: "policies"
   mechanisms_directory: "mechanisms"
@@ -15,7 +16,7 @@
       Check_ml_deployment_Behaviour: # This is oneshot behaviour should be False always
           enabled: False
       CheckInactiveClustersBehaviour:
-          enabled: True
+          enabled: False
           period: 10
       HBReceiverBehaviour:
           enabled: True
@@ -25,11 +26,6 @@
       ManagementModeBehaviour:
           enabled: False
       ManageSubscriptionBehaviour:
-          enabled: True
-      MessageReceivingBehavior:
-          enabled: True
-          message_queue: "message_queue"
-      MessageSendingBehavior:
-          enabled: True
-      Subscribe:
           enabled: False
+      Subscribe:
+          enabled: True

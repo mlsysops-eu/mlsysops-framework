@@ -1,0 +1,13 @@
+kubernetes
+psutil>=5.4.5
+geographiclib
+flask
+flask-restx
+ruamel.yaml
+yamllint
+jsonschema
+geojson
+shapely
+pyproj
+utm
+flask_cors
