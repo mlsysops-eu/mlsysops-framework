@@ -12,3 +12,4 @@ pynvml
 nvidia-pyindex
 cpufreq
 kubernetes
+redis

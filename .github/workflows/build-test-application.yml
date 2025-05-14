@@ -1,0 +1,179 @@
+name: Build test application containers
+
+on:
+  workflow_call:
+    inputs:
+      agent:
+        default: 'node'
+        required: false
+        type: string
+      registry:
+        default: 'harbor.nbfc.io'
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      agent:
+        default: 'node'
+        required: false
+        type: string
+      registry:
+        default: 'harbor.nbfc.io'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ${{ github.event.inputs.registry || 'harbor.nbfc.io' }}
+  REGISTRY_IMAGE: ${{ github.event.inputs.registry || 'harbor.nbfc.io' }}/mlsysops/test-app
+  RUNNER_ARCH_MAP: '[{"amd64":"x86_64", "arm64":"aarch64", "arm":"armv7l"}]'
+
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ${{ format('{0}-{1}', 'base-dind-2204', matrix.arch) }}
+    strategy:
+      matrix:
+        arch: ["arm64", "amd64"]
+      fail-fast: false
+    outputs:
+      digest-amd64: ${{ steps.set-outputs.outputs.digest-amd64 }}
+      digest-arm64: ${{ steps.set-outputs.outputs.digest-arm64 }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Login to registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.HARBOR_USER }}
+          password: ${{ secrets.HARBOR_SECRET }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+          tags: |
+            type=sha,prefix=${{ matrix.arch }}-
+            type=ref,event=branch,prefix=${{ matrix.arch }}-
+
+      - name: Build and push ${{ matrix.arch }} image
+        id: build-and-push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./tests/application
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          file: ./tests/application/Dockerfile
+          provenance: false
+          build-args: |
+            ARCHTAG=${{ fromJson(env.RUNNER_ARCH_MAP)[0][matrix.arch] }}
+            BRANCH=${{ github.event.ref_name || github.ref_name }}
+
+      - name: Set ${{ matrix.arch }} digest output
+        id: set-outputs
+        run: |
+          # Workaround for https://github.com/actions/runner/issues/2499
+          echo "digest-${{ matrix.arch }}=${{ steps.build-and-push.outputs.digest }}" \
+            >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  create-manifest:
+    name: Create Merged Docker Image Manifest
+    needs: [build]
+    runs-on: 'base-dind-2204-amd64'
+    outputs:
+      digest-merged: ${{ steps.inspect.outputs.digest-merged }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Login to registry ${{ inputs.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.HARBOR_USER }}
+          password: ${{ secrets.HARBOR_SECRET }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: Create and push manifest
+        run: |
+          docker buildx imagetools create \
+          $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< \
+            "$DOCKER_METADATA_OUTPUT_JSON") \
+            ${{ env.REGISTRY_IMAGE }}@${{ needs.build.outputs.digest-amd64 }} \
+            ${{ env.REGISTRY_IMAGE }}@${{ needs.build.outputs.digest-arm64 }}
+        shell: bash
+
+      - name: Inspect merged image
+        id: inspect
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          digest=$(docker buildx imagetools inspect \
+            ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }} \
+            --format '{{json .Manifest}}' | jq -r '.digest')
+          if [[ -z "${digest}" ]]; then
+            echo "Could not get merged image digest"
+            exit 1
+          fi
+          echo "digest-merged=${digest}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  sign:
+    name: Sign Docker Images
+    needs: [build, create-manifest]
+    runs-on: 'base-dind-2204-amd64'
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Verify Cosign installation
+        run: cosign version
+
+      - name: Login to registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.HARBOR_USER }}
+          password: ${{ secrets.HARBOR_SECRET }}
+
+      - name: Sign published Docker images
+        env:
+          DIGESTS: >-
+            ${{ needs.create-manifest.outputs.digest-merged }}
+            ${{ needs.build.outputs.digest-amd64 }}
+            ${{ needs.build.outputs.digest-arm64 }}
+        run: |
+          for digest in ${DIGESTS}; do
+            cosign sign --yes ${{ env.REGISTRY_IMAGE }}@${digest} \
+              -a "repo=${{ github.repository }}" \
+              -a "workflow=${{ github.workflow }}" \
+              -a "ref=${{ github.sha }}" \
+              -a "author=Nubificus LTD"
+          done
+        shell: bash

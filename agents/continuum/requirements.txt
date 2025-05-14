@@ -12,3 +12,5 @@ nvidia-pyindex
 cpufreq
 cachetools
 kubernetes
+redis
+kubernetes_asyncio
