@@ -59,6 +59,15 @@ jobs:
     uses: ./.github/workflows/build-northbound-api.yml
     secrets: inherit
 
+  build-test-app:
+    #needs: [build-agent-pkg]
+    name: Build testing application containers 
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    uses: ./.github/workflows/build-test-application.yml
+    secrets: inherit
+
 
 #  lint:
 #    name: Lint code
