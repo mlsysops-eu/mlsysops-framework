@@ -89,6 +89,12 @@
                 - "*.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
                 - "*.{{ .Release.Namespace }}.svc"
                 {% endraw %}
+
+          components:
+            - search
+
+          search:
+            enableResourceRegistry: true
         mode: '0644'
       tags: install
 
