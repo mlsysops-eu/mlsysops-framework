@@ -20,7 +20,7 @@ spec:
       containers:
         - name: continuum-agent
           imagePullPolicy: Always
-          image: registry.mlsysops.eu/agent/agents/continuum:0.0.15
+          image: harbor.nbfc.io/mlsysops/continuum-agent:latest
           env:
             - name: KARMADA_API_KUBECONFIG
               value: /etc/kubeconfigs/karmada-api.kubeconfig

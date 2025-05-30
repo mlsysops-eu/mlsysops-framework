@@ -82,7 +82,7 @@ apply the CR or the descirption via the MLS CLI:
 
 ## Custom Policies
 
-3. Create a configmap based on each policy that you want to use inside the agents.
+Create a configmap based on each policy that you want to use inside the agents.
 `kubectl create configmap cluster-policies --from-file=policy-<policy-name>.py --from-file=policy-<policy-name>.py --namespace=mlsysops-framework`
 
 
@@ -90,19 +90,19 @@ apply the CR or the descirption via the MLS CLI:
 
 ## Environmental variables
 
-EJABBERD_DOMAIN - the IP/domain of the continuum node. used for spade agent login to xmpp (xmpp server ip), and from the cluster otel to send telemetry
-MLS_OTEL_HIGHER_EXPORT - ON (default) /OFF to indidcate if telemetry export to cluster/continuum OTEL is enabled. Used in cluster/node agents.
-MLS_OTEL_CLUSTER_PORT - the port used that cluster otel collector listend (gRPC - default 43170)
-MLS_OTEL_CONTINUUM_PORT - the continuum otel collector GRPC port. must be set to cluster agent pod
-MLS_OTEL_PROMETHEUS_LISTEN_IP/MLS_OTEL_PROMETHEUS_LISTEN_PORT - the otel collector prometheus exporting ip/port, for every layer. for local fetch
-MLS_OTEL_CONTINUUM_EXPORT_IP/MLS_OTEL_CONTINUUM_EXPORT_PORT - used in continuum agent env pod. if we want to use another OTEL collector receiving the telemetry stream
-MLS_OTEL_MIMIR_EXPORT_ENDPOINT - used to indicate if the otel collector should export metrics to a mimir instance
-MLS_OTEL_LOKI_EXPORT_ENDPOINT - used to indicate if the otel collector should export logs to a loki instance
-MLS_OTEL_TEMPO_EXPORT_ENDPOINT - used to indicate if the otel collector should export traces to a tempo instance
-MLS_OTEL_NODE_EXPORTER_FLAGS - used to setup the --collect.* flags of node exporter. It always uses --collector.disable-defaults, appending this env variable. 
- Default only --collector.os. Use the collector names, separated by comma (e.g. cpu, os, netdev)
-LOCAL_OTEL_ENDPOINT - the local ip 
-
+| Variable Name                      | Values                                    | Description                                                                                                                          |
+|------------------------------------|-------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| EJABBERD_DOMAIN                    | IP/domain                                 | The IP/domain of the continuum node used for spade agent login to xmpp (xmpp server ip), and from the cluster otel to send telemetry |
+| MLS_OTEL_HIGHER_EXPORT             | ON (default)/OFF                          | Indicates if telemetry export to cluster/continuum OTEL is enabled. Used in cluster/node agents.                                     |
+| MLS_OTEL_CLUSTER_PORT              | Port number (default 43170)               | The port used that cluster otel collector listens (gRPC)                                                                             |
+| MLS_OTEL_CONTINUUM_PORT            | Port number                               | The continuum otel collector GRPC port. Must be set to cluster agent pod                                                             | 
+| MLS_OTEL_PROMETHEUS_LISTEN_IP/PORT | IP:PORT                                   | The otel collector prometheus exporting ip/port, for every layer. For local fetch                                                    |
+| MLS_OTEL_CONTINUUM_EXPORT_IP/PORT  | IP:PORT                                   | Used in continuum agent env pod if we want to use another OTEL collector receiving the telemetry stream                              |
+| MLS_OTEL_MIMIR_EXPORT_ENDPOINT     | URL                                       | Used to indicate if the otel collector should export metrics to a mimir instance                                                     |
+| MLS_OTEL_LOKI_EXPORT_ENDPOINT      | URL                                       | Used to indicate if the otel collector should export logs to a loki instance                                                         |
+| MLS_OTEL_TEMPO_EXPORT_ENDPOINT     | URL                                       | Used to indicate if the otel collector should export traces to a tempo instance                                                      |
+| MLS_OTEL_NODE_EXPORTER_FLAGS       | Comma-separated list (e.g. cpu,os,netdev) | Used to setup the --collect.* flags of node exporter. Always uses --collector.disable-defaults. Default: --collector.os              |
+| LOCAL_OTEL_ENDPOINT                | IP                                        | The local IP                                                                                                                         |
 
 ### ML Connect
 Use environmental variable MLS_MLCONNECTOR_ENDPOINT to provide the REST API URL:IP of the service. If none is provided, the object in
