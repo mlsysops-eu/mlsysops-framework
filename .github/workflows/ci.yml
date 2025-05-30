@@ -13,6 +13,8 @@ concurrency:
 permissions:
   pull-requests: read
   contents: read
+  id-token: write
+
 
 
 jobs:
@@ -23,6 +25,49 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'skip-lint')
     uses: ./.github/workflows/validate-files-and-commits.yml
     secrets: inherit
+
+  build-agent-pkg:
+    #needs: [validate-files-and-commits, lint]
+    name: Build python pkg
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-pkg')
+    uses: ./.github/workflows/build-mlsysops-pkg.yml
+    secrets: inherit
+
+  build-agent-containers:
+    needs: [build-agent-pkg]
+    name: Build containers
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    strategy:
+      matrix:
+        agent: ["node", "cluster", "continuum"]
+      fail-fast: false
+    uses: ./.github/workflows/build-containers.yml
+    secrets: inherit
+    with:
+      agent: ${{ matrix.agent }} 
+
+  build-northbound-api:
+    needs: [build-agent-pkg]
+    name: Build Northbound API 
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    uses: ./.github/workflows/build-northbound-api.yml
+    secrets: inherit
+
+  build-test-app:
+    #needs: [build-agent-pkg]
+    name: Build testing application containers 
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    uses: ./.github/workflows/build-test-application.yml
+    secrets: inherit
+
 
 #  lint:
 #    name: Lint code

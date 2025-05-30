@@ -1,0 +1,41 @@
+mechanisms:
+- ""
+mechanisms_directory: "mechanisms"
+
+default_telemetry_metrics: "None"
+policy_directory: "policies"
+continuum_layer: "continuum"
+monitor_data_retention_time: 30
+node_exporter_scrape_interval: 10s
+
+system_description: ""
+managed_telemetry_enabled: true
+
+behaviours:
+  APIPingBehaviour:
+    enabled: False
+  Check_ml_deployment_Behaviour: # This is oneshot behaviour should be False always
+    enabled: False
+  CheckInactiveClustersBehaviour:
+    enabled: True
+    period: 10
+  HBReceiverBehaviour:
+    enabled: True
+  HeartbeatBehaviour:
+    enabled: False
+    period: 10  # Example parameter for PeriodicBehaviour
+  ManagementModeBehaviour:
+    enabled: False
+  ManageSubscriptionBehaviour:
+    enabled: True
+  MessageReceivingBehavior:
+    enabled: False
+    message_queue: "message_queue"
+  MessageSendingBehavior:
+    enabled: False
+  ML_process_Behaviour:
+    enabled: True
+  ProcessBehaviour:
+    enabled: True
+  Subscribe:
+    enabled: False

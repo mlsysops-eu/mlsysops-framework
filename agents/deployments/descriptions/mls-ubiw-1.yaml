@@ -1,0 +1,3 @@
+MLSysOpsCluster:
+  clusterID: mls-ubiw-1
+  nodes: ["mls-ubiw-2", "mls-ubiw-3"]
