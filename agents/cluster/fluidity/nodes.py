@@ -18,6 +18,7 @@
 """Fluidity nodes functionality."""
 from __future__ import print_function
 import logging
+import os
 import sys
 
 from kubernetes import client, config
@@ -178,6 +179,7 @@ def get_node_availability(node_name, nodes):
                     else:
                         logger.info('%s is not online. Returning False.', node_name)
                         return False
+    return False
 
 def get_k8s_nodes():
     """Get the list of k8s node objects.
@@ -185,7 +187,10 @@ def get_k8s_nodes():
     Returns:
         list: The nodes dictionaries.
     """
-    config.load_kube_config()
+    if 'KUBERNETES_PORT' in os.environ:
+        config.load_incluster_config()
+    else:
+        config.load_kube_config()
     api_instance = client.CoreV1Api()
     try:
         node_list = api_instance.list_node()

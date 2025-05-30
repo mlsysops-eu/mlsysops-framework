@@ -100,12 +100,13 @@ class PlanScheduler:
 
                         self.state.update_task_log(plan.uuid,updates={"status": "Scheduled"})
 
-                        # mark asset touched
-                        assets_touched[asset] = {
-                            "timestamp": time.time(),
-                            "plan_uuid": plan.uuid,
-                            "plan": command
-                        }
+                        # mark asset touched only for non-core
+                        if not plan.core:
+                            assets_touched[asset] = {
+                                "timestamp": time.time(),
+                                "plan_uuid": plan.uuid,
+                                "plan": command
+                            }
 
                         # start execution task
                         plan_task = ExecuteTask(asset,command, self.state, plan.uuid)

@@ -15,6 +15,7 @@
 
 import json
 import os
+import traceback
 from unittest import case
 
 import asyncio
@@ -29,7 +30,9 @@ from mlsysops.tasks.monitor import MonitorTask
 
 from mlsysops.logger_util import logger
 
-from .libs.otel_pods import create_otel_pod, create_svc, delete_otel_pod,remove_service
+from .libs.otel_pods import create_otel_pod, create_svc, delete_otel_pod, remove_service, deploy_node_exporter_pod, \
+    delete_node_exporter_pod
+
 
 class TelemetryController(BaseController):
 
@@ -40,6 +43,8 @@ class TelemetryController(BaseController):
         self.monitor_task = monitor_task
         self.agent_state = agent_state
         self.otel_pod_list = []
+        self.node_exporter_pod_list = []
+
 
     def __del__(self):
         logger.debug("Telemetry controller destroyed.")
@@ -54,6 +59,13 @@ class TelemetryController(BaseController):
                         remove_service()
                     except Exception as e:
                         logger.error(f"Failed to remove OTEL pod: {pod_entry}, error: {e}")
+                logger.debug("Removing node exporter pods......................................")
+                for pod_entry in self.node_exporter_pod_list:
+                    logger.debug(f"Removing node exporter pod: {pod_entry}")
+                    try:
+                        delete_node_exporter_pod(pod_entry['node'])
+                    except Exception as e:
+                        logger.error(f"Failed to remove node exporter pod: {pod_entry}, error: {e}")
             case "node":
                     # Send the parsed content to the cluster
                     # TODO spade seems to shutdown - no message goes out.
@@ -93,9 +105,6 @@ class TelemetryController(BaseController):
             # Load the template
             template = env.get_template("otel-config.yaml.j2")
 
-
-
-
             # Log the parsed content (for debugging purposes)
             logger.debug(f"Parsed OTEL configuration for level {self.agent.state.configuration.continuum_layer}")
 
@@ -105,48 +114,103 @@ class TelemetryController(BaseController):
                     return
                 case "cluster":
                     logger.debug("Applying cluster default telemetry configuration.")
-                    # Render the template with the `otlp_export_endpoint`
-                    parsed_otel_config = template.render(
-                        otlp_export_endpoint="karmada.mlsysops.eu:43170",
-                        prometheus_export_endpoint="0.0.0.0:9999",
-                        scrape_interval=self.agent.state.configuration.node_exporter_scrape_interval,
-                        scrape_timeout=self.agent.state.configuration.node_exporter_scrape_interval
-                    )
+                    if self.agent_state.configuration.otel_deploy_enabled:
+                        # Render the template with the `otlp_export_endpoint`
+                        otlp_export_endpoint_enabled = os.getenv("MLS_OTEL_HIGHER_EXPORT", "ON")
+                        if otlp_export_endpoint_enabled == "ON":
+                            otlp_export_endpoint = f'{os.getenv("EJABBERD_DOMAIN","127.0.0.1")}:{os.getenv("MLS_OTEL_CONTINUUM_PORT","43170")}'
+                        else:
+                            otlp_export_endpoint = None
+                        parsed_otel_config = template.render(
+                            otlp_export_endpoint=otlp_export_endpoint,
+                            prometheus_export_endpoint=f'{os.getenv("MLS_OTEL_PROMETHEUS_LISTEN_IP","0.0.0.0")}:{os.getenv("MLS_OTEL_PROMETHEUS_LISTEN_PORT","9999")}',
+                            scrape_interval=self.agent.state.configuration.node_exporter_scrape_interval,
+                            scrape_timeout=self.agent.state.configuration.node_exporter_scrape_interval,
+                            mimir_export_endpoint=os.getenv("MLS_OTEL_MIMIR_EXPORT_ENDPOINT"),
+                            loki_export_endpoint=os.getenv("MLS_OTEL_LOKI_EXPORT_ENDPOINT"),
+                            tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT")
+                        )
 
-                    await create_svc()
-                    pod_name, config_name = await create_otel_pod(self.agent.state.hostname,parsed_otel_config)
-                    self.otel_pod_list.append({
-                        "node": self.agent.state.hostname,
-                        "payload": parsed_otel_config,
-                        "pod": pod_name,
-                        "config": config_name}
-                    )
+                        await create_svc(name_prefix="cluster-")
+                        pod_name, config_name = await create_otel_pod(self.agent.state.hostname,parsed_otel_config)
+                        self.otel_pod_list.append({
+                            "node": self.agent.state.hostname,
+                            "payload": parsed_otel_config,
+                            "pod": pod_name,
+                            "config": config_name}
+                        )
+                    if self.agent_state.configuration.node_exporter_enabled:
+                        node_exporter_pod_port = int(os.getenv("MLS_NODE_EXPORTER_PORT", "9200"))
+                        node_exporter_flags = os.getenv("MLS_OTEL_NODE_EXPORTER_FLAGS", "os")
+                        pod_name = await deploy_node_exporter_pod(self.agent.state.hostname,node_exporter_flags,node_exporter_pod_port)
+                        self.node_exporter_pod_list.append({
+                            "node": self.agent.state.hostname,
+                            "pod": pod_name,
+                        })
                     return
                 case "node":
-                    # Render the template with the `otlp_export_endpoint`
-                    parsed_otel_config = template.render(
-                        otlp_export_endpoint="opentelemetry-collector.mls-telemetry.svc.cluster.local:43170",
-                        prometheus_export_endpoint="0.0.0.0:9999",
-                        scrape_interval=self.agent.state.configuration.node_exporter_scrape_interval,
-                        scrape_timeout=self.agent.state.configuration.node_exporter_scrape_interval
-                    )
-                    # Send the parsed content to the cluster
-                    payload = {"node": self.agent.state.hostname, "otel_config": parsed_otel_config}
-                    await self.agent.send_message_to_node(self.agent_state.configuration.cluster,mlsysops.events.MessageEvents.OTEL_DEPLOY.value,payload)
-                case "continuum":
-                    logger.debug("Applying continuum default telemetry configuration.")
-                    # Render the template with the `otlp_export_endpoint`
-                    parsed_otel_config = template.render(
-                        otlp_export_endpoint="karmada.mlsysops.eu:43170",
-                        prometheus_export_endpoint="0.0.0.0:9999",
-                        scrape_interval=self.agent.state.configuration.node_exporter_scrape_interval,
-                        scrape_timeout=self.agent.state.configuration.node_exporter_scrape_interval
-                    )
+                    if self.agent_state.configuration.otel_deploy_enabled:
+                        # Render the template with the `otlp_export_endpoint`
+                        otlp_export_endpoint_enabled = os.getenv("MLS_OTEL_HIGHER_EXPORT", "ON")
+                        if otlp_export_endpoint_enabled == "ON":
+                            otlp_export_endpoint = f'cluster-otel-collector.mls-telemetry.svc.cluster.local:{os.getenv("MLS_OTEL_CLUSTER_PORT","43170")}'
+                        else:
+                            otlp_export_endpoint = None
+                        parsed_otel_config = template.render(
+                            otlp_export_endpoint=otlp_export_endpoint,
+                            prometheus_export_endpoint=f'{os.getenv("MLS_OTEL_PROMETHEUS_LISTEN_IP","0.0.0.0")}:{os.getenv("MLS_OTEL_PROMETHEUS_LISTEN_PORT","9999")}',
+                            scrape_interval=self.agent.state.configuration.node_exporter_scrape_interval,
+                            scrape_timeout=self.agent.state.configuration.node_exporter_scrape_interval,
+                            mimir_export_endpoint=os.getenv("MLS_OTEL_MIMIR_EXPORT_ENDPOINT"),
+                            loki_export_endpoint=os.getenv("MLS_OTEL_LOKI_EXPORT_ENDPOINT"),
+                            tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT")
+                        )
+                        # Send the parsed content to the cluster
+                        payload = {"node": self.agent.state.hostname, "otel_config": parsed_otel_config}
+                        await self.agent.send_message_to_node(self.agent_state.configuration.cluster,mlsysops.events.MessageEvents.OTEL_DEPLOY.value,payload)
 
-                    await create_svc()
-                    pod_name, config_name = await create_otel_pod(self.agent.state.hostname, parsed_otel_config)
+                    if self.agent_state.configuration.node_exporter_enabled:
+                        node_exporter_pod_port = int(os.getenv("MLS_NODE_EXPORTER_PORT", "9200"))
+                        node_exporter_flags = os.getenv("MLS_OTEL_NODE_EXPORTER_FLAGS", "os")
+                        payload = {"node": self.agent.state.hostname, "port": node_exporter_pod_port, "flags": node_exporter_flags}
+                        await self.agent.send_message_to_node(self.agent_state.configuration.cluster,mlsysops.events.MessageEvents.NODE_EXPORTER_DEPLOY.value,payload)
+                    return
+                case "continuum":
+                    if self.agent_state.configuration.otel_deploy_enabled:
+                        logger.debug("Applying continuum default telemetry configuration.")
+                        # Render the template with the `otlp_export_endpoint`
+                        otlp_export_endpoint = f'{os.getenv("MLS_OTEL_CONTINUUM_EXPORT_IP","None")}:{os.getenv("MLS_OTEL_CONTINUUM_EXPORT_PORT","43170")}'
+                        if "None" in otlp_export_endpoint:
+                            otlp_export_endpoint = None
+                        parsed_otel_config = template.render(
+                            otlp_export_endpoint=otlp_export_endpoint,
+                            prometheus_export_endpoint="0.0.0.0:9999",
+                            scrape_interval=self.agent.state.configuration.node_exporter_scrape_interval,
+                            scrape_timeout=self.agent.state.configuration.node_exporter_scrape_interval,
+                            mimir_export_endpoint=os.getenv("MLS_OTEL_MIMIR_EXPORT_ENDPOINT"),
+                            loki_export_endpoint=os.getenv("MLS_OTEL_LOKI_EXPORT_ENDPOINT"),
+                            tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT")
+                        )
+
+                        await create_svc()
+                        pod_name, config_name = await create_otel_pod(self.agent.state.hostname, parsed_otel_config)
+                        self.node_exporter_pod_list.append({
+                            "node": self.agent.state.hostname,
+                            "pod": pod_name,
+                        })
+                    if self.agent_state.configuration.node_exporter_enabled:
+                        node_exporter_pod_port = int(os.getenv("MLS_NODE_EXPORTER_PORT", "9200"))
+                        node_exporter_flags = os.getenv("MLS_OTEL_NODE_EXPORTER_FLAGS", "os")
+                        pod_name = await deploy_node_exporter_pod(self.agent.state.hostname, node_exporter_flags,
+                                                                  node_exporter_pod_port)
+                        self.node_exporter_pod_list.append({
+                            "node": self.agent.state.hostname,
+                            "pod": pod_name,
+                        })
+                    return
         except Exception as e:
             logger.error(f"An error occurred while reading the configuration file: {e}")
+            logger.error(traceback.format_exc())
 
     async def remote_apply_otel_configuration(self, node_name, otel_payload):
         """
@@ -199,6 +263,54 @@ class TelemetryController(BaseController):
                     break
         except Exception as e:
             logger.error(f"An error occurred while removing OTEL pod for {node_name}: {e}")
+
+    async def remote_apply_node_exporter(self,payload):
+        """
+        Handles the deployment of a node exporter pod on a specified node in an
+        asynchronous manner. The function logs the process, applies the
+        configuration, and tracks the pod details in the `otel_pod_list`.
+
+        Args:
+            payload (dict):
+                A dictionary containing parameters for the node exporter application. Expected keys
+                include:
+                - 'node': str, the node name where the pod will be deployed.
+                - 'flags': list, optional flags for configuring the node exporter pod.
+                - 'port': int, the port number to use for the deployment.
+
+        Raises:
+            Exception:
+                If any error occurs during the node exporter's deployment or pod
+                configuration, an exception is raised and logged, interrupting the
+                operation.
+        """
+        try:
+            logger.debug(f"Applying node exporter message node {payload['node']}")
+            pod_name = await deploy_node_exporter_pod(
+                node_name=payload['node'],
+                flags=payload['flags'],
+                port=payload['port'])
+
+            self.node_exporter_pod_list.append({
+                "node":payload['node'],
+                "payload": payload,
+                "pod": pod_name
+            }
+            )
+        except Exception as e:
+            logger.error(f"An error occurred while applying the node exporter for node {payload['node']}: {e}")
+
+    async def remote_remove_node_exporter_pod(self, node_name):
+
+        try:
+            logger.debug(f"Remove node exporter node pod for node {node_name}")
+            delete_node_exporter_pod(node_name)
+            for node_exporter_pod in self.node_exporter_pod_list:
+                if node_exporter_pod["node"] == node_name:
+                    self.node_exporter_pod_list.remove(node_exporter_pod)
+                    break
+        except Exception as e:
+            logger.error(f"An error occurred while removing node exporter pod for {node_name}: {e}")
 
 
 

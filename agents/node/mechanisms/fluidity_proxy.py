@@ -58,7 +58,7 @@ async def apply(plan):
 
 
 def get_state():
-    pass
+    return {}
 
 
 def get_options():

@@ -19,9 +19,13 @@ setup(
         "spade==3.3.3",
         "Jinja2==3.0.3",
         "kubernetes==32.0.1",
+        "kubernetes_asyncio==32.0.1",
         "mlstelemetry==0.3.2",
         "python-dotenv==1.1.0",
-        "PyYAML==6.0.2"
+        "PyYAML==6.0.2",
+        "redis",
+        "ruamel.yaml",
+        "watchdog"
     ],
     package_data={
         "mlsysops": ["templates/*.j2"],

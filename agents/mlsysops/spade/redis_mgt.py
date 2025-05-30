@@ -16,12 +16,13 @@
 import json
 import os
 import redis
+from ..logger_util import logger
 
 # Fetching environment variables with default values if not set
 redis_host = os.getenv('REDIS_HOST', '127.0.0.1')  # Default to '10.96.12.155'
 redis_port = int(os.getenv('REDIS_PORT', 6379))  # Default to 6379
 redis_db_number = int(os.getenv('REDIS_DB_NUMBER', 0))  # Default to 0
-redis_password = os.getenv('REDIS_PASSWORD', 'pass')  # Uncomment if password is needed
+redis_password = os.getenv('REDIS_PASSWORD', 'secret')  # Uncomment if password is needed
 redis_queue_name = os.getenv('REDIS_QUEUE_NAME', 'valid_descriptions_queue')  # Default queue name
 redis_channel_name = os.getenv('REDIS_CHANNEL_NAME', 'my_channel')  # Default channel name
 redis_dict_name = os.getenv('REDIS_DICT_NAME', 'system_app_hash')  # Default dictionary name
@@ -53,11 +54,11 @@ class RedisManager:
         try:
             self.redis_conn = redis.Redis(host=self.host, port=self.port, db=self.db, password=self.redis_password)
             if self.redis_conn.ping():
-                print(f"Successfully connected to Redis at {self.host}.")
+                logger.info(f"Successfully connected to Redis at {self.host}.")
             else:
                 raise Exception("Could not connect to Redis.")
         except redis.ConnectionError as e:
-            print(f"Connection error: {e}")
+            logger.error(f"Connection error: {e}")
             self.redis_conn = None
 
     # --- Queue Methods ---

@@ -87,7 +87,7 @@ class ConfigurationController:
                 Updated configuration containing the loaded system description.
         """
         if not os.path.exists(self.description_path):
-            logger.error(f"System description file '{self.config_path}' not found.")
+            logger.error(f"System description file '{self.description_path}' not found.")
 
         try :
             description_file_path = os.path.join(self.description_path, os.getenv("NODE_NAME", socket.gethostname())+".yaml")

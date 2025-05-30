@@ -8,6 +8,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+node_one = "csl-rpi5-1"
+node_two = "csl-vader"
 
 def parse_analyze_interval(interval: str) -> int:
     """
@@ -54,16 +56,15 @@ def initialize():
         "mechanisms": [
             "fluidity_proxy"
         ],
-        "packages": [
-
-        ],
+        "packages": [],
         "configuration": {
             "analyze_interval": "10s"
         },
         "latest_timestamp": None,
         "core": False,
         "scope": "application",
-        "current_placement": "csl-rpi5-1"
+        "current_placement": "mls-ubiw-2",
+        "moving_interval": "30s"
     }
 
     return initialContext
@@ -73,6 +74,9 @@ def analyze(context, application_description, system_description, current_plan, 
     # a simple policy that periodically changes the frequency of the node
     # Analyze
     print("Called analyze of relocation ", context)
+    logger.info(f"\nTelemetry {telemetry}")
+    #await asyncio.sleep(10)
+    #time.sleep(30)
     current_timestamp = time.time()
 
     # The first time called
@@ -81,7 +85,7 @@ def analyze(context, application_description, system_description, current_plan, 
         return False, context
 
     # All the next ones, get it
-    analyze_interval = parse_analyze_interval(context['configuration']['analyze_interval'])
+    analyze_interval = parse_analyze_interval(context['moving_interval'])
     print(f"{current_timestamp} - {context['latest_timestamp']}  = {current_timestamp - context['latest_timestamp']} with interval {analyze_interval}")
     if current_timestamp - context['latest_timestamp'] > analyze_interval:
         context['latest_timestamp'] = current_timestamp
@@ -93,29 +97,46 @@ def analyze(context, application_description, system_description, current_plan, 
 
 def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
     print("Called relocation plan  ----- ", current_plan)
+    
+    context['initial_plan'] = False
+    main_node = node_one
+    alternative_node = node_two
 
-    main_node = "csl-rpi5-1"
-    alternative_node = "csl-jetson1"
-
-    container_relocation_command = {}
-
-    if "rpi" in context["current_placement"]:
-        container_relocation_command = {
+    plan_result = {}
+    plan_result['deployment_plan'] = {}
+    plan_result['deployment_plan']['server-app'] = []
+    curr_plan = {}
+    if main_node == context["current_placement"]:
+        curr_plan = {
             "action": "move",
             "target_host": alternative_node,
             "src_host": main_node,
         }
-    elif "jetson" in context["current_placement"]:
-        container_relocation_command = {
-            "action": "move",
-            "target_host": alternative_node,
-            "src_host": main_node,
-        }
+        context["current_placement"] = alternative_node
 
-    context["current_placement"] = container_relocation_command['target_host']
+    elif alternative_node == context["current_placement"]:
+        curr_plan = {
+            "action": "move",
+            "target_host": main_node,
+            "src_host": alternative_node,
+        }
+        context["current_placement"] = main_node
+
+    plan_result['deployment_plan']['server-app'].append(curr_plan)
+    if not context['initial_plan']:
+        context['name'] = application_description[0]['name']
+        context['initial_plan'] = True
+        
+    # This policy produces a plan for reconfiguration and not for the initial
+    # deployment
+    plan_result['deployment_plan']['initial_plan'] = False
+
+
+    if plan_result:
+        plan_result['name'] = context['name']
 
     new_plan = {
-        "fluidity": container_relocation_command,
+        "fluidity": plan_result,
     }
     logger.info('plan: New plan %s', new_plan)
 

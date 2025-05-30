@@ -103,7 +103,7 @@ def analyze(context, application_description, system_description, current_plan, 
 def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
     print("Called plan  ----- ", current_plan)
 
-    image_name = "registry.mlsysops.eu/agent/agents/test_app:0.0.0"
+    image_name = "registry.mlsysops.eu/agent/agents/test_app"
 
     if current_plan is None:
         container_image_command = {

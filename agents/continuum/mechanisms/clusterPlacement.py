@@ -15,7 +15,6 @@
 #  #
 
 import asyncio
-import fluidity.controller as fluidity_controller
 from mlsysops.logger_util import logger
 from mlsysops import MessageEvents
 
@@ -37,8 +36,7 @@ async def apply(plan):
 
 
 async def send_message(msg):
-    logger.debug(f"Sending message to fluidity {msg}")
-    await queues['outbound'].put(msg)
+    pass
 
 def get_state():
     pass

@@ -16,3 +16,4 @@ kubernetes_asyncio
 ruamel.yaml
 jsonschema
 redis
+watchdog

@@ -21,13 +21,10 @@ import time
 from ...logger_util import logger
 import yaml
 from spade.behaviour import CyclicBehaviour
-
-
-def create_yaml_file(yaml_string, output_file):
-    # Write the YAML string to a file
-    with open(output_file, 'w') as file:
-        file.write(yaml_string)
-
+import kubernetes_asyncio
+from kubernetes_asyncio.client.api import CustomObjectsApi
+from kubernetes_asyncio.client import ApiException
+from ruamel.yaml import YAML
 
 def transform_description(input_dict):
     # Extract the name and other fields under "MLSysOpsApplication"
@@ -36,7 +33,7 @@ def transform_description(input_dict):
 
     # Create a new dictionary with the desired structure
     updated_dict = {
-        "apiVersion": "fluidity.gr/v1",
+        "apiVersion": "mlsysops.eu/v1",
         "kind": "MLSysOpsApp",
         "metadata": {
             "name": app_name
@@ -52,24 +49,6 @@ def transform_description(input_dict):
     return yaml_output
 
 
-def apply_kubectl(file_path, command='apply'):
-    """
-    Apply a Kubernetes configuration file using kubectl.
-
-    :param command:
-    :param file_path: Path to the Kubernetes configuration file.
-    """
-    try:
-        env_vars = os.environ.copy()
-        result = subprocess.run(["kubectl", command, "-f", file_path], check=True, text=True, capture_output=True,
-                                env=env_vars)
-
-        # demo_telemetry_with_delay(command)
-        print(f"Command {command} executed successfully: {result.stdout}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error executing kubectl command: {e.stderr}")
-
-
 class ProcessBehaviour(CyclicBehaviour):
     """
           A behavior that processes tasks from a Redis queue in a cyclic manner.
@@ -83,35 +62,104 @@ class ProcessBehaviour(CyclicBehaviour):
         """Continuously process tasks from the Redis queue."""
         logger.info("MLs Agent is processing for Application ...")
 
-        if self.r.is_empty(self.r.q_name):
-            print(self.r.q_name + " queue is empty waiting for next iteration ")
-            await asyncio.sleep(10)
-        else:
+        karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "kubeconfigs/karmada-api.kubeconfig")
+
+        try:
+            await kubernetes_asyncio.config.load_kube_config(config_file=karmada_api_kubeconfig)
+        except kubernetes_asyncio.config.ConfigException:
+            logger.info("Running out-of-cluster configuration.")
+            return
+
+        # Initialize Kubernetes API client
+        async with kubernetes_asyncio.client.ApiClient() as api_client:
+            custom_api = CustomObjectsApi(api_client)
+
+            if self.r.is_empty(self.r.q_name):
+                logger.debug(self.r.q_name + " queue is empty, waiting for next iteration...")
+                await asyncio.sleep(10)
+                return
+
             q_info = self.r.pop(self.r.q_name)
             data_dict = json.loads(q_info)
             app_id = data_dict['MLSysOpsApplication']['name']
-            print("name", app_id, type(app_id))
-            print(self.r.get_dict_value("system_app_hash", app_id))
+            logger.debug(f"name {app_id} {type(app_id)}")
+            logger.debug(self.r.get_dict_value("system_app_hash", app_id))
+
+            group = "mlsysops.eu"
+            version = "v1"
+            plural = "mlsysopsapps"
+            namespace = "default"
+            name = app_id
 
             if self.r.get_dict_value("system_app_hash", app_id) == "To_be_removed":
-                file = transform_description(data_dict)
-                output_file = f"CR-{app_id}.yaml"
-                create_yaml_file(file, output_file)
-                apply_kubectl(output_file, "delete")
-                self.r.update_dict_value("system_app_hash", app_id, "Removed")
-
-                time.sleep(5)
-                self.r.remove_key("system_app_hash", app_id)
-
+                try:
+                    # Delete the existing custom resource
+                    logger.info(f"Deleting Custom Resource: {name}")
+                    await custom_api.delete_namespaced_custom_object(
+                        group=group,
+                        version=version,
+                        namespace=namespace,
+                        plural=plural,
+                        name=name
+                    )
+                    logger.info(f"Custom Resource '{name}' deleted successfully.")
+                    self.r.update_dict_value("system_app_hash", app_id, "Removed")
+                    self.r.remove_key("system_app_hash", app_id)
+                except ApiException as e:
+                    if e.status == 404:
+                        logger.warning(f"Custom Resource '{name}' not found. Skipping deletion.")
+                    else:
+                        logger.error(f"Error deleting Custom Resource '{name}': {e}")
+                        raise
             else:
+                try:
+                    self.r.update_dict_value("system_app_hash", app_id, "Under_deployment")
+                    # Transform and parse the description
+                    file_content = transform_description(data_dict)
+                    yaml = YAML(typ="safe")
+                    cr_spec = yaml.load(file_content)
 
-                self.r.update_dict_value("system_app_hash", app_id, "Under_deployment")
-                file = transform_description(data_dict)
-                output_file = f"CR-{app_id}.yaml"
-                create_yaml_file(file, output_file)
-                apply_kubectl(output_file)
-                self.r.update_dict_value("system_app_hash", app_id, "Deployed")
+                    # Create or update the custom resource
+                    logger.info(f"Creating or updating Custom Resource: {name}")
+                    try:
+                        current_resource = await custom_api.get_namespaced_custom_object(
+                            group=group,
+                            version=version,
+                            namespace=namespace,
+                            plural=plural,
+                            name=name
+                        )
+                        # Add resourceVersion for updating
+                        cr_spec["metadata"]["resourceVersion"] = current_resource["metadata"]["resourceVersion"]
+                        await custom_api.replace_namespaced_custom_object(
+                            group=group,
+                            version=version,
+                            namespace=namespace,
+                            plural=plural,
+                            name=name,
+                            body=cr_spec
+                        )
+                        logger.info(f"Custom Resource '{name}' updated successfully.")
+                    except ApiException as e:
+                        if e.status == 404:
+                            # Resource does not exist; create it
+                            await custom_api.create_namespaced_custom_object(
+                                group=group,
+                                version=version,
+                                namespace=namespace,
+                                plural=plural,
+                                body=cr_spec
+                            )
+                            logger.info(f"Custom Resource '{name}' created successfully.")
+                        else:
+                            logger.error(f"Error processing Custom Resource: {e}")
+                            raise
 
-                await asyncio.sleep(2)
+                    self.r.update_dict_value("system_app_hash", app_id, "Deployed")
+                    await asyncio.sleep(2)
+                except Exception as e:
+                    logger.error(f"Error during deployment of '{name}': {e}")
+                    self.r.update_dict_value("system_app_hash", app_id, "Deployment_Failed")
 
-            await asyncio.sleep(10)
+        await asyncio.sleep(2)
+

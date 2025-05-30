@@ -33,7 +33,6 @@ class MessageReceivingBehavior(CyclicBehaviour):
 
 
     async def run(self):
-        logger.debug("Receiving message Behaviour")
         msg = await self.receive(timeout=10)  # wait for a message for 10 seconds
         if msg:
             sender = str(msg._sender).split("/")[0]
@@ -81,6 +80,20 @@ class MessageReceivingBehavior(CyclicBehaviour):
                         "payload": json.loads(msg.body)
                     }
                     await self.message_queue.put(payload)
+                case ("request", MessageEvents.NODE_EXPORTER_DEPLOY.value):
+                    logger.debug(f"Received {event} from {sender}")
+                    payload = {
+                        "event": event,
+                        "payload": json.loads(msg.body)
+                    }
+                    await self.message_queue.put(payload)
+                case ("request", MessageEvents.NODE_EXPORTER_REMOVE.value):
+                    logger.debug(f"Received {event} from {sender}")
+                    payload = {
+                        "event": event,
+                        "payload": json.loads(msg.body)
+                    }
+                    await self.message_queue.put(payload)
                 case ("request", MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value):
                     logger.debug(f"Received node sys desc update from {sender}")
                     payload = {
@@ -95,6 +108,5 @@ class MessageReceivingBehavior(CyclicBehaviour):
                         "payload": json.loads(msg.body)
                     }
                     await self.message_queue.put(payload)
-
         else:
-            print("Did not received any message after 10 seconds")
+            logger.debug("Did not received any message after 10 seconds")

@@ -12,22 +12,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-
-import string
-import threading
+import os
 import asyncio
-import yaml
-import random
 import string
-import kubernetes
-import time
-import pprint
-import re
+import traceback
+
 from kubernetes import client , config , watch
-from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
+
+from ruamel.yaml import YAML
+
 from mlsysops.logger_util import logger
 from kubernetes.client.rest import ApiException
+from jinja2 import Environment, FileSystemLoader, PackageLoader, select_autoescape
 
 initial_list = None
 node_list_dict = None
@@ -39,9 +36,22 @@ base_configmap_name = 'otel-collector-configmap'
 # node_lock = []
 task_list = None
 
+client_handler = None
+
 class STATUS(Enum): # i use it to check if a node has an otel collector pod deployed and if not we should deploy it
     NOT_DEPLOYED = 0
     DEPLOYED = 1
+
+def get_api_handler():
+    global client_handler
+    if client_handler is None:
+        if 'KUBERNETES_PORT' in os.environ:
+            config.load_incluster_config()
+        else:
+            config.load_kube_config()
+        client_handler = client.CoreV1Api()
+    return client_handler
+
 
 def set_node_dict(v1: client.CoreV1Api) -> None:
     global node_list_dict # List of dictionaries
@@ -93,71 +103,115 @@ def set_node_dict(v1: client.CoreV1Api) -> None:
     return None
 
 
+def create_pod_spec(pod_name: str, node_name: str, configmap_name: str) -> str:
+    """Create a pod manifest using a Jinja template.
+
+    Args:
+        pod_name (str): Name of the pod.
+        node_name (str): Name of the node.
+        configmap_name (str): Name of the ConfigMap.
+
+    Returns:
+        str: The rendered pod manifest as a string.
+    """
+    loader = PackageLoader("mlsysops", "templates")
+    env = Environment(
+        loader=loader,
+        autoescape=select_autoescape(enabled_extensions=("j2"))
+    )
+    template = env.get_template('otel-collector-pod-definition.yml.j2')
+
+    # Render the template
+    manifest = template.render({
+        'pod_name': pod_name,
+        'node_name': node_name,
+        'configmap_name': configmap_name,
+        "otlp_grpc_port": int(os.getenv("MLS_OTEL_GRPC_PORT", "43170")),
+        "otlp_http_port": int(os.getenv("MLS_OTEL_HTTP_PORT", "43180")),
+        "otlp_prometheus_port": int(os.getenv("MLS_OTEL_PROM_PORT", "9999"))
+    })
+
+    yaml = YAML(typ='safe', pure=True)
+    manifest_dict = yaml.load(manifest)
+
+    return manifest_dict
+
+
 async def create_pod(v1: client.CoreV1Api, pod_name: str, node_name: str, configmap_name: str) -> None:
     # Define the pod spec
-    pod_spec = client.V1Pod(
-        metadata=client.V1ObjectMeta(
-            name=pod_name,
-            labels={"mls-telemetry/app": "otel-collector"
-                    }),
-        spec=client.V1PodSpec(
-            containers=[
-                client.V1Container(
-                    name="otel-collector",
-                    image="otel/opentelemetry-collector-contrib:0.113.0",
-                    args=["--config=/etc/otel-collector-config/otel-collector-config.yaml"],
-                    volume_mounts=[
-                        client.V1VolumeMount(
-                            name="otel-config-volume",
-                            mount_path="/etc/otel-collector-config",
-                            read_only=True
-                        )
-                    ],
-                    env=[
-                        client.V1EnvVar(
-                            name="NODE_HOSTNAME",
-                            value_from=client.V1EnvVarSource(
-                                field_ref=client.V1ObjectFieldSelector(
-                                    api_version="v1",
-                                    field_path="spec.nodeName"
-                                )
-                            )
-                        ),
-                        client.V1EnvVar(
-                            name="NODE_IP",
-                            value_from=client.V1EnvVarSource(
-                                field_ref=client.V1ObjectFieldSelector(
-                                    api_version="v1",
-                                    field_path="status.hostIP"
-                                )
-                            )
-                        )
-                    ]
-                )
-            ],
-            volumes=[
-                client.V1Volume(
-                    name="otel-config-volume",
-                    config_map=client.V1ConfigMapVolumeSource(name=configmap_name)
-                )
-            ],
-            restart_policy="OnFailure",
-            node_selector={"kubernetes.io/hostname": node_name}
-        ),
-    )
-
+    pod_spec = create_pod_spec(pod_name,node_name, configmap_name)
+    logger.debug(f'Pod spec is {pod_spec}')
     try:
         http_response = v1.create_namespaced_pod(namespace=namespace, body=pod_spec)  # HTTP POST
-        print(f"Pod {pod_name} created successfully on node {node_name} in namespace {namespace}.")
+        logger.info(f"Pod {pod_name} created successfully on node {node_name} in namespace {namespace}.")
     except client.exceptions.ApiException as ex:
         if ex.status == 404:
-            print(f"Status 404: Pod creation failed for pod {pod_name} in namespace {namespace}.")
+            logger.error(f"Status 404: Pod creation failed for pod {pod_name} in namespace {namespace}.")
         elif ex.status == 400:
-            print(f"Bad request: Failed to create pod {pod_name} in namespace {namespace}.")
+            logger.error(f"Bad request: Failed to create pod {pod_name} in namespace {namespace}.")
+            logger.error(traceback.format_exc())
         else:
-            print(f"Error creating Pod: {ex.reason} (code: {ex.status})")
+            logger.error(f"Error creating Pod: {ex.reason} (code: {ex.status})")
     except Exception as e:
-        print(str(e))
+        logger.error(str(e))
+    return None
+
+
+def create_node_exporter_pod_spec(pod_name: str, node_name: str, flags: str, port: int) -> dict:
+    """Create a pod manifest using a Jinja template.
+
+    Args:
+        pod_name (str): Name of the pod.
+        node_name (str): Name of the node.
+        configmap_name (str): Name of the ConfigMap.
+
+    Returns:
+        str: The rendered pod manifest as a string.
+    """
+    global namespace
+    loader = PackageLoader("mlsysops", "templates")
+    env = Environment(
+        loader=loader,
+        autoescape=select_autoescape(enabled_extensions=("j2"))
+    )
+    template = env.get_template('node-exporter-pod-definition.yml.j2')
+    node_exporter_flags = [
+        f"--collector.{flag.strip()}"
+        for flag in flags.split(",")
+    ]
+
+    # Render the template
+    manifest = template.render({
+        'pod_name': pod_name,
+        'node_name': node_name,
+        'namespace': namespace,
+        'port': port,
+        'node_exporter_flags': node_exporter_flags
+    })
+
+    yaml = YAML(typ='safe', pure=True)
+    manifest_dict = yaml.load(manifest)
+
+    return manifest_dict
+
+async def create_node_exporter_pod(v1: client.CoreV1Api, pod_name: str, node_name: str,flags: str, port: int) -> None:
+    # Define the pod spec
+    pod_spec = create_node_exporter_pod_spec(pod_name,node_name,flags,port)
+    logger.debug(f'Pod spec is {pod_spec}')
+    try:
+        http_response = v1.create_namespaced_pod(namespace=namespace, body=pod_spec)  # HTTP POST
+        logger.info(f"Pod {pod_name} created successfully on node {node_name} in namespace {namespace}.")
+    except client.exceptions.ApiException as ex:
+        if ex.status == 404:
+            logger.error(f"Status 404: Pod creation failed for pod {pod_name} in namespace {namespace}.")
+        elif ex.status == 400:
+            logger.error(f"Bad request: Failed to create pod {pod_name} in namespace {namespace}.")
+            logger.error(traceback.format_exc())
+        else:
+            logger.error(f"Error creating Pod: {ex.reason} (code: {ex.status})")
+            logger.error(traceback.format_exc())
+    except Exception as e:
+        logger.error(str(e))
     return None
 
 def delete_pod(v1:client.CoreV1Api , pod_name:str) -> None:
@@ -167,6 +221,7 @@ def delete_pod(v1:client.CoreV1Api , pod_name:str) -> None:
         print(f'Pod with name {pod_name} from {namespace} namespace has been deleted')
 
     except client.exceptions.ApiException as e:
+        logger.error(traceback.format_exc())
         if e.status == 404:
             print(f'Pod {pod_name} did not deleted. Error 404')
         else:
@@ -175,22 +230,17 @@ def delete_pod(v1:client.CoreV1Api , pod_name:str) -> None:
 
 
 async def create_configmap(v1: client.CoreV1Api, configmap_name: str, otel_specs :str , verbose=False) -> client.V1ConfigMap:
-    loop = asyncio.get_running_loop()  # Get the current event loop
-
     try:
         configmap = client.V1ConfigMap(
             metadata=client.V1ObjectMeta(name=configmap_name),
             data={"otel-collector-config.yaml": otel_specs}
         )
 
-        # Run the synchronous API call in a separate thread
-        with ThreadPoolExecutor() as executor:
-            created_configmap = await loop.run_in_executor(
-                executor, v1.create_namespaced_config_map, namespace, configmap
-            )
 
-        if verbose:
-            print(f"ConfigMap '{configmap_name}' created in namespace '{namespace}'.")
+        # Run the synchronous API call in a separate thread
+        created_configmap = v1.create_namespaced_config_map(namespace, configmap)
+
+        print(f"ConfigMap '{configmap_name}' created in namespace '{namespace}'.")
         return created_configmap
 
     except client.exceptions.ApiException as e:
@@ -200,16 +250,6 @@ async def create_configmap(v1: client.CoreV1Api, configmap_name: str, otel_specs
             print(f"Bad request in creating ConfigMap '{configmap_name}' in namespace '{namespace}'.")
         else:
             print(f"Error creating ConfigMap: {e.reason}")
-        return None
-
-
-    except client.exceptions.ApiException as e:
-        if e.status == 409:  # ConfigMap already exists
-            print(f"ConfigMap '{configmap_name}' already exists in namespace '{namespace}'.")
-        elif e.status == 400:
-            print(f'Bad request in creating {configmap_name} in {namespace} namespace ')
-        else:
-            print(f"Error creating ConfigMap: {e}")
         return None
 
 
@@ -232,8 +272,7 @@ def remove_service() -> None:
         namespace (str): The namespace from which to delete the service.
 
     """
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
+    v1 = get_api_handler()
     service_name = "otel-collector-svc"
     try:
         # Attempt to delete the service
@@ -253,43 +292,6 @@ async def read_configmap(v1: client.CoreV1Api , configmap_name: str) -> client.V
     except Exception as ex:
         print(ex)
         return None
-
-# def monitor_nodes(v1:client.CoreV1Api) -> None: # Always check for new nodes if added or deleted
-#     w = watch.Watch()
-#     try:
-
-#         for event in w.stream(v1.list_node):
-#             event_type = event["type"]
-#             node_name = event["object"].metadata.name
-#             print(f"Node Event: {event_type} - Node Name: {node_name}")
-
-#     except Exception as ex:
-#         print(ex)
-#     finally:
-#         w.stop()
-#     return None
-
-# def add_new_nodes(v1: client.CoreV1Api) -> None:
-#     global node_list_dict
-#     global initial_list
-#     global node_counter
-#     try:
-#         http_response = v1.list_node()
-#         new_item_list = http_response.items # New V1NodesList
-#         for node in new_item_list :
-#             if node.metadata.name not in {n.metadata.name for n in initial_list}: : # found a V1Node object that is not in the orginal list
-#                 node_counter += 1
-#                 key = node.metadata.name
-#                 assigned_pod_name = pod_name + str(node_counter)
-#                 config_name = configmap_name + str(node_counter)
-#                 label_value = node.metadata.labels
-#                 val = [assigned_pod_name , config_name , label_value]
-#                 new_node = {key : val}
-#                 node_list_dict.append(new_node) # Add the new node to our list of dictionaries
-#                 initial_list.append(node)
-#     except Exception as ex:
-#         print(ex)
-#     return None
 
 # def monitor_pods(v1:client.CoreV1Api) -> None:
 #     w = watch.Watch()
@@ -344,6 +346,21 @@ async def task_monitor(v1: client.CoreV1Api , node_list : list,otel:string) -> N
     return None
 # Gather , check : is_running ,
 
+async def deploy_node_exporter_pod(node_name: str, flags: str,port: int) -> bool :
+
+    v1 = get_api_handler()
+
+    logger.debug(f'Node exporter Pod with name:{node_name} is been created')
+    final_pod_name = f"node-exporter-{node_name}"
+    try:
+        await create_node_exporter_pod(v1, final_pod_name, node_name, flags, port)
+    except Exception as e:
+        logger.error(f'Error creating pod for node {node_name} : {e}')
+        logger.error(traceback.format_exc())
+        return None,None
+
+    return final_pod_name
+
 async def create_otel_pod(node_name: str , otel_yaml:string) -> bool :
     """
         Creates an OpenTelemetry (OTEL) pod and its associated ConfigMap on the provided node.
@@ -363,8 +380,7 @@ async def create_otel_pod(node_name: str , otel_yaml:string) -> bool :
             Exception: If an error occurs during the creation of ConfigMap or pod, the exception
                        is caught, logged, and the function returns False.
     """
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
+    v1 = get_api_handler()
 
     logger.debug(f'OTEL Pod with name:{node_name} is been created')
     final_config_name = f"{base_configmap_name}-{node_name}"
@@ -374,6 +390,7 @@ async def create_otel_pod(node_name: str , otel_yaml:string) -> bool :
         await create_pod(v1, final_pod_name, node_name, final_config_name)
     except Exception as e:
         logger.error(f'Error creating pod for node {node_name} : {e}')
+        logger.error(traceback.format_exc())
         return None,None
 
     return final_pod_name , final_config_name
@@ -395,8 +412,7 @@ def delete_otel_pod(node_name: str) -> bool:
     Returns:
         bool: True if the pod and ConfigMap are successfully deleted, otherwise False.
     """
-    config.load_kube_config()
-    v1 = client.CoreV1Api()
+    v1 = get_api_handler()
 
     final_config_name = f"{base_configmap_name}-{node_name}"
     final_pod_name = f"{base_pod_name}-{node_name}"
@@ -409,6 +425,17 @@ def delete_otel_pod(node_name: str) -> bool:
 
     return True
 
+def delete_node_exporter_pod(node_name: str) -> bool:
+    v1 = get_api_handler()
+
+    final_pod_name = f"node-exporter-{node_name}"
+    try:
+        delete_pod(v1, final_pod_name)
+    except Exception as e:
+        logger.error(f'Error creating pod for node {node_name} : {e}')
+        return False
+
+    return True
 
 async def restart_telemetry_pod(v1: client.CoreV1Api , node : dict , node_id : int  , otel:string ,update_method = None) -> None :
     global node_list_dict
@@ -450,48 +477,38 @@ async def restart_telemetry_pod(v1: client.CoreV1Api , node : dict , node_id : i
     return None
 
 
-def create_svc_manifest():
-    """Create manifest for service-providing component.
-    Returns:
-        manifest (dict): The respective service manifest.
-    """
+def create_svc_manifest(name_prefix=None):
+    """Create manifest for service-providing component using Jinja template.
+       Returns:
+           manifest (str): The rendered service manifest as a string.
+       """
 
-    manifest = {
-        'apiVersion': 'v1',
-        'kind': 'Service',
-        'metadata': {
-            'name': "otel-collector-svc"
-        },
-        'spec': {
-            'type': "ClusterIP",
-            'ports': [
-                {
-                    'name': "otlp-grpc",
-                    'port': 43170,
-                    'protocol': "TCP",
-                    'targetPort': 43170,
-                },
-                {
-                    'name': "otlp-http",
-                    'port': 43180,
-                    'protocol': "TCP",
-                    'targetPort': 43180,
-                },{
-                    'name': 'prom',
-                    'port': 9999,
-                    'protocol': "TCP",
-                    'targetPort': 9999,
-                },
-            ],
-            'selector': {
-                'mls-telemetry/app': "otel-collector",
-            }
-        }
-    }
-    return manifest
+    loader = PackageLoader("mlsysops", "templates")
+    env = Environment(
+        loader=loader,
+        autoescape=select_autoescape(enabled_extensions=("j2"))
+    )
+    template = env.get_template('otel-collector-service.yaml.j2')
+    name = "otel-collector"
+    if name_prefix is not None:
+        name = name_prefix + name
+    # Render the template with the context data
+    manifest = template.render({
+        'name': name,
+        'type': "ClusterIP",
+        'selector': "otel-collector",
+        "otlp_grpc_port": int(os.getenv("MLS_OTEL_GRPC_PORT","43170")),
+        "otlp_http_port": int(os.getenv("MLS_OTEL_HTTP_PORT","43180")),
+        "otlp_prometheus_port": int(os.getenv("MLS_OTEL_PROM_PORT","9999"))
+    })
+
+    yaml = YAML(typ='safe',pure=True)
+    manifest_dict = yaml.load(manifest)
+
+    return manifest_dict
 
 
-async def create_svc(svc_manifest=None):
+async def create_svc(name_prefix=None,svc_manifest=None):
     """Create a Kubernetes service.
 
     Note: For testing it deletes the service if already exists.
@@ -502,10 +519,9 @@ async def create_svc(svc_manifest=None):
     Returns:
         svc (obj): The instantiated V1Service object.
     """
-    config.load_kube_config()
-    core_api = client.CoreV1Api()
+    core_api = get_api_handler()
     if svc_manifest is None:
-        svc_manifest = create_svc_manifest()
+        svc_manifest = create_svc_manifest(name_prefix)
     resp = None
     try:
         logger.info('Trying to read service if already exists')

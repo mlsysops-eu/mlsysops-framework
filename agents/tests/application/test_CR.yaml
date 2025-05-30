@@ -34,6 +34,8 @@ components:
               fieldPath: status.hostIP
         - name: TELEMETRY_ENDPOINT
           value: "$(NODE_IP):43170"
+        - name: TCP_SERVER_IP
+          value: "0.0.0.0"
       ports:
         - containerPort: 10000
           protocol: TCP
@@ -42,7 +44,7 @@ components:
     nodePlacement:
       continuumLayer:
         - Edge
-      node: csl-rpi5-1
+      node: csl-vader
       labels:
         - "node-type:edge"
       Scaling:

@@ -1,7 +1,7 @@
 from cpufreq import cpuFreq
 
 
-def initialize():
+def initialize(inbound_queue, outbound_queue):
     pass
 
 # TODO change to paylod
@@ -86,18 +86,17 @@ def get_state():
 
 def get_cpu_available_frequencies():
     cpufreq = cpuFreq()
-    frequencies = cpufreq.get_available_frequencies()
-    print("Available Frequencies (kHz):")
-    for cpu, freqs in frequencies.items():
-        print(f"  {cpu}: {freqs}")
+    frequencies = {
+        "min": cpufreq.get_min_freq(),
+        "max": cpufreq.get_max_freq()
+         }
+    return frequencies
 
 
 def get_cpu_current_frequencies():
     cpufreq = cpuFreq()
     current_freqs = cpufreq.get_frequencies()
-    print("Current Frequencies (kHz):")
-    for cpu, freq in current_freqs.items():
-        print(f"  {cpu}: {freq}")
+    return current_freqs
 
 def reset_to_governor(governor: str = "ondemand"):
     cpufreq = cpuFreq()

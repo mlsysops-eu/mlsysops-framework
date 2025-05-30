@@ -20,7 +20,7 @@ def initialize():
     initialContext = {
         "telemetry": {
             "metrics": ["node_load1"],
-            "system_scrape_interval": "1s"
+            "system_scrape_interval": "2s"
         },
         "mechanisms": [
             "CPUFrequencyConfigurator"
@@ -73,7 +73,7 @@ def initial_plan(context, app_desc, system_desc):
 
 
 def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
-    logger.info('Analyze has current deployment %s', current_plan)
+    logger.info('--Analyze has current deployment %s.', current_plan)
     application = application_description[0]
     adaptation = False
     # NOTE: Fix analyze, it does not receive the updated app description

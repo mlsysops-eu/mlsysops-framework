@@ -13,3 +13,5 @@ nvidia-pyindex
 cpufreq
 kubernetes
 redis
+watchdog
+kubernetes_asyncio

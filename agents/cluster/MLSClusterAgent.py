@@ -14,6 +14,7 @@
 #
 
 import asyncio
+import traceback
 
 import mlsysops
 from mlsysops.application import MLSApplication
@@ -67,7 +68,7 @@ class MLSClusterAgent(MLSAgent):
         """
         Task to listen for messages from the message queue and act upon them.
         """
-        print("MLSAGENT:::: Starting Message Queue Listener...")
+        logger.debug("MLSAGENT:::: Starting Message Queue Listener...")
         while True:
             try:
                 # Wait for a message from the queue
@@ -80,6 +81,7 @@ class MLSClusterAgent(MLSAgent):
                 #node = data.get("hostname")
                 # Act upon the event type
                 logger.debug(f"Received message from spade msg queue of event {event}")
+                logger.debug(f"Payload: {data}")
 
                 match event:
                     case mlsysops.events.MessageEvents.COMPONENT_PLACED.value:
@@ -105,6 +107,12 @@ class MLSClusterAgent(MLSAgent):
                             "event": event,
                             "payload": data
                         })
+                    case mlsysops.events.MessageEvents.NODE_EXPORTER_DEPLOY.value:
+                        logger.debug(f"Received node exporter deploy msg from node")
+                        await self.telemetry_controller.remote_apply_node_exporter(data)
+                    case mlsysops.events.MessageEvents.NODE_EXPORTER_REMOVE.value:
+                        logger.debug(f"Received node exporter remove msg from node")
+                        self.telemetry_controller.remote_remove_node_exporter_pod(data['node'])
                     case _:
                         print(f"Unhandled event type: {event}")
                 print("Going to sleep for 1 second...")
@@ -123,6 +131,8 @@ class MLSClusterAgent(MLSAgent):
                 event = msg.get("event")  # Expected event field
                 logger.debug(f'Event {event}')
                 data = msg.get("payload")  # Additional application-specific data
+                logger.debug(f"Payload: {data}")
+
                 match event:
                     case MessageEvents.APP_CREATED.value:
                         logger.debug(f"Received APP_CREATED msg from fluidity")
@@ -185,5 +195,6 @@ class MLSClusterAgent(MLSAgent):
                 break
             except Exception as e:
                 logger.error(f"fluidity_message_listener: Error processing msg: {e}")
+                logger.debug(traceback.format_exc())
                 await asyncio.sleep(1)
-        print(f"MLSAGENT::::  stopping fluidity message listener.... ")
+        logger.debug(f"MLSAGENT::::  stopping fluidity message listener.... ")

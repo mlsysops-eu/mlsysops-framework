@@ -39,3 +39,5 @@ class MessageEvents(Enum):
     MESSAGE_TO_NODE = "message_to_node"
     MESSAGE_TO_FLUIDITY = "message_to_fluidity"
     PLAN_STATUS_UPDATE = "plan_status_update"
+    NODE_EXPORTER_DEPLOY = "node_exporter_deploy"
+    NODE_EXPORTER_REMOVE = "node_exporter_remove"

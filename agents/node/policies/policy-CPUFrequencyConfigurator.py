@@ -78,10 +78,11 @@ def initialize():
     return initialContext
 
 
-def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
+def analyze(context, application_description, system_description, assets, telemetry, ml_connector):
     # a simple policy that periodically changes the frequency of the node
     # Analyze
-    print("Called analyze of cpufreq", context)
+    print(f"Called analyze of cpufreq {context}\n")
+    print(f"Assets {assets}\n")
     current_timestamp = time.time()
 
     # The first time called

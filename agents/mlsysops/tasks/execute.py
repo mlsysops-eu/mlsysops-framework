@@ -40,7 +40,7 @@ class ExecuteTask(BaseTask):
         if self.asset_name in self.state.configuration.mechanisms and self.asset_name in self.state.assets:
             # Agent is configured to handle this mechanism
             # TODO we can do this check in scheduler?
-            mechanism_handler = self.state.assets[self.asset_name]
+            mechanism_handler = self.state.assets[self.asset_name]['module']
 
             print(mechanism_handler)
 

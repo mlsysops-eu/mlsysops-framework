@@ -94,7 +94,7 @@ class ApplicationController:
     async def on_application_updated(self, data):
         #logger.info('App %s updated %s', data['name'], )
         if data['name'] in self.application_tasks_running:
-            self.state.update_application(data['name'],data['spec'])
+            self.state.update_application(data['name'],data)
         # else:
         #     logger.error('No app name specified. Will not update app desc.')
     async def run(self):

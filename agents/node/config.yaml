@@ -1,14 +1,14 @@
   mechanisms:
     - "CPUFrequencyConfigurator"
     - "fluidity_proxy"
-  default_telemetry_metrics: "None"
+  default_telemetry_metrics:
+    - "node_os_info"
   policy_directory: "policies"
   mechanisms_directory: "mechanisms"
   continuum_layer: "node"
   monitor_data_retention_time: 30
   node_exporter_scrape_interval: 10s
   node_description: descriptions/csl-rpi5-1
-  managed_telemetry_enabled: true
 
   behaviours:
       APIPingBehaviour:

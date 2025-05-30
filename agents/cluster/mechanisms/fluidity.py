@@ -31,7 +31,7 @@ async def send_message(msg):
     await queues['outbound'].put(msg)
 
 def get_state():
-    pass
+    return {}
 
 def get_options():
-    pass
+    return {}
