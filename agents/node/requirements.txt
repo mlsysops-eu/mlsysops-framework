@@ -15,3 +15,4 @@ kubernetes
 redis
 watchdog
 kubernetes_asyncio
+ruamel.yaml
