@@ -1,0 +1,10 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlsysops-framework
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mls-telemetry

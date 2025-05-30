@@ -1,10 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ejabberd-deployment
+  name: ejabberd
   namespace: mlsysops-framework
-  labels:
-    app: ejabberd
 spec:
   replicas: 1
   selector:
@@ -16,33 +14,34 @@ spec:
         app: ejabberd
     spec:
       containers:
-        - name: ejabberd
-          image: ghcr.io/processone/ejabberd
-          env:
-            - name: ERLANG_NODE_ARG
-              value: "ejabberd@${IP_SEL}"
-            - name: ERLANG_COOKIE
-              value: "dummycookie123"
-            - name: CTL_ON_CREATE
-              value: "! register admin ${IP_SEL} 1234"
-          ports:
-            - containerPort: 5210
-              hostPort: 5210
-            - containerPort: 5222
-              hostPort: 5222
-            - containerPort: 5269
-              hostPort: 5269
-            - containerPort: 5280
-              hostPort: 5280
-            - containerPort: 5443
-              hostPort: 5443
-            - containerPort: 4369
-              hostPort: 4369
-          volumeMounts:
-            - name: ejabberd-config-volume
-              mountPath: /opt/ejabberd/conf/ejabberd.yml
-              subPath: ejabberd.yml
+      - name: ejabberd
+        image: ghcr.io/processone/ejabberd:latest
+        ports:
+          - containerPort: 5222
+            hostPort: 5222
+            protocol: "TCP"
+          - containerPort: 5280
+            hostPort: 5280
+            protocol: "TCP"
+        env:
+        - name: POD_IP
+          value: karmada.mlsysops.eu
+#          valueFrom:
+#            fieldRef:
+#              fieldPath: status.hostIP
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "📥 Generating ejabberd.yml with pod IP = ${POD_IP}" && \
+            sed "s/__POD_IP__/${POD_IP}/g" /config/ejabberd.yml.template \
+              > /opt/ejabberd/conf/ejabberd.yml && \
+            echo "✅ Starting ejabberd..." && \
+            exec ejabberdctl foreground
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+          readOnly: true
       volumes:
-        - name: ejabberd-config-volume
-          configMap:
-            name: ejabberd-config
+      - name: config-volume
+        configMap:
+          name: ejabberd-config

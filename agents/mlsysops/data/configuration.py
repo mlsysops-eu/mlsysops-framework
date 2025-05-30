@@ -37,6 +37,9 @@ class AgentConfig:
     # Telemetry
     node_exporter_scrape_interval: str = "5s"
 
+    node_exporter_enabled: bool = True
+    otel_deploy_enabled: bool = True
+
     node: str = field(default_factory=lambda: os.getenv("NODE_NAME", socket.gethostname()))
     cluster: str = field(default_factory=lambda: os.getenv("CLUSTER_NAME", ""))
     domain: str = field(default_factory=lambda: os.getenv("EJABBERD_DOMAIN", ""))

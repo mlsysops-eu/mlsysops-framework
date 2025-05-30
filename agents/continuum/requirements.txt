@@ -14,3 +14,4 @@ cachetools
 kubernetes
 redis
 kubernetes_asyncio
+watchdog

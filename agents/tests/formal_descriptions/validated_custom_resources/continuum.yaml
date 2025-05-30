@@ -1,0 +1,6 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsContinuum
+metadata:
+  name: mlsysops-slice-1
+continuum_id: mlsysops-slice-1
+clusters: ["uth-prod-1", "uth-dev-1"]

@@ -92,4 +92,7 @@ async def main():
 
 if __name__ == "__main__":
     # Start an asyncio event loop and run the `main` coroutine
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt as e:
+        logger.info("MLSAgent stopped.")

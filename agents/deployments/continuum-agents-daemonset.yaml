@@ -1,0 +1,51 @@
+# DaemonSet for continuum Agent
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mlsysops-continuum-agent
+  namespace: mlsysops-framework
+spec:
+  selector:
+    matchLabels:
+      app: continuum-agent
+  template:
+    metadata:
+      labels:
+        app: continuum-agent
+    spec:
+      serviceAccountName: mlsysops-agents-sa
+      # Use nodeSelector to target nodes with mlsysops/continuumLayer=continuum
+      nodeSelector:
+        mlsysops/continuumLayer: "continuum"
+      containers:
+        - name: continuum-agent
+          imagePullPolicy: Always
+          image: registry.mlsysops.eu/agent/agents/continuum:0.0.15
+          env:
+            - name: KARMADA_API_KUBECONFIG
+              value: /etc/kubeconfigs/karmada-api.kubeconfig
+            - name: REDIS_HOST
+              value: karmada.mlsysops.eu
+            - name: NODE_NAME
+              value: uth-karmada
+            - name: CLUSTER_NAME
+              value: cluster
+            - name: EJABBERD_DOMAIN
+              value: karmada.mlsysops.eu
+            - name: NODE_PASSWORD
+              value: "1234"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: continuum-config-volume
+              mountPath: /etc/kubeconfigs      # Mount location of the ConfigMap
+              readOnly: true
+      volumes:
+        - name: continuum-config-volume
+          configMap:
+            name: continuum-config

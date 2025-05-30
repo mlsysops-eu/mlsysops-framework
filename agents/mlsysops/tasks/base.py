@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import os
+
 
 class BaseTask:
     def __init__(self, state):
@@ -30,3 +32,9 @@ class BaseTask:
 
     def get_available_assets(self):
         return self.state.configuration.mechanisms
+
+    def get_assets(self):
+        return self.state.assets
+
+    def get_ml_connector_object(self):
+        return os.getenv("MLS_MLCONNECTOR_ENDPOINT")

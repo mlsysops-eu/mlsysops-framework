@@ -17,6 +17,7 @@
 
 import json
 import logging
+import os
 import random
 import threading
 import time
@@ -737,7 +738,10 @@ def schedule_all_components(app):
     Args:
         app (dict): The application info dictionary.
     """
-    config.load_kube_config()
+    if 'KUBERNETES_PORT' in os.environ:
+        config.load_incluster_config()
+    else:
+        config.load_kube_config()
     api = client.CoreV1Api()
     stream = watch.Watch().stream(api.list_namespaced_pod, 'default')
     scheduled_pods = 0

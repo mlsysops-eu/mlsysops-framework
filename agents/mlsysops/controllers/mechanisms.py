@@ -87,7 +87,11 @@ class MechanismsController:
                             raise AttributeError(f"Module {mechanism_name} is missing required method: {method}")
 
                     # Add the policy in the module
-                    self._state.assets[mechanism_name] = module
+                    self._state.assets[mechanism_name] = {
+                        "module" : module,
+                        "state" : None,
+                        "options": None,
+                    }
 
                     logger.info(f"Loaded module {mechanism_name} from {file_path}, calling initialize")
 
@@ -96,9 +100,14 @@ class MechanismsController:
                         "inbound": asyncio.Queue(),
                         "outbound": asyncio.Queue(),
                     }
-                    self._state.assets[mechanism_name].initialize(
+                    self._state.assets[mechanism_name]["module"].initialize(
                         inbound_queue=self.queues[mechanism_name]["inbound"],
                         outbound_queue=self.queues[mechanism_name]["outbound"])
+                    self._state.assets[mechanism_name]["state"] = self._state.assets[mechanism_name]["module"].get_state()
+                    self._state.assets[mechanism_name]["options"] = self._state.assets[mechanism_name]["module"].get_options()
+
+                    logger.debug(f"{self._state.assets[mechanism_name]}")
+
 
                 except Exception as e:
                     logger.error(f"Failed to load module {mechanism_name} from {file_path}: {e}")

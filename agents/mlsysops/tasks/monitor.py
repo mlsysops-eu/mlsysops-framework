@@ -40,9 +40,9 @@ class MonitorTask:
         metrics_list: A thread-safe list holding the names of monitored metrics.
         mlsTelemetryClient: An MLSTelemetry instance used for fetching metrics telemetry data.
     """
-    def __init__(self, queue, monitor_data: MonitorData, period = 1):
+    def __init__(self, state, queue, monitor_data: MonitorData, period = 1):
         self.__lock = asyncio.Lock()  # Lock to ensure thread-safe access
-
+        self.state = state
         self.queue = queue
         self.__data = monitor_data
         self.period = period
@@ -96,12 +96,14 @@ class MonitorTask:
             logger.debug("All metrics cleared.")
 
     async def run(self):
-
         try:
             while True:
                 await asyncio.sleep(self.period)
+                logger.debug("Monitor task running")
+
                 async with self.__lock:  # Locking ensures safe iteration if list is modified concurrently
                     current_time = time.time()
+                    # Fetch telemetry data
                     for metric_name in self.metrics_list:
                         # logger.debug(f"Fetching telemetry for metric: {metric_name}")
                         try:
@@ -113,8 +115,14 @@ class MonitorTask:
                             # Metric name will be the column, and its value will be the specific recorded data
                             entry = {metric_name: metric_status[0]['value'], "timestamp": current_time} # TODO handle multiple values and timestamp
                             await self.__data.add_entry(entry)
+
                         except Exception as e:
                             logger.error(f"Error fetching telemetry for metric '{metric_name}': {str(e)}")
+
+                    # Fetch mechanisms state
+                    for mechanism_key, mechanism_object in self.state.assets.items():
+                        mechanism_object['state'] = mechanism_object['module'].get_state()
+
         except asyncio.CancelledError:
             logger.debug(f"Monitor task cancelled.")
         except Exception as e:

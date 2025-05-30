@@ -76,6 +76,49 @@ def start_asyncio_thread():
     thread.start()
     return loop, thread  # Return the loop so we can schedule tasks on it
 
+def create_cr(cr_dict, cr_kind):
+    api_version = "mlsysops.eu/v1"
+    group = "mlsysops.eu"
+    version = "v1"
+    namespace = "default"
+
+    # Create the API client for Custom Resources
+    api = client.CustomObjectsApi()
+    # Extract the cluster name and CR kind
+    if cr_kind == 'MLSysOpsCluster':
+        plural = "mlsysopsclusters"
+        # Access the desired field
+        cr_name = cr_dict['clusterID']
+        logger.info("clusterID: %s", cr_name)
+        fluidityapp_settings.cluster_id = cr_name
+        logger.info('Current cluster id: %s', fluidityapp_settings.cluster_id)
+    else:
+        cr_name = cr_dict.pop("name", "")
+        plural = "mlsysopnodes"
+
+    # Create a new dictionary with the desired structure
+    updated_dict = {
+        "apiVersion": "mlsysops.eu/v1",
+        "kind": cr_kind,
+        "metadata": {
+            "name": cr_name
+        }
+    }
+    updated_dict.update(cr_dict)
+    logger.info(f'Updated dict {updated_dict}')
+    
+    try:
+        api.create_namespaced_custom_object(
+            group=group,
+            version=version,
+            namespace=namespace,
+            plural=plural,
+            body=updated_dict
+        )
+        logger.info(f"Custom resource {updated_dict['metadata']['name']} created in namespace {namespace}")
+    except ApiException as exc:
+        logger.error('Create CR %s failed: %s', cr_kind, exc)
+
 def ensure_crds():
     """Ensure all MLSysOps CRDs are registered.
 
@@ -129,33 +172,6 @@ class FluidityAppController():
         self.__app_handler_task = None
         self._app_monitor_thr_dict = {}
 
-    def spade_recv_pipe(self):
-        logger.info('Spade pipe recv started.')
-        while True:
-            logger.info('Going to block on pipe recv')
-            message = self.spade_pipe.recv()
-            logger.info('Received from spade msg: %s', message)
-            event = message.get("event")  # Expected event field
-            data = message.get("payload")  # Additional application-specific data
-            if event is None or data is None:
-                #logger.error("[%s]: Event is None or data is None", inspect.currentframe().f_code.co_name)
-                continue
-            node = data.get("hostname")
-            name = data.get("app_name")
-            if node is None:
-                #logger.error("[%s]: node is None", inspect.currentframe().f_code.co_name)
-                continue
-            if event == 'COMPONENT_SPEC_UPDATE':
-                logger.info('COMPONENT SPEC UPDATE EVENT')
-                if name is None:
-                    logger.error('[%s]: APP FIELD IS NONE.')
-                elif name not in self.apps_dict:
-                    logger.error('[%s]: APP %s IS NOT IN THE APP DICT.', inspect.currentframe().f_code.co_name, name)
-                else:
-                    self._handle_upd_app(name, self.apps_dict[name]['spec'], self.apps_dict[name]['uid'], data)
-            else:
-                logger.error(f"Unhandled event type: {event}")
-
     async def _mls_inbound_monitor(self):
         """Monitor MLSysOps inbound queue for messages."""
         logger.info('MLSysOps inbound queue monitor started')
@@ -166,9 +182,12 @@ class FluidityAppController():
                 event = message.get("event")
                 data = message.get("payload")
 
-                # TODO Submit node and cluster CR in the k8s api
+                # Submit node and cluster CR in the k8s api
                 if event == MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value:
-                    print(f"Received node system CR")
+                    logger.debug(f"Received node system CR")
+                    for cr_entry in data:
+                        logger.info(f'Found CR with name {cr_entry}')
+                        create_cr(data[cr_entry], cr_entry)
                     continue
 
                 name = data.get("name")
@@ -176,6 +195,7 @@ class FluidityAppController():
                 # uid = data.get("uid")
 
                 if event is None or data is None or name is None:
+                    logger.info('Ignoring message: One of event/data/name is missing.')
                     continue
 
                 if event == MessageEvents.PLAN_SUBMITTED.value:
@@ -490,7 +510,6 @@ class FluidityAppController():
         """
         resource_version = None  # Start with 'None' to fetch the latest events
         #resource_version = ''
-        await kubernetes_asyncio.config.load_kube_config()
         while True:
             async with kubernetes_asyncio.client.ApiClient() as api_client:
                 co_api = kubernetes_asyncio.client.CustomObjectsApi(api_client)
@@ -595,7 +614,7 @@ class FluidityAppController():
                         logger.info('payload, app name or plan is empty.')
                         continue
                     result = None
-                    #logger.info("plan %s",plan)
+                    logger.info("initial_plan %s",initial_plan)
                     if initial_plan:
                         plan.pop('initial_plan')
                         for comp_name in plan:
@@ -611,6 +630,7 @@ class FluidityAppController():
                         if deployment and start_monitor:
                             logger.info('Going to push %s to agent queue.', comp_dict)
                             status = 'SUCCESS'
+                            self.apps_dict[app_name]['initial_plan_completed'] = True
                         else:
                             logger.error('Initial deployment failed.')
                             status = 'FAILURE'
@@ -624,6 +644,11 @@ class FluidityAppController():
                         await self.mls_outbound_queue.put(agent_msg)
                     else:
                         logger.info('Received reconfiguration request %s', plan)
+                        logger.info('curr plan %s', self.apps_dict[app_name]['curr_plan']['curr_deployment'])
+                        # Extra check so that no adaptation is made if the initial plan is not executed
+                        if self.apps_dict[app_name]['initial_plan_completed'] is not True:
+                            logger.info('Initial deployment is not executed. Ignoring...')
+                            continue
                         plan.pop('initial_plan')
                         self.apps_dict[app_name]['curr_plan']['curr_deployment'] = plan
                         await self._handle_upd_app(app_name, self.apps_dict[app_name]['spec'], self.apps_dict[app_name]['uid'])
@@ -646,10 +671,7 @@ class FluidityAppController():
         app_dict['name'] = app_name
         app_dict['uid'] = app_uid
         app_dict['spec'] = app_spec
-        if 'mlsysops-id' in app_spec:
-            app_dict['internal_uid'] = app_spec['mlsysops-id']
-        else:
-            app_dict['internal_uid'] = None
+        app_dict['initial_plan_completed'] = False
 
         # MLS: remove policy
         # logger.info(app_dict['name'])
@@ -755,7 +777,6 @@ class FluidityAppController():
 
         # Get I/O component relations and create service manifests/objects
         app_dict['state'] = 'COMPONENTS_IO_RELATIONS'
-        print("IO Relations")
         for comp_name in app_dict['components']:
             comp_spec = app_dict['components'][comp_name]
             # Create Service manifest (dict) for service-providing components
@@ -994,17 +1015,22 @@ class FluidityAppController():
                 move_src_host = None
                 move_target_host = None
                 if action == 'move':
-                    move_src_host = new_deployment_plan['curr_deployment'][comp_name]['src_host']
-                    move_target_host = new_deployment_plan['curr_deployment'][comp_name]['target_host']
-                    append_dict_to_list({'name': move_src_host, 'status': 'INACTIVE'}, comp_spec['hosts'])
-                    append_dict_to_list({'name': move_target_host, 'status': 'PENDING'}, comp_spec['hosts'])
+                    # move_src_host = new_deployment_plan['curr_deployment'][comp_name][entry]['src_host']
+                    # move_target_host = new_deployment_plan['curr_deployment'][comp_name][entry]['target_host']
+                    move_src_host = entry['src_host']
+                    move_target_host = entry['target_host']
+                    logger.info(f'Caught move cmd of {comp_name} from {move_src_host} to {move_target_host}')
+                    logger.info('comp_spec[hosts]: %s', comp_spec['hosts'])
+                    append_dict_to_list({'host': move_src_host, 'status': 'INACTIVE'}, comp_spec['hosts'])
+                    append_dict_to_list({'host': move_target_host, 'status': 'PENDING'}, comp_spec['hosts'])
                     updated_hosts = True
                 elif action == 'deploy' or action == 'remove':
-                    host = new_deployment_plan['curr_deployment'][comp_name]['host']
+                    host = new_deployment_plan['curr_deployment'][comp_name][entry]['host']
+                    entry['host']
                     status = 'INACTIVE'
                     if action == 'deploy':
                         status = 'PENDING'
-                    append_dict_to_list({'name': host, 'status': status}, comp_spec['hosts'])
+                    append_dict_to_list({'host': host, 'status': status}, comp_spec['hosts'])
                     logger.info(comp_spec['hosts'])
                     updated_hosts = True
                 elif action == 'change_img':
@@ -1091,7 +1117,7 @@ class FluidityAppController():
             del_response, agent_msg = check_for_hosts_to_delete(self.apps_dict[app_name], self.nodes['edgenodes'])
         if agent_msg != [] and self.mls_outbound_queue is not None:
             logger.info('Going to push %s to agent queue.', agent_msg)
-            await self.mls_outbound_queue.send(agent_msg)
+            await self.mls_outbound_queue.put(agent_msg)
         if not del_response:
             logger.info('check_for_hosts_to_delete failed.')
         logger.info('AFTER check_for_hosts_to_delete')
@@ -1156,7 +1182,6 @@ async def main(inbound_queue=None, outbound_queue=None):
     args = parser.parse_args()
     # Overwrite arg if respective environment variable is set
     exec_mode = os.getenv('FLUIDITY_CONTROLLER_EXEC_MODE', args.exec)
-
     # Configure logging
     logger = logging.getLogger('')
     formatter = logging.Formatter('%(asctime)s %(levelname)s '
@@ -1164,7 +1189,6 @@ async def main(inbound_queue=None, outbound_queue=None):
     f_hdlr = logging.FileHandler('/var/tmp/cluster_agent_fluidity_mlsysops.log')
     f_hdlr.setFormatter(formatter)
     f_hdlr.setLevel(logging.INFO)
-    f_hdlr.setLevel(logging.DEBUG)
     logger.addHandler(f_hdlr)
     s_hdlr = logging.StreamHandler(sys.stdout)
     s_hdlr.setFormatter(formatter)
@@ -1172,26 +1196,26 @@ async def main(inbound_queue=None, outbound_queue=None):
     logger.addHandler(s_hdlr)
     logger.setLevel(logging.DEBUG)
     #logger.setLevel(logging.INFO)
+    await kubernetes_asyncio.config.load_config()
 
     # Detect if controller is run within a Pod or outside
     if 'KUBERNETES_PORT' in os.environ:
         config.load_incluster_config()
     else:
         config.load_kube_config()
+        await kubernetes_asyncio.config.load_kube_config()
+
+
     # Load kubeconfig from the default location (~/.kube/config)
     # Retrieve the current context and cluster name
-    current_context = config.list_kube_config_contexts()[1]  # [0]: All contexts, [1]: Current context
-    current_cluster_name = current_context['context']['cluster']
-
-    logger.info(f"Current cluster name: {current_cluster_name}")
-
-    # Print the cluster name
-    if current_cluster_name:
-        fluidityapp_settings.cluster_id = current_cluster_name
-        logger.info('Current cluster id: %s', fluidityapp_settings.cluster_id)
-    else:
-        logger.error("Cluster name not found in the kubeconfig.")
-        sys.exit(0)
+    #current_context = config.list_kube_config_contexts()[1]  # [0]: All contexts, [1]: Current context
+    # cluster_desc = _apply_cluster_description()
+    # if not cluster_desc:
+    #     logger.error("Error on applying cluster description")
+    #     sys.exit(0)
+    # else:
+    #     fluidityapp_settings.cluster_id = cluster_desc['clusterID']
+    #     logger.info('Current cluster id: %s', fluidityapp_settings.cluster_id)
 
     #ensure_crds() # TODO maybe we need to remove it, as it comes from continuum
     controller = FluidityAppController(inbound_queue,outbound_queue, ExecMode[exec_mode])

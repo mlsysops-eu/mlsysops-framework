@@ -28,12 +28,13 @@ import uuid
 
 class PlanTask(BaseTask):
 
-    def __init__(self, id: str, state: MLSState = None, scope: str = "global"):
+    def __init__(self, id: str, state: MLSState = None, scope: str = "global", policy_name: str = None):
         super().__init__(state)
 
         self.id = id
         self.state = state
         self.scope = scope
+        self.policyName = policy_name
 
     async def process_plan(self, current_app_desc, active_policy: Policy):
         start_date = time.time()
@@ -43,7 +44,7 @@ class PlanTask(BaseTask):
             self.get_system_description_argument(),
             {},
             self.get_telemetry_argument(),
-            {},  # TODO MLConnector,
+            self.get_ml_connector_object(),
             self.get_available_assets())
 
         logger.debug("Plan Result: %s", plan_result)
@@ -73,7 +74,7 @@ class PlanTask(BaseTask):
 
     async def run(self):
         logger.debug("Running Plan Task")
-        active_policy = PolicyController().get_policy_instance(self.scope,self.id)
+        active_policy = PolicyController().get_policy_instance(self.scope,self.id,self.policyName)
         # active_policy = self.state.policies[0] # for debug
         if active_policy is not None:
 

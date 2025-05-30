@@ -5,4 +5,5 @@ mlstelemetry==0.3.2
 pandas==2.2.3
 python-dotenv==1.1.0
 PyYAML==6.0.2
-redis==5.2.1
+redis
+watchdog
