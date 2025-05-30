@@ -1,0 +1,71 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsNode
+metadata:
+  name: node-2
+continuum_layer: edge
+cluster_id: uth-prod-cluster
+labels:
+  - "node-type:rpi"
+mobility: False
+location: [22.812791301, 29.82382932]
+sensors:
+  - temperature:
+      model: sdc30
+      measurement_min: 13
+      measurement_max: 45
+      measurement_unit: celsius
+      accuracy: 0.4
+      sampling_frequency: 10
+    instances: 1
+environment:
+  node_type: native
+  os: zephyr
+  container_runtime: 
+    - docker
+hardware:
+  cpu: #change to cpu and merge with resources above.
+    cores: 30
+    architecture: arm64
+    frequency: # All the available values
+      - 1.4
+      - 1.7
+    performance_indicator: 700 # BogoMIPS
+  gpu:
+    model: k80
+    memory: 2 # GB
+  memory: 4 # GB
+  disk: "100" # GB
+  
+network_resources:
+  basic_interface:
+    name: ethernet
+    interface_name: eth0
+permitted_actions:
+  - "*"
+power:
+  target:
+    cost:
+      value: 35    
+      relation: lower_than
+      measurement_unit: kwh
+  availability:
+    - mode: brown
+      value: 2  # The node's max power consumption within the specified time window
+      measurement_unit: kwh
+      time_windows: ["00:00-23:59"]  
+      cost:
+        value: 35    
+        measurement_unit: kwh
+      co2_emission:
+        value: 40
+        measurement_unit: kt/kwh
+    - mode: green
+      value: 2 # The node's max power consumption within the specified time window
+      measurement_unit: kwh
+      time_windows: ["09:00-17:00", "21:00-22:00"]  # Each window has the same max consumption
+      cost:
+        value: 35    
+        measurement_unit: kwh
+      co2_emission:
+        value: 40
+        measurement_unit: kt/kwh

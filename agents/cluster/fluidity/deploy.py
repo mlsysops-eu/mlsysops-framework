@@ -462,12 +462,12 @@ def destroy_wifi_connection(app, comp_name, edgenodes_list):
             continue
         found = False
         for entry in edgenodes_list:
-            if host['name'] == entry['metadata']['name']:
+            if host['host'] == entry['metadata']['name']:
                 found = True
                 break
         if not found:
             return
-        result = get_adhoc_info(host['name'], edgenodes_list)
+        result = get_adhoc_info(host['host'], edgenodes_list)
         if result['direct-comm'] == True:
             mobile_comp_name = app['mobile_comp_names'][0]
             mobile_name_host = app['components'][mobile_comp_name]['hosts'][0]['name']
@@ -490,13 +490,13 @@ def initiate_wifi_connection(app, comp_name, edgenodes_list):
         # Check for host status
         if host['status'] == 'INACTIVE':
             for entry in edgenodes_list:
-                if host['name'] == entry['metadata']['name']:
+                if host['host'] == entry['metadata']['name']:
                 #    logger.info('Old host was an edge node with redirection.')
                 #    logger.info('Skipping early wifi connection.')
                     return
         elif host['status'] != 'PENDING':
             continue
-        result = get_adhoc_info(host['name'], edgenodes_list)
+        result = get_adhoc_info(host['host'], edgenodes_list)
         if result['direct-comm'] == True:
             mobile_comp_name = app['mobile_comp_names'][0]
             mobile_name_host = app['components'][mobile_comp_name]['hosts'][0]['name']
@@ -524,7 +524,7 @@ def create_adjusted_pods_and_configs(app):
             # uid = i
             pod_name = '{}-m-{}'.format(comp_name, uid)
             extend_pod_instance(pod_dict, pod_name, False)
-            pin_pod_instance(pod_dict, host['name'])
+            pin_pod_instance(pod_dict, host['host'])
             #set_pod_placement(pod_dict, 'mobile')
             comp_spec['pod_manifests'].append({'file':pod_dict,'status':'PENDING'})
             # pod_fpath = '{}/pod-{}.yaml'.format(app['fpath'], pod_name)
@@ -550,7 +550,7 @@ def create_adjusted_pods_and_configs(app):
             uid = get_random_key(4)
             pod_name = '{}-e-{}'.format(comp_name, uid)
             extend_pod_instance(pod_dict, pod_name, False)
-            pin_pod_instance(pod_dict, host['name'])
+            pin_pod_instance(pod_dict, host['host'])
             comp_spec['pod_manifests'].append({'file':pod_dict,'status':'PENDING'})
             # pod_fpath = '{}/pod-{}.yaml'.format(app['fpath'], pod_name)
             # comp_spec['pod_fpaths'].append(pod_fpath)
@@ -593,8 +593,8 @@ def create_adjusted_pods_and_configs(app):
             uid = get_random_key(4)
             pod_name = '{}-hmc-{}'.format(comp_name, uid)
             # NOTE: The host name parameter in the function below is temporary for testing reasons.
-            extend_pod_instance(pod_dict, pod_name, system_services, host['name'])
-            pin_pod_instance(pod_dict, host['name'])
+            extend_pod_instance(pod_dict, pod_name, system_services, host['host'])
+            pin_pod_instance(pod_dict, host['host'])
             # # NOTE:Check if set_pod_placement/add_related_edge_info needed
             # if host['name'] == comp_spec['host_hybrid_cloud']:
             #     set_pod_placement(pod_dict, 'cloud')
@@ -628,7 +628,7 @@ def create_adjusted_pods_and_configs(app):
             # uid = i
             pod_name = '{}-c-{}'.format(comp_name, uid)
             extend_pod_instance(pod_dict, pod_name, False)
-            pin_pod_instance(pod_dict, host['name'])
+            pin_pod_instance(pod_dict, host['host'])
             #set_pod_placement(pod_dict, 'cloud')
             comp_spec['pod_manifests'].append({'file':pod_dict,'status':'PENDING'})
             # pod_fpath = '{}/pod-{}.yaml'.format(app['fpath'], pod_name)
@@ -730,7 +730,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                 #logger.info('Pod dict is %s',pod_dict)
                 #logger.info('nodeName:%s', pod_dict['spec']['nodeName'])
                 #logger.info('host name is:%s',host['name'])
-                if pod_dict['spec']['nodeName'] == host['name']:
+                if pod_dict['spec']['nodeName'] == host['host']:
                     pod_name = pod_dict['metadata']['name']
                     comp_spec['pod_names'].remove(pod_name)
                     curr_dict = copy.deepcopy(queue_dict)
@@ -745,7 +745,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                     # generate_policy_configs(comp_name, app)
             # Delete pod manifest from components dict
             for entry in list(comp_spec['pod_manifests']):
-                if entry['file']['spec']['nodeName'] == host['name']:
+                if entry['file']['spec']['nodeName'] == host['host']:
                     comp_spec['pod_manifests'].remove(entry)
         # Iterate and delete host dictionaries
         # with format: {'name':edge_loc['hosts']['name'],'status':edge_loc['hosts']['status']}
@@ -767,7 +767,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                 #logger.info('Pod dict is %s',pod_dict)
                 #logger.info('nodeName:%s', pod_dict['spec']['nodeName'])
                 #logger.info('host name is:%s',host['name'])
-                if pod_dict['spec']['nodeName'] == host['name']:
+                if pod_dict['spec']['nodeName'] == host['host']:
                     pod_name = pod_dict['metadata']['name']
                     # pod_fpath = '{}/pod-{}.yaml'.format(app['fpath'], pod_name)
                     # comp_spec['pod_fpaths'].remove(pod_fpath)
@@ -786,7 +786,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                     # generate_policy_configs(comp_name, app)
             # Delete pod manifest from components dict
             for entry in list(comp_spec['pod_manifests']):
-                if entry['file']['spec']['nodeName'] == host['name']:
+                if entry['file']['spec']['nodeName'] == host['host']:
                     comp_spec['pod_manifests'].remove(entry)
         # Iterate and delete host dictionaries
         # with format: {'name':edge_loc['hosts']['name'],'status':edge_loc['hosts']['status']}
@@ -809,7 +809,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                 #logger.info('Pod dict is %s',pod_dict)
                 #logger.info('nodeName:%s', pod_dict['spec']['nodeName'])
                 #logger.info('host name is:%s',host['name'])
-                if pod_dict['spec']['nodeName'] == host['name']:
+                if pod_dict['spec']['nodeName'] == host['host']:
                     pod_name = pod_dict['metadata']['name']
                     # pod_fpath = '{}/pod-{}.yaml'.format(app['fpath'], pod_name)
                     # comp_spec['pod_fpaths'].remove(pod_fpath)
@@ -828,7 +828,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                     # generate_policy_configs(comp_name, app)
             # Delete pod manifest from components dict
             for entry in list(comp_spec['pod_manifests']):
-                if entry['file']['spec']['nodeName'] == host['name']:
+                if entry['file']['spec']['nodeName'] == host['host']:
                     comp_spec['pod_manifests'].remove(entry)
         # Iterate and delete host dictionaries
         # with format: {'name':edge_loc['hosts']['name'],'status':edge_loc['hosts']['status']}
@@ -849,7 +849,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                 #logger.info('Pod dict is %s',pod_dict)
                 #logger.info('nodeName:%s', pod_dict['spec']['nodeName'])
                 #logger.info('host name is:%s',host['name'])
-                if pod_dict['spec']['nodeName'] == host['name']:
+                if pod_dict['spec']['nodeName'] == host['host']:
                     pod_name = pod_dict['metadata']['name']
                     pod_fpath = '{}/pod-{}.yaml'.format(app['fpath'], pod_name)
                     comp_spec['pod_fpaths'].remove(pod_fpath)
@@ -887,7 +887,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                     # generate_policy_configs(comp_name, app)
             # Delete pod manifest from components dict
             for entry in list(comp_spec['pod_manifests']):
-                if entry['file']['spec']['nodeName'] == host['name']:
+                if entry['file']['spec']['nodeName'] == host['host']:
                     comp_spec['pod_manifests'].remove(entry)
         # Iterate and delete host dictionaries
         # with format: {'name':edge_loc['hosts']['name'],'status':edge_loc['hosts']['status']}
@@ -904,7 +904,7 @@ def check_for_hosts_to_delete(app, edgenodes_list, connection_init_thread=None, 
                 thread_join_end = time.perf_counter()
             #fluidityapp_settings.timer_start = time.perf_counter()
             # check if name belongs to edge node
-            result = get_adhoc_info(host['name'], edgenodes_list)
+            result = get_adhoc_info(host['host'], edgenodes_list)
             # if true, send notification to edge
             if result['direct-comm'] == True:
                 mobile_comp_name = app['mobile_comp_names'][0]
@@ -1121,7 +1121,9 @@ def deploy_new_pods(app):
                 return
     # Wait for all pods to run
     logger.info('Waiting for all pods to have status running') 
+    max_retries = 10
     for pod_name in app['pod_names']:
+        curr_retry = 0
         while True:
             try:
                 resp = api.read_namespaced_pod(name=pod_name, namespace='default')
@@ -1141,7 +1143,10 @@ def deploy_new_pods(app):
                 break
             elif get_node_availability(resp.spec.node_name, nodes) == False:
                 break
-            time.sleep(0.05)
+            elif curr_retry == max_retries:
+                logger.error('Reached max number of retries. Break...')
+            curr_retry += 1
+            time.sleep(0.5)
     #logger.info('After pod deployment, the agent msg is: %s', agent_msg)
     return agent_msg
 
@@ -1330,7 +1335,7 @@ def deploy_app_pods_and_configs(app, initial_deployment):
             check_violated_priority(high, low, priority_list)
     logger.info('Final priority list %s', priority_list)
     #initial_deployment = priority_list
-
+    logger.info('initial_deployment %s', initial_deployment)
     # List of dicts, one for each host containing the respective pod Spec
     # for the components deployed on that node.
     agent_msg = {}
@@ -1368,7 +1373,7 @@ def deploy_app_pods_and_configs(app, initial_deployment):
                     uid = get_random_key(4)
                     pod_name = '{}-hmc-{}'.format(comp_name, uid)
                     extend_pod_instance(pod_dict, pod_name, system_services)
-                    pin_pod_instance(pod_dict, host['name'])
+                    pin_pod_instance(pod_dict, host['host'])
                     # NOTE:Check if set_pod_placement/add_related_edge_info needed
                     # if host['name'] == comp_spec['host_hybrid_cloud']:
                     #     set_pod_placement(pod_dict, 'cloud')

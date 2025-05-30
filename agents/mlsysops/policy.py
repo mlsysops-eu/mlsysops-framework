@@ -14,7 +14,10 @@
 #
 import importlib
 import copy
+import subprocess
 import sys
+import time
+import ast
 
 from .logger_util import logger
 
@@ -23,34 +26,47 @@ class Policy:
         self.name = name
         self.module_path = module_path
         self.module = None
-        self.context = None
+        self.context = {}
         self.current_plan = None
         self.scope = None
         self.core = False
+        self.last_analyze_run = time.time()
 
     def initialize(self):
         # Check if it was initialized
         try:
-            if self.context is None:
-                self.context = self.module.initialize()
-                logger.debug(f"Policy {self.name} initialized {self.context}")
-                self.scope = self.context['scope']
-                self.core = self.context['core']
+            policy_initial_context = self.module.initialize().copy()
+            self.context.update(policy_initial_context)
+            logger.debug(f"Policy {self.name} initialized {self.context}")
+            self.scope = self.context['scope']
+            self.core = self.context['core']
         except Exception as e:
             logger.error(f"Failed to initialize policy {self.name}: {e}")
 
     def update_context(self,context):
         self.context = context
 
+    def get_analyze_period_from_context(self):
+        return self.context['configuration']['analyze_interval']
+
     def analyze(self,application_description, system_description, current_plan, telemetry, ml_connector):
         # Inject context before calling module method
-        analyze_result,updated_context = self.module.analyze(self.context,application_description, system_description, current_plan, telemetry, ml_connector)
+        try:
+            analyze_result,updated_context = self.module.analyze(self.context,application_description, system_description, current_plan, telemetry, ml_connector)
+        except Exception as e:
+            logger.error(f"Error in policy analyze {self.name}: {e}")
+            return False
         self.update_context(updated_context)
+        self.last_analyze_run = time.time()
         return analyze_result
 
     def plan(self,application_description, system_description, current_plan, telemetry, ml_connector,available_assets):
         # Inject context before calling module method
-        new_plan, updated_context = self.module.plan(self.context,application_description, system_description, self.current_plan, telemetry, ml_connector,available_assets)
+        try:
+            new_plan, updated_context = self.module.plan(self.context,application_description, system_description, self.current_plan, telemetry, ml_connector,available_assets)
+        except Exception as e:
+            logger.error(f"Error in policy plan {self.name}: {e}")
+            return {}
         self.update_context(updated_context)
         self.current_plan = new_plan
         return new_plan
@@ -58,6 +74,22 @@ class Policy:
     def load_module(self):
         # Dynamically import the policy module
         try:
+            # Step 1: Parse the module for context['packages']
+            packages = self.parse_module_for_context_data()
+            if packages and isinstance(packages, list):
+                for pkg in packages:
+                    if isinstance(pkg, str):
+                        logger.debug(f"Installing package: {pkg}")
+                        try:
+                            # Install the package using subprocess
+                            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+                        except subprocess.CalledProcessError as e:
+                            logger.error(f"Failed to install package {pkg}: {e}")
+                    else:
+                        logger.warning(f"Invalid package format: {pkg}. Expected a string.")
+            else:
+                logger.info("No packages to install or 'packages' is not a valid list.")
+
             if self.name in sys.modules:
                del sys.modules[self.name]
             spec = importlib.util.spec_from_file_location(self.name, self.module_path)
@@ -111,3 +143,30 @@ class Policy:
         self.__dict__.update(state)
         # Re-initialize excluded attributes if necessary
         self.module = None
+
+    def parse_module_for_context_data(self):
+        """Parses the Python module to extract static 'context' definitions."""
+        try:
+            # Read the module file
+            with open(self.module_path, 'r') as f:
+                module_code = f.read()
+
+            # Parse the Python code
+            tree = ast.parse(module_code)
+
+            # Look for the 'context' variable in the module
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Assign):  # Look for assignment statements
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and target.id == "initialContext":
+                            # Extract the value of the 'context' variable
+                            context_value = ast.literal_eval(node.value)  # Convert AST to Python objects
+                            if isinstance(context_value, dict) and 'packages' in context_value:
+                                return context_value.get('packages', [])
+
+            logger.warning(f"No 'context' variable found in {self.module_path} or 'packages' key is missing.")
+            return []
+
+        except Exception as e:
+            logger.error(f"Failed to parse module {self.module_path} for 'context': {e}")
+            return []

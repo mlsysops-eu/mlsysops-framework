@@ -46,7 +46,7 @@ class MLSAgent:
         # Monitor task
         self.monitor_data = MonitorData()
         self.monitor_queue = asyncio.Queue()
-        self.monitor_task = MonitorTask(self.monitor_queue, self.monitor_data)
+        self.monitor_task = MonitorTask(self.state, self.monitor_queue, self.monitor_data)
         monitor_async_task = asyncio.create_task(self.monitor_task.run())
         self.running_tasks.append(monitor_async_task)
 
@@ -198,7 +198,7 @@ class MLSAgent:
         try:
             if self.state.configuration.continuum_layer == 'cluster':
                 logger.debug(f"Applying system description")
-                await self.state.assets["fluidity"].send_message({
+                await self.state.assets["fluidity"]["module"].send_message({
                     "event": MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value,
                     "payload": self.state.configuration.system_description
                 })
@@ -213,10 +213,11 @@ class MLSAgent:
 
         await self.telemetry_controller.apply_configuration_telemetry()
         await self.telemetry_controller.initialize()
-        await self.spade_instance.start()
+        await self.spade_instance.start(auto_register=True)
 
         # Start global policies
         self.policy_controller.start_global_policies()
+        self.policy_controller.start_policy_directory_monitor()
 
         return True
 

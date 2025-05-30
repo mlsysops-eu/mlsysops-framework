@@ -85,7 +85,7 @@ def append_dict_to_list(entry_dict, hosts):
     """
 
     for host in hosts:
-        if host['name'] == entry_dict['name']:
+        if host['host'] == entry_dict['host']:
             host['status'] = entry_dict['status']
             return
     # At this point we did not find the entry, so we append it to the list.

@@ -20,6 +20,8 @@ from __future__ import print_function
 import asyncio
 import copy
 import logging
+import os
+
 from nodes import get_drones, get_dronestations, get_edgenodes, get_mobilenodes, get_cloudnodes, get_k8s_nodes, get_custom_nodes
 from util import FluidityNodeInfoDict
 from kubernetes import client, config, watch
@@ -69,7 +71,10 @@ class FluidityAppMonitor():
         #                                               target=self._check_for_resources)
         self._resource_checker_task = None
 
-        config.load_kube_config()
+        if 'KUBERNETES_PORT' in os.environ:
+            config.load_incluster_config()
+        else:
+            config.load_kube_config()
         self.api = client.CoreV1Api()
     
     async def _check_for_resources(self):

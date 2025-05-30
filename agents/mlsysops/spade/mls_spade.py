@@ -72,7 +72,7 @@ class MLSSpade(Agent):
     async def setup(self):
         self.is_subscribed = False
         logger.debug("MLSSpade agent setup")
-        print(f"Configured behaviors: {self.behaviours_config}")
+        logger.debug(f"Configured behaviors: {self.behaviours_config}")
 
         for behaviour_name, config in self.behaviours_config.items():
             if not config.get("enabled", False):
@@ -114,10 +114,6 @@ class MLSSpade(Agent):
 
         agent_exec_ins_behaviour = MessageReceivingBehavior(self.message_queue)
         self.add_behaviour(agent_exec_ins_behaviour)
-
-        # agent_otel_behaviour = OTELConfigurationReceive(self.message_queue)
-        # self.add_behaviour(agent_otel_behaviour)
-
 
         logger.debug("MLSSpade agent setup finished")
 

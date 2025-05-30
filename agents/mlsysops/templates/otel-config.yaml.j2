@@ -15,13 +15,26 @@ receivers:
           scrape_interval: {{ scrape_interval }}
           scrape_timeout: {{ scrape_timeout }}
           static_configs:
-            - targets: ['${env:NODE_IP}:9100']
+            - targets: ['${env:NODE_IP}:9200']
 
-exporters:
+exporters: {% if otlp_export_endpoint is not none %}
   otlp:
-    endpoint: {{  otlp_export_endpoint }}
+    endpoint: {{ otlp_export_endpoint }}
     tls:
-      insecure: true
+      insecure: true {% endif %} {% if mimir_export_endpoint is not none %}
+  prometheusremotewrite:
+    endpoint: {{ mimir_export_endpoint }}
+    target_info:
+      enabled: true
+    resource_to_telemetry_conversion:
+      enabled: true
+    tls:
+      insecure: true {% endif %} {% if loki_export_endpoint is not none %}
+  loki:
+    endpoint: {{ loki_export_endpoint }} {% endif %} {% if tempo_export_endpoint is not none %}
+  tempo:
+    endpoint: {{ tempo_export_endpoint }} {% endif %}
+
   prometheus:
     endpoint: {{ prometheus_export_endpoint }}
     send_timestamps: true
@@ -43,4 +56,15 @@ service:
     metrics:
       receivers: [otlp,prometheus]
       processors: [attributes/add_labels]
-      exporters: [otlp, prometheus]
+      exporters: [ prometheus,
+          {%- if otlp_export_endpoint is not none -%}otlp{%- if mimir_export_endpoint is not none or tempo_export_endpoint is not none -%}, {%- endif -%}{%- endif -%}
+          {%- if mimir_export_endpoint is not none -%}prometheusremotewrite{%- if tempo_export_endpoint is not none -%}, {%- endif -%}{%- endif -%}
+          {%- if tempo_export_endpoint is not none -%}tempo{%- endif -%}
+      ] {% if loki_export_endpoint is not none %}
+    logs:
+      receivers: [ otlp ]
+      processors: [ ]
+      exporters: [ loki ]
+    {%- endif -%}
+
+

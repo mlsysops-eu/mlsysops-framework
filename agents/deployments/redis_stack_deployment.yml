@@ -23,13 +23,13 @@ spec:
               name: redis-port
           env:
             - name: REDIS_HOST
-              value: "127.0.0.1"
+              value: "172.25.27.72" # Replace with appropriate cluster DNS or IP
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_DB_NUMBER
               value: "0"
             - name: REDIS_PASSWORD
-              value: "----"
+              value: "secret"
             - name: REDIS_QUEUE_NAME
               value: "parsed_descriptions"
             - name: REDIS_CHANNEL_NAME
