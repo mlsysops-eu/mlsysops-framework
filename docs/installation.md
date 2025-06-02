@@ -7,15 +7,19 @@ is able to run on a number of distros.
 We will be installing and setting up each component individually:
 
 ### Core Framework
+
 TBC
 
 ### Plugins
+
 TBC
 
 ### Mechanisms
+
 TBC
 
 ## Install required dependencies
+
 TBC
 
 > Note: Be aware that some instructions might override existing tools and services.

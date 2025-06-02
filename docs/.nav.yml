@@ -1,6 +1,8 @@
 nav:
   - Home: index.md
-  - Quickstart: quickstart.md
+  - Getting Started: 
+      - Testbed Setup: testbed.md
+      - Quickstart: quickstart.md
   - Installation: installation.md
   - Design:
       - design/*.md
