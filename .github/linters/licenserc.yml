@@ -38,6 +38,8 @@ header:
     - 'VERSION'
     - 'build*'
     - 'docs/CNAME'
+    - 'docs/**'
+    - 'orchestrators/**'
 
   language:
     Go:
