@@ -12,7 +12,7 @@ all:
           service_cidr: "10.11.0.0/16"
           labels:
             is_vm: true
-            continuumLayer: continuum
+            mlsysops/continuumLayer: continuum
             vaccel: "false"
 
     cluster1:
@@ -29,7 +29,7 @@ all:
               service_cidr: "10.13.0.0/16"
               labels:
                 is_vm: true
-                continuumLayer: cluster
+                mlsysops/continuumLayer: cluster
                 vaccel: "false"
         worker_nodes:
           hosts:
@@ -41,7 +41,7 @@ all:
               k3s_cluster_name: cluster1
               labels:
                 is_vm: true
-                continuumLayer: node
+                mlsysops/continuumLayer: node
                 vaccel: "false"
             testvm3:
               ansible_host: 192.168.5.23
@@ -51,7 +51,7 @@ all:
               k3s_cluster_name: cluster1
               labels:
                 is_vm: true
-                continuumLayer: node
+                mlsysops/continuumLayer: node
                 vaccel: "false"
     cluster2:
       children:
@@ -67,7 +67,7 @@ all:
               service_cidr: "10.15.0.0/16"
               labels:
                 is_vm: true
-                continuumLayer: cluster
+                mlsysops/continuumLayer: cluster
                 vaccel: "false"
         worker_nodes:
           hosts: 
@@ -79,7 +79,7 @@ all:
               k3s_cluster_name: cluster2
               labels:
                 is_vm: true
-                continuumLayer: node
+                mlsysops/continuumLayer: node
                 vaccel: "false"
     cluster3:
       children:
@@ -95,7 +95,7 @@ all:
               service_cidr: "10.15.0.0/16"
               labels:
                 is_vm: true
-                continuumLayer: cluster
+                mlsysops/continuumLayer: cluster
                 vaccel: "false"
         worker_nodes:
           hosts: 
@@ -107,5 +107,5 @@ all:
               k3s_cluster_name: test1
               labels:
                 is_vm: true
-                continuumLayer: node
+                mlsysops/continuumLayer: node
                 vaccel: "false"  
