@@ -18,6 +18,35 @@ class FileKind(str, Enum):
     model = "model"
     data = "data"
     code = "code"
+    env = "env"
+
+@router.post("/model/add",response_model=MLModel, status_code=201, tags=["Model"])
+async def add_new_model(
+        request: Request,
+        model: MLModelCreate, 
+        db: Session = Depends(get_db)
+    ):
+    return await utl.create_model(db=db, mlmodel=model)
+
+@router.post("/model/{model_id}/upload", response_model=FileSchema, status_code=201, tags=["Model"])
+async def upload_file_for_model(
+    model_id: str,
+    file: UploadFile = File(...),
+    file_kind: FileKind = Form(...),
+    db: Session = Depends(get_db)
+):
+    model_db = await utl.get_model_by_id(db, model_id)
+    if model_db:
+        # Create a FileSchema instance to represent the uploaded file metadata
+        file_data = FileSchema(modelid=model_id, filekind=file_kind.value, filename=file.filename, contenttype=file.content_type)
+        file_upload = await utl.upload_models(db, file, file_data)
+        if file_upload:
+            return file_data
+        else:
+            raise HTTPException(status_code=500, detail="Failed to upload file to S3")    
+    else:
+        raise HTTPException(status_code=404, detail="No model details found")
+
 
 @router.get("/model/all",  response_model=List[MLModel], tags=["Model"])
 async def get_all_models(
@@ -66,34 +95,6 @@ async def get_models_by_tags(
     if not models:
         raise HTTPException(status_code=404, detail="No models found with the provided tags")
     return models
-
-
-@router.post("/model/add",response_model=MLModel, status_code=201, tags=["Model"])
-async def add_new_model(
-        request: Request,
-        model: MLModelCreate, 
-        db: Session = Depends(get_db)
-    ):
-    return await utl.create_model(db=db, mlmodel=model)
-
-@router.post("/model/{model_id}/upload", response_model=FileSchema, status_code=201, tags=["Model"])
-async def upload_file_for_model(
-    model_id: str,
-    file: UploadFile = File(...),
-    file_kind: FileKind = Form(...),
-    db: Session = Depends(get_db)
-):
-    model_db = await utl.get_model_by_id(db, model_id)
-    if model_db:
-        # Create a FileSchema instance to represent the uploaded file metadata
-        file_data = FileSchema(modelid=model_id, filekind=file_kind.value, filename=file.filename, contenttype=file.content_type)
-        file_upload = await utl.upload_models(db, file, file_data)
-        if file_upload:
-            return file_data
-        else:
-            raise HTTPException(status_code=500, detail="Failed to upload file to S3")    
-    else:
-        raise HTTPException(status_code=404, detail="No model details found")
 
 
 @router.patch("/model/{model_id}", tags=["Model"])

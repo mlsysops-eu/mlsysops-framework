@@ -6,3 +6,4 @@ opentelemetry-exporter-otlp
 opentelemetry-api
 opentelemetry-sdk
 cachetools
+python-dotenv

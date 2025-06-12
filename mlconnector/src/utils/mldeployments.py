@@ -13,7 +13,7 @@ import json
 from db.redis_setup import create_redis_connection
 from utils.api.generate_dockerfile import build_and_push_image, generate_json
 from dotenv import load_dotenv
-from utils.mlmodels import get_model_by_id, get_model_join_by_id
+from utils.mlmodels import get_model_by_id, get_model_files
 from pydantic import create_model
 import os
 import uuid
@@ -177,16 +177,18 @@ async def update_deployment(
     return existing_deployment
 
 async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, create_new=False):
-    model = await get_model_join_by_id(db, model_id=deployment.modelid)
+    model = await get_model_by_id(db, model_id=deployment.modelid)
+    file_model = await get_model_files(db, modelid=deployment.modelid, filekind="model")
+    #file_require = await get_model_files(db, modelid=deployment.modelid, filekind="data")
     if(deployment.deployment_id ==""):
         deployment_id = str(uuid.uuid4())
     else:
         deployment_id = deployment.deployment_id
-    #print(str(extract_feature_names(model.featurelist)))
-    #print(type(extract_feature_names(model.featurelist)))
+    #print(model.featurelist)
+    #print(file_model)
     schema_code = ""
     if(deployment.inference_data==0):
-        schema_code = generate_schema_code(flag=0, feature_list_str=json.dumps((extract_feature_names(model[0][0].featurelist))))
+        schema_code = generate_schema_code(flag=0, feature_list_str=json.dumps((extract_feature_names(model.featurelist))))
     else:  
         schema_code = generate_schema_code(flag=1)
     
@@ -197,10 +199,10 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
         image_name = "registry.mlsysops.eu/usecases/augmenta-demo-testbed/"+deployment.modelid+":0.0.1"
         
         # download model file...
-        local_model_path = prepare_model_artifact(s3_manager, model[0][1].filename)
+        local_model_path = prepare_model_artifact(s3_manager,  file_model[0].filename)
         build_and_push_image(
             #model.trained_model[0]['modelname'], 
-            model[0][1].filename, 
+            file_model[0].filename, 
             "registry.mlsysops.eu",
             image_name, 
             os.getenv("DOCKER_USERNAME"), 
@@ -224,7 +226,7 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
         )
        
         #deployment_json = json.dumps(new_deployment)
-        #print(str(deployment_json))
+        #print(str(new_deployment))
         
         #con = await create_redis_connection()
         #await con.rpush(os.getenv("DEPLOYMENT_QUEUE"), [str(deployment_json)])
@@ -238,7 +240,7 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
             deployment_id = deployment_id,
             status = "waiting"
         )
-        deployment = MLDeployment(
+        new_deployment = MLDeployment(
             modelid = deployment.modelid,
             ownerid = deployment.ownerid,
             placement = placement_as_dict,
@@ -256,7 +258,7 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
                 await db.refresh(existing_deployment)
         else:
             # Add new deployment
-            db.add(deployment)
+            db.add(new_deployment)
             await db.commit()
-            await db.refresh(deployment)
+            await db.refresh(new_deployment)
         return res

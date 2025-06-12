@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import inspect
+from sqlalchemy import text
 from typing import List, Optional
 from fastapi import UploadFile
 
@@ -49,7 +50,7 @@ async def update_deployments(db: AsyncSession, deployments: List[dict]):
             deployment_id=row['deployment_id'],
             inference_data=0,  
         )
-        results = await utils.mldeployments.create_deployment(db=db, deployment=ml_deployment)
+        results = await utils.mldeployments.create_deployment(db=db, deployment=ml_deployment, create_new=True)
         print("Deployment created: ", results)
         count += 1
        
@@ -73,21 +74,35 @@ async def get_model_by_id(db: AsyncSession, model_id: str):
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
+
 async def get_model_join_by_id(db: AsyncSession, model_id: str):
-    query = (
-        select(MLModels, MLModelFiles)
-        .join(MLModelFiles, MLModels.modelid == MLModelFiles.modelid)
-        .where(MLModels.modelid == model_id)
-    )
-    result = await db.execute(query)
-    # result.all() is a list of tuples: (MLModels, MLModelFiles)
-    return result.all()
+    sql = text("""
+        SELECT
+          m.*,
+          f.*
+        FROM mlmodels AS m
+        JOIN mlmodelfiles AS f
+        ON m.modelid = f.modelid
+        WHERE m.modelid = :model_id
+    """)
+    result = await db.execute(sql, {"model_id": model_id})
+    return result.fetchall()
 
 async def get_file_details(db: AsyncSession, file_id: str):
     query = select(MLModelFiles).where(MLModelFiles.fileid == file_id)
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
+async def get_model_files(db: AsyncSession, modelid: str, filekind:str):
+    query = (
+        select(MLModelFiles)
+        .where(
+            MLModelFiles.modelid == modelid,
+            MLModelFiles.filekind == filekind
+        )
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
   
 async def get_model_by_kind(db: AsyncSession, modelkind: str):
     query = select(MLModels).where(MLModels.modelkind == modelkind)
@@ -200,7 +215,7 @@ async def create_model(db: AsyncSession, mlmodel: MLModels):
     runresource_as_dict = [runresource.dict() for runresource in mlmodel.runresource] if mlmodel.runresource else None
     featurelist_as_dict = [featurelist.dict() for featurelist in mlmodel.featurelist] if mlmodel.featurelist else None
     inference_as_dict = [inference.dict() for inference in mlmodel.inference] if mlmodel.inference else None
-    #trained_model_as_dict = [trained_model.dict() for trained_model in mlmodel.trained_model] if mlmodel.trained_model else None
+    drift_detection_as_dict = [drift_detection.dict() for drift_detection in mlmodel.drift_detection] if mlmodel.drift_detection else None
     #training_data_as_dict = [training_data.dict() for training_data in mlmodel.training_data] if mlmodel.training_data else None
     new_model = MLModels(
         modelid = str(uuid.uuid4()),
@@ -215,7 +230,8 @@ async def create_model(db: AsyncSession, mlmodel: MLModels):
         runresource = runresource_as_dict,
         featurelist = featurelist_as_dict,
         inference = inference_as_dict,
-        modeltags = mlmodel.modeltags
+        modeltags = mlmodel.modeltags,
+        drift_detection = drift_detection_as_dict
     )
     #async with db.begin():
     db.add(new_model)

@@ -12,6 +12,11 @@ class Hyperparameter(BaseModel):
     parameter: str = Field(None, description="Hyperparameters, eg 'max_depth'")
     value: int = Field(None, description="Hyperparameter value, eg '5'")
 
+class DriftDetection(BaseModel):
+    is_true: int = Field(0, description="Set the value to 1 to turn on drift detection, otherwise 0")
+    method: int = Field(0, description="Method used to detect drift, eg '0', Mean-Shift, '1', FourierMMD and  '2' for Kolmogorov-Smirnov test")
+
+
 class FileSchema(BaseModel):
     modelid: str
     filekind: str
@@ -93,6 +98,7 @@ class MLModelBase(BaseModel):
     inference:Optional[List[Inference]] = Field(None, description="How to pass the inference data")
     modeltags: Optional[List[str]] = Field(None, description="List of key tags to search model")
     #file_data:FileSchema = Field(..., description="model")
+    drift_detection:Optional[List[DriftDetection]] = Field(..., description="Set the value to 1 to turn on drift detection, otherwise 0")
 
 class MLModelDeploy(BaseModel):
     modelid:str

@@ -40,7 +40,7 @@ app.add_middleware(
 #app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET"))
 
 app.include_router(mlmodels.router)
-app.include_router(mltraining.router)
+#app.include_router(mltraining.router)
 app.include_router(mldeployment.router)
 
 #app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET"))

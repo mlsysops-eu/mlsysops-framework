@@ -71,7 +71,12 @@ services:
             - .env
         restart: always
         ports:
-            - "80:8090"
+            - "8090:8090"
+        healthcheck:
+                test: ["CMD-SHELL", "curl -f http://localhost:8090/docs || exit 1"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
         depends_on:
             db:
                 condition: service_healthy
@@ -83,6 +88,19 @@ services:
 
         networks:
             - api_network
+    #drift:
+    #    build: ./drift_app
+    #    container_name: drfit_detection
+    #    
+    #    restart: always
+    #    ports:
+    #        - "8050:8050"
+    #    depends_on:
+    #        app:
+    #            condition: service_healthy
+    #            restart: true
+    #    networks:
+     #       - api_network
 
     #xai:
         #image: registry.mlsysops.eu/usecases/augmenta-demo-testbed/side-api:0.0.1

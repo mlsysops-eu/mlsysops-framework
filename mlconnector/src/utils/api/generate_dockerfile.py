@@ -2,8 +2,23 @@ import os
 import docker
 import yaml
 from dotenv import load_dotenv
+import subprocess
+import pickle
+from pkg_resources import Requirement
+from io import StringIO
 
-load_dotenv()
+from utils.manage_s3 import S3Manager
+
+load_dotenv(verbose=True, override=True)
+
+
+s3_manager = S3Manager(
+    os.getenv("AWS_S3_BUCKET_DATA"),
+    os.getenv("AWS_ACCESS_KEY_ID"),
+    os.getenv("AWS_SECRET_ACCESS_KEY"),
+    os.getenv("AWS_ACCESS_URL")
+)
+
 
 BASE_URL = os.getenv('SIDE_API_ENDPOINT')
 if not BASE_URL:
@@ -110,14 +125,14 @@ async def make_prediction(request: DynamicSchema):
                 print("Response JSON:", response.json())
             except ValueError:
                 print("No JSON response returned.")
-            if request.explanation:
-                explanation_res = get_single_explanation(model_id,data_dict)
-                if explanation_res:
-                    return {{"inference": str(result_pred), "explanation":explanation_res}}
-                else:
-                    return {{"inference": str(result_pred), "explanation":"explanation_error"}}
-            else:
-                return {{"inference": str(result_pred)}}
+            #if request.explanation:
+            #    explanation_res = get_single_explanation(model_id,data_dict)
+            #    if explanation_res:
+            #        return {{"inference": str(result_pred), "explanation":explanation_res}}
+            #    else:
+            #        return {{"inference": str(result_pred), "explanation":"explanation_error"}}
+            #else:
+            return {{"inference": str(result_pred)}}
         else:
             return {{"url": request.data_link}}
     except Exception as e:
@@ -127,8 +142,71 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port={port})
 """
+def prepare_model_artifact(s3_manager: S3Manager, model_name: str, download_dir: str = "/code/utils/api"):
+    """
+    Download the model from S3 into download_dir.
+    Returns the local path to the downloaded model.
+    """
+    local_path = os.path.join(download_dir, model_name)
+    # ensure the directory exists
+    os.makedirs(download_dir, exist_ok=True)
 
-def generate_dockerfile():
+    # download from S3
+    s3_manager.download_file(object_name=model_name, download_path=local_path)
+    print(f"Model downloaded to {local_path}")
+    return local_path
+
+def merge_requirements_from_dir(req_dir: str) -> list[str]:
+    """
+    Scan a directory for *.txt files, merge all requirements,
+    dedupe, normalize, and return a sorted list.
+    """
+    all_reqs: set[str] = set()
+    for fname in os.listdir(req_dir):
+        if not fname.endswith('.txt'):
+            continue
+        path = os.path.join(req_dir, fname)
+        with open(path, 'r') as f:
+            content = f.read()
+        all_reqs |= parse_requirements_content(content)
+
+    return sorted(all_reqs, key=lambda r: r.lower())
+
+def parse_requirements_content(content: str) -> set[str]:
+    """Parse a requirements.txt content string into a normalized set of requirements."""
+    reqs = set()
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        try:
+            req = Requirement.parse(line)
+            extras = f"[{','.join(req.extras)}]" if req.extras else ""
+            spec = ''.join(str(s) for s in req.specifier)
+            reqs.add(f"{req.name}{extras}{spec}")
+        except Exception:
+            # fallback if pkg_resources can't parse
+            reqs.add(line)
+    return reqs
+
+def generate_dockerfile(model_id):
+    # generate a combined requirements.txt file
+    model_reqs = prepare_model_artifact(s3_manager,  f"{model_id}.txt")
+    
+    reqs_dir = "/code/utils/api"
+    merged = merge_requirements_from_dir(reqs_dir)
+
+    req_path = "/code/utils/api/requirements.txt"
+    os.makedirs(os.path.dirname(req_path), exist_ok=True)
+    with open(req_path, "w") as f:
+        for line in merged:
+            f.write(line + "\n")
+    req_path = "/code/utils/api/requirements.txt"
+    os.makedirs(os.path.dirname(req_path), exist_ok=True)
+    with open(req_path, "w") as f:
+        for line in merged:
+            f.write(line + "\n")
+
     dockerfile_content = f"""\
         FROM python:3.11
 
@@ -153,6 +231,7 @@ def generate_dockerfile():
     print("Dockerfile generated successfully!")
 
 
+
 def build_and_push_image(model, registry_url, image_name, registry_username, registry_password, inference_data, datasource, model_id,model_owner, deploymentid):
     params = {
         #"model_filename": model_name,
@@ -172,7 +251,7 @@ def build_and_push_image(model, registry_url, image_name, registry_username, reg
 
     print("Python file 'main.py' has been created with the provided parameters.")
 
-    generate_dockerfile()
+    generate_dockerfile(model_id)
     client = docker.from_env()
 
     try:
@@ -194,6 +273,7 @@ def build_and_push_image(model, registry_url, image_name, registry_username, reg
             print(log)
     except docker.errors.APIError as e:
         print(f"Error pushing image: {e}")
+
 
 """def generate_json(deployment_id: str, image: str, placement, port: int = 8000):
     app = {
@@ -251,28 +331,37 @@ def generate_json(
             "mlsysops-id": deployment_id
         }
     }
+
+    # Only add clusterPlacement if clusterID is not a wildcard
     cluster_id = placement.get("clusterID", "")
-    if cluster_id:
+    if cluster_id and cluster_id != "*":
         app["MLSysOpsApplication"]["clusterPlacement"] = {
             "clusterID": [cluster_id],
             "instances": 1
         }
+
+    # Build the component block
     component = {
         "Component": {
             "name": "ml-comp",
             "uid": deployment_id
         }
     }
+
+    # Always consider continuumLayer, but only add node if it's not "*"
     node_conf = {}
     node_name = placement.get("node", "")
-    if node_name:
+    if node_name and node_name != "*":
         node_conf["node"] = node_name
-    elif placement.get("continuum", False):
-        node_conf["continuumLayer"] = ["*"]
+
+    continuum = placement.get("continuum", "")
+    if continuum:
+        node_conf["continuumLayer"] = [continuum]
 
     if node_conf:
         component["nodePlacement"] = node_conf
 
+    # Add the remaining fields
     component["restartPolicy"] = "OnFailure"
     component["containers"] = [
         {

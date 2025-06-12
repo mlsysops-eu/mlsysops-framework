@@ -10,14 +10,19 @@ class Placement(BaseModel):
     clusterID: Optional[str] = Field(
         None, 
         example="UTH-Internal-testbed", 
-        description="ID of the cluster, or '*' to deploy on any cluster"
+        description="ID of the cluster, or "'*'" to deploy on any cluster"
     )
     node: Optional[str] = Field(
         None, 
         example="mls-drone", 
         description="Node ID, or '*' to deploy on any node"
     )
-    continuum: bool = Field(False, description="Set to True to deploy at continuum level")
+    continuum: Optional[str] = Field(
+        None, 
+        example="Edge", 
+        description="continuum ID, or '*' to deploy on any where"
+    )
+    #bool = Field(False, description="Set to True to deploy at continuum level")
 
 
 class MLDeploymentBase(BaseModel):

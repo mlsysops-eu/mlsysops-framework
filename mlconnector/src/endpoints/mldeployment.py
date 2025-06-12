@@ -76,17 +76,18 @@ async def get_deployment_ops_by_owner(
             #return {"status": "Pending"}
     return opos
 
-"""@router.patch("/deployment/{deployment_id}", tags=["Deployments"])
-async def update_deployment(
+"""
+@router.patch("/deployment/{deployment_id}", tags=["Deployments"])
+async def update_deployments(
         request: Request,
         deploy: MLDeploymentCreate, 
         deployment_id: str,
         db: Session = Depends(get_db),
     ):
-    existing_deployment = await utl.get_car_by_reg(db=db, deployment_id=deployment_id)
+    existing_deployment = await utl.get_deployment_by_id(db=db, deployment_id=deployment_id)
     
     if existing_deployment is None:
-        raise HTTPException(status_code=404, detail="Car was not found")
+        raise HTTPException(status_code=404, detail="Deployment was not found")
     return await utl.update_deployment(db=db, deployment_id=deployment_id, deployment=deploy)
 """
 

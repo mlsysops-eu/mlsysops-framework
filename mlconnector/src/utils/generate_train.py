@@ -5,42 +5,8 @@ import requests
 
 
 def generate_entry_file(file_list):
-    file_paths_str = " ".join(f'"{fp}"' for fp in file_list)
     script_template = f"""#!/bin/bash
     set -e
-
-    project_path="side-api/ml_models"
-    file_paths=({file_paths_str})
-    ref="main"
-    VAL=""
-
-    # URL-encode the project_path once.
-    encoded_project=$(python3 -c "import urllib.parse; print(urllib.parse.quote_plus('$project_path'))")
-
-    for file in "${{file_paths[@]}}"; do
-        # URL-encode the file name. The inner '$file' refers to the bash variable.
-        encoded_file=$(python3 -c "import urllib.parse; print(urllib.parse.quote_plus('$file'))")
-        
-        # Construct the GitLab API URL for this file.
-        api_url="https://mlsysops-gitlab.e-ce.uth.gr/api/v4/projects/${{encoded_project}}/repository/files/${{encoded_file}}?ref=${{ref}}"
-        echo "Constructed API URL for ${{file}}: $api_url"
-        
-        # Download the file metadata using the token.
-        response=$(curl -sSL -H "VAL: $VAL" "$api_url")
-        
-        # Extract the 'content' field using jq.
-        content=$(echo "$response" | jq -r '.content')
-        
-        if [ "$content" == "null" ]; then
-            echo "Error: Failed to get file content for ${{file}} from API."
-            echo "Response was: $response"
-            exit 1
-        fi
-        
-        # Decode the Base64 content and save it as the file.
-        echo "$content" | base64 -d > "$file"
-        echo "Downloaded and decoded file saved as ${{file}}"
-    done
     echo "Running {file_list[1]} with {file_list[0]}"
     python {file_list[1]} {file_list[0]}
     echo "Saving model"
@@ -64,70 +30,65 @@ import requests
 from io import BytesIO
 import base64
 import urllib.parse
+from dotenv import load_dotenv
+from requests.exceptions import RequestException, HTTPError
 
-model_id ="{model_id}"
-VAL = ""
+load_dotenv()
 
-def get_model_data(model_id):
-    base_url = "http://daistwo.ucd.ie/model/get/"
-    url = f"{{base_url}}{{model_id}}"
-    headers = {{"accept": "application/json"}}
-    
+import os
+import requests
+import mimetypes
+
+def upload_model_file(file_path: str,file_kind: str,model_id: str) -> dict:
+    BASE_URL = os.getenv('SIDE_API_ENDPOINT')
+    if not BASE_URL:
+        raise ValueError("SIDE_API_ENDPOINT is not set in the .env file")
+    url = f"{{BASE_URL}}/model/{{model_id}}/upload"
+    filename = os.path.basename(file_path)
+
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"No such file: {{file_path}}")
+
+    # get MIME type based on extension
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
+        with open(file_path, "rb") as f:
+            files = {{
+                "file": (filename, f, mime_type),
+            }}
+            data = {{"file_kind": file_kind}}
+            headers = {{"Accept": "application/json"}}
+
+            resp = requests.post(url, headers=headers, files=files, data=data)
+            resp.raise_for_status()
             try:
-                return response.json()
-            except Exception as e:
-                return f"Error parsing JSON: {{e}}"
-        else:
-            return f"Error: Received status code {{response.status_code}}. Response: {{response.text}}"
-    except Exception as err:
-        return f"Request error occurred: {{err}}"
+                return resp.json()
+            except ValueError:
+                return {{"status": "success", "response_text": resp.text}}
 
-model = get_model_data(model_id)
+    except HTTPError as http_err:
+        # The server returned an HTTP error code
+        raise HTTPError(
+            f"HTTP error uploading {{filename}}: {{http_err}} - "
+            f"Response body: {{http_err.response.text}}"
+        ) from http_err
 
-project_path = "side-api/ml_models"
-file_path = model["trained_model"][0]["modelname"] 
-ref = "main"
-VAL = ""
+    except RequestException as req_err:
+        # Network-level errors (connection timeout, DNS failure, etc.)
+        raise RequestException(f"Network error during upload: {{req_err}}") from req_err
 
 
-encoded_project = urllib.parse.quote_plus(project_path)
-encoded_file = urllib.parse.quote_plus(file_path)
-
-api_url = f"https://mlsysops-gitlab.e-ce.uth.gr/api/v4/projects/{{encoded_project}}/repository/files/{{encoded_file}}"
-print("Constructed API URL:", api_url)
-
-try:
-    with open(file_path, "rb") as f:
-        file_content = f.read()
-except Exception as e:
-    print(f"Error reading the file '{{file_path}}': {{e}}")
-    exit(1)
-
-encoded_content = base64.b64encode(file_content).decode("utf-8")
-
-data = {{
-    "branch": ref,
-    "content": encoded_content,
-    "commit_message": f"Add or update file {{file_path}}",
-    "encoding": "base64"
-}}
-
-headers = {{
-    "VAL": VAL
-}}
-
-response = requests.post(api_url, headers=headers, json=data)
-if response.status_code == 400 and "already exists" in response.text:
-    print("File already exists. Attempting to update (overwrite) it using PUT.")
-    response = requests.put(api_url, headers=headers, json=data)
-
-if response.status_code in (200, 201):
-    print("File saved successfully.")
-else:
-    print(f"Error saving file: {{response.status_code}} - {{response.text}}")
+# Example usage:
+if __name__ == "__main__":
+    result = upload_model_file(
+        file_path="{file_name}",
+        file_kind="model",
+        model_id="{model_id}"
+    )
+    print("Upload response:", result)
 """
 
 def generate_dockerfile():
@@ -158,7 +119,8 @@ def build_and_push_image(modelid, registry_url, image_name, registry_username, r
     file_list=[training_data, training_code]
     generate_entry_file(file_list)
     params = {
-        "model_id": modelid
+        "model_id": modelid,
+        "file_name": modelid+".pkl",
     }
     generated_code = template.format(**params)
 
@@ -237,3 +199,52 @@ def generate_yaml(
         yaml_content["components"][0]["placement"] = placement
     
     return yaml_content
+
+def generate_json(
+    deployment_id: str,
+    image: str,
+    placement: dict,
+    app_name: str = "ml-app-1",
+    port: int = 8000
+):
+    app = {
+        "MLSysOpsApplication": {
+            "name": app_name,
+            "mlsysops-id": deployment_id
+        }
+    }
+    cluster_id = placement.get("clusterID", "")
+    if cluster_id:
+        app["MLSysOpsApplication"]["clusterPlacement"] = {
+            "clusterID": [cluster_id],
+            "instances": 1
+        }
+    component = {
+        "Component": {
+            "name": "ml-comp",
+            "uid": deployment_id
+        }
+    }
+    node_conf = {}
+    node_name = placement.get("node", "")
+    if node_name:
+        node_conf["node"] = node_name
+    elif placement.get("continuum", False):
+        node_conf["continuumLayer"] = ["*"]
+
+    if node_conf:
+        component["nodePlacement"] = node_conf
+
+    component["restartPolicy"] = "OnFailure"
+    component["containers"] = [
+        {
+            "image": image,
+            "imagePullPolicy": "IfNotPresent",
+            "ports": [
+                {"containerPort": port}
+            ]
+        }
+    ]
+
+    app["MLSysOpsApplication"]["components"] = [component]
+    return app
