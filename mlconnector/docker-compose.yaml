@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+    db:
+        #image: registry.mlsysops.eu/usecases/augmenta-demo-testbed/side-db:0.0.1
+        build: ./db
+        container_name: database
+        env_file:
+            - .env
+        restart: always
+        environment:
+            POSTGRES_DB: ${POSTGRES_DB}
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        
+        #ports:
+            #- "5432:5432"
+        tty: true
+        networks:
+            - api_network
+        volumes:
+            - ./db_data:/var/lib/postgresql/data
+
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    pgadmin:
+        image: dpage/pgadmin4
+        container_name: pgadmin
+        restart: always
+        ports:
+            - "23456:80"
+        environment:
+            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+
+        networks:
+            - api_network
+    
+    #redis:
+    #    image: redis:latest
+    #    container_name: deployment_queue
+    #    restart: always
+    #    ports:
+    #        - "6379:6379"
+    #    networks:
+    #        - api_network
+    #    command: /bin/sh -c "redis-server --save 20 1 --loglevel warning --requirepass $$REDIS_HOST_PASSWORD"
+        # command: redis-server --save 20 1 --loglevel warning --requirepass secret
+    #    env_file:
+    #        - .env
+
+    #redisinsight:
+    #    image: redislabs/redisinsight:latest
+    #    container_name: redisinsight
+    #    ports:
+    #       - "5540:5540"
+    #    depends_on:
+    #        - redis
+    #    networks:
+    #        - api_network
+
+    app:
+        #image: registry.mlsysops.eu/usecases/augmenta-demo-testbed/side-api:0.0.1
+        build: ./src
+        container_name: api
+        env_file:
+            - .env
+        restart: always
+        ports:
+            - "8090:8090"
+        healthcheck:
+                test: ["CMD-SHELL", "curl -f http://localhost:8090/docs || exit 1"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
+        depends_on:
+            db:
+                condition: service_healthy
+                restart: true
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock 
+            - /usr/bin/docker:/usr/bin/docker  
+            #- ./src:/code 
+
+        networks:
+            - api_network
+    #drift:
+    #    build: ./drift_app
+    #    container_name: drfit_detection
+    #    
+    #    restart: always
+    #    ports:
+    #        - "8050:8050"
+    #    depends_on:
+    #        app:
+    #            condition: service_healthy
+    #            restart: true
+    #    networks:
+     #       - api_network
+
+    #xai:
+        #image: registry.mlsysops.eu/usecases/augmenta-demo-testbed/side-api:0.0.1
+    #    build: ./xai-server-app
+    #    container_name: xai
+        #env_file:
+        #    - .env
+    #    restart: always
+    #    ports:
+    #        - "34567:8091"
+    #    networks:
+    #        - api_network
+
+volumes:
+    db_data:
+    #/src/migrations:
+
+networks:
+  api_network:
