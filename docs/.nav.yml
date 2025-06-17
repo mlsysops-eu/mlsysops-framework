@@ -6,6 +6,10 @@ nav:
   - Installation: installation.md
   - Design:
       - design/*.md
+  - MLConnector:
+      - mlconnector/Overview.md
+      - mlconnector/Installation.md
+      - mlconnector/Step-by-step guide.md
   - Developer Guide: 
       - developer-guide/*.md
   - Tutorials:

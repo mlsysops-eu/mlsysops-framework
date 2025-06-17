@@ -26,6 +26,20 @@ not_in_nav: /index.md
 
 draft_docs: |
   performance/
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Installation: installation.md
+  - Design:
+      - design/*.md
+  - MLConnector:
+      - mlconnector/Overview.md
+      - mlconnector/Installation.md
+      - mlconnector/Step-by-step guide.md
+  - Developer Guide: 
+      - developer-guide/*.md
+  - Tutorials:
+      - tutorials/*.md
 
 theme:
   name: material
