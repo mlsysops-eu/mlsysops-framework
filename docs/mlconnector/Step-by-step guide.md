@@ -1,4 +1,4 @@
-# API Integration Documentation
+# MLConnector step-by-step guide and example
 
 **Base URL:** `BASE_URL`
 
