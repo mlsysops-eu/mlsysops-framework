@@ -1,0 +1,20 @@
+services:
+  api_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api_service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=172.25.27.72
+      - REDIS_PORT=6379
+      - REDIS_DB_NUMBER=0
+      - REDIS_QUEUE_NAME=valid_descriptions_queue
+      - REDIS_PASSWORD=secret
+      - REDIS_CHANNEL_NAME=my_channel
+      - REDIS_DICT_NAME=system_app_hash
+    volumes:
+      - ./config:/app/config
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
