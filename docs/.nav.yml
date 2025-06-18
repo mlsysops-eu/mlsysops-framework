@@ -5,14 +5,37 @@ nav:
       - Quickstart: quickstart.md
   - Installation: installation.md
   - Design:
-      - design/*.md
-  - MLConnector:
-      - mlconnector/Overview.md
-      - mlconnector/Installation.md
-      - mlconnector/Step-by-step guide.md
+      - Architecture: design/architecture.md
+      - Agents:
+          - Multi-layer Agents: design/agents.md
+          - MAPE Tasks: design/mape.md
+          - SPADE: design/spade.md
+          - Controllers: design/controllers.md
+      - Plugins:
+          - Plugin System: design/plugins/plugin_system.md
+          - Policy Plugins: design/plugins/policy_plugins.md
+          - Mechanism Plugins: design/plugins/mechanism_plugins.md
+      - Descriptions:
+          - Application Description: design/application-description.md
+          - System Description: design/system-description.md
+      - Telemetry: design/telemetry.md
+      - Agent Configuration: design/agent-configuration.md
+      - ML Connector: design/ml-connector.md
+  - User Guide:
+      - Application Description:
+      - System Description:
+      - Policy Plugins:
+      - Mechanism Plugins:
+      - MLConnector:
+        - mlconnector/Overview.md
+        - mlconnector/Installation.md
+        - mlconnector/Step-by-step guide.md
   - Developer Guide: 
       - developer-guide/*.md
   - Tutorials:
       - tutorials/*.md
-
-
+  - References:
+    - Python Telemetry API Reference: references/telemetrysdk.md
+    - Northbound API Reference: references/northbound-api.md
+    - ML Connector API Reference: references/ml-connector.md
+    - Command-line Interfaces: references/cli.md
