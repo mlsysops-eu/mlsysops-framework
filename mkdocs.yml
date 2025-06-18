@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-site_name: MLSysOps framework
+site_name: MLSysOps Framework
 site_url: https://mlsysops-eu.github.io/mlsysops-framework
 site_author: MLSysOps Consortium
 
@@ -77,6 +77,7 @@ theme:
     - navigation.tracking
     - navigation.top
     - navigation.footer
+    - navigation.sections
     - toc.follow
     - content.code.copy
     - content.tabs.link
