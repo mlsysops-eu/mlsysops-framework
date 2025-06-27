@@ -52,23 +52,167 @@ the directory `nodes/`.
 * **Cluster** level descritptions, require a file for each cluster registered in Karmada. It contains the clusterID and a list of node hostnames, that MLSysOps is allowed to manage.
 * **Node** level descriptions, contain the detailed information about the node resources. Example [here](descriptions/nodes/node-1.yaml).
 
-#### Step 2: Automated Deployment
+Before deploying, prepare system descriptions as Kubernetes CRDs:
 
-MLSysOps CLI tool can be used to automatically deploy all the necessary components.
-It needs the kubeconfigs of Karmada host cluster and Karmada API.
+- Stored in the `descriptions/` directory
 
-- `export KARMADA_HOST_KUBECONFIG=<path to karmada host kubeconfig>`
-- `export KARMADA_API_KUBECONFIG=<path to karmada api kubeconfig>`
-- `export KARMADA_HOST_IP=<karmada host ip>`
+### 📁 File structure:
 
-And then execute the CLI command inside `deployments` directory, with `descriptions` directory files prepared:
-- `cd deployments`
-- `python3 deploy.py`
+```
+descriptions/
+├── continuum/
+│   └── <continuum-hostname>.yaml
+├── clusters/
+│   └── <cluster-hostname>.yaml
+└── nodes/
+    └── <node-hostname>.yaml
+```
 
+Descriptions define IDs, managed components, and resource details. All files are required before installation.
 
-Wait for the MLSysOps framework to be deployed, and you can check if the agents are running with: 
+---
 
-`kubectl get pods -n mlsysops-framework`
+### Step 3: Deploy the Framework
+
+There are two ways to deploy the framework:
+
+#### ✅ Option 1: Automated using the MLSysOps CLI
+
+You can install the CLI in two ways:
+
+**From TestPyPI:**
+
+```bash
+pip install -i https://test.pypi.org/simple/ mlsysops-cli==0.1.9
+```
+
+**From GitHub (includes deployments folder):**
+
+```bash
+git clone https://github.com/marcolo-30/mlsysops-cli.git
+cd mlsysops-cli
+pip install -e .
+```
+
+This exposes the `mls` command.
+
+**Set environment variables:**
+
+```bash
+export KARMADA_HOST_KUBECONFIG=<path to host kubeconfig>
+export KARMADA_API_KUBECONFIG=<path to api kubeconfig>
+export KARMADA_HOST_IP=<host IP>
+```
+
+**Run deployment:**
+
+```bash
+cd deployments/
+mls framework deploy-all
+```
+
+This will:
+- Deploy core services (ejabberd, redis, API service)
+- Register system descriptions
+- Deploy all agents in correct order
+
+**Alternative:**
+You can also run the CLI script directly:
+
+```bash
+cd deployments
+python3 deploy.py
+```
+
+Wait for all pods to be created:
+
+```bash
+kubectl get pods -n mlsysops-framework
+```
+
+---
+
+#### 🛠 Option 2: Manual Deployment
+
+Follow the order below to deploy manually if you prefer full control.
+
+### 📍 Management Cluster (Continuum)
+
+```bash
+export KUBECONFIG=<host kubeconfig>
+```
+
+- Create namespace:
+```bash
+kubectl apply -f namespace.yaml
+```
+
+- Install services:
+```bash
+kubectl apply -f xmpp/deployment.yaml
+kubectl apply -f api-service-deployment.yaml
+kubectl apply -f redis-stack-deployment.yaml
+```
+
+- Start ML Connector:
+```bash
+docker compose -f mlconnector.docker-compose.yaml up -d
+```
+
+- Apply RBAC:
+```bash
+kubectl apply -f mlsysops-rbac.yaml
+```
+
+- Add configuration and system descriptions:
+```bash
+kubectl create configmap continuum-karmadapi-config --from-file=<karmada-api.kubeconfig> --namespace=mlsysops-framework
+kubectl create configmap continuum-system-description --from-file=descriptions/continuum/<hostname>.yaml --namespace=mlsysops-framework
+```
+
+- Start the Continuum Agent:
+```bash
+kubectl apply -f continuum-agent-daemonset.yaml
+```
+
+### 📍 Karmada API Cluster (Cluster Agents)
+
+```bash
+export KUBECONFIG=<api kubeconfig>
+```
+
+- Apply policies and namespace:
+```bash
+kubectl apply -f cluster-propagation-policy.yaml
+kubectl apply -f propagation-policy.yaml
+kubectl apply -f namespace.yaml
+kubectl apply -f mlsysops-rbac.yaml
+```
+
+- Add system descriptions:
+```bash
+kubectl create configmap cluster-system-description --from-file=descriptions/clusters --namespace=mlsysops-framework
+```
+
+- Start Cluster Agents:
+```bash
+kubectl apply -f cluster-agents-daemonset.yaml
+```
+
+### 📍 Node Agents
+
+- Ensure node descriptions are in place
+- Add them via ConfigMap:
+```bash
+kubectl create configmap node-system-descriptions --from-file=descriptions/nodes --namespace=mlsysops-framework
+```
+
+- Start Node Agents:
+```bash
+kubectl apply -f node-agents-daemonset.yaml
+```
+
+---
 
 #### Step 4: Deploy a test application
 
