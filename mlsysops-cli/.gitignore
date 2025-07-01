@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+.venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Test cache / logs
+.cache/
+*.log
+.tox/
+.coverage
+htmlcov/
+.nox/
+
+# PyCharm and VSCode settings
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
