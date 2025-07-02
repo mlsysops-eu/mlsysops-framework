@@ -1,5 +1,5 @@
 mechanisms:
-- ""
+- "clusterPlacement"
 mechanisms_directory: "mechanisms"
 
 default_telemetry_metrics: "None"

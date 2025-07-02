@@ -14,27 +14,51 @@
 #
 import os
 
+from mlsysops.logger_util import logger
+
 
 class BaseTask:
     def __init__(self, state):
         self.state = state
 
-    def get_telemetry_argument(self):
+    async def get_telemetry_argument(self):
         argument = {
-            "endpoint": "localhost:9100/metrics",
-            "data": self.state.monitor_data
+            "prometheus_endpoint": os.getenv("LOCAL_OTEL_ENDPOINT","localhost:9100/metrics"),
+            "grafana_endpoint": os.getenv("GRAFANA_ENDPOINT","localhost:3000"),
+            "dataframe": await self.state.monitor_data.get_data(),
+            "query": self.state.monitor_data.query_data
         }
-
         return argument
 
     def get_system_description_argument(self):
         return self.state.configuration.system_description
 
-    def get_available_assets(self):
-        return self.state.configuration.mechanisms
+    def get_mechanisms(self):
+        """
+        Retrieve the mechanisms configured and their respective states and options.
 
-    def get_assets(self):
-        return self.state.assets
+        Returns
+        -------
+        dict
+            A dictionary where the keys represent mechanism names, and the values are dictionaries
+            containing 'state' (status of the mechanism) and 'options' (configuration options).
+            If an error occurs, an empty dictionary is returned.
+        """
+        mechanism_dictionary = {}
+        try:
+            # It exposes the installed assets and the active (via configuration) assets
+            mechanism_dictionary = {
+                key: {
+                    "state" : self.state.active_mechanisms[key]['module'].get_state(),
+                    "options": self.state.active_mechanisms[key]['module'].get_options()
+                }
+                for key in self.state.active_mechanisms
+                if key in self.state.configuration.mechanisms
+            }
+        except Exception as e:
+            logger.error(f"Error getting mechanisms: {e}")
+        finally:
+            return mechanism_dictionary
 
     def get_ml_connector_object(self):
         return os.getenv("MLS_MLCONNECTOR_ENDPOINT")

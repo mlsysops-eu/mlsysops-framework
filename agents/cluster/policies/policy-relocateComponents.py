@@ -6,10 +6,8 @@ import re
 import time
 import logging
 
-logger = logging.getLogger(__name__)
+from mlsysops.logger_util import logger
 
-node_one = "csl-rpi5-1"
-node_two = "csl-vader"
 
 def parse_analyze_interval(interval: str) -> int:
     """
@@ -51,7 +49,7 @@ def initialize():
     initialContext = {
         "telemetry": {
             "metrics": ["node_load1"],
-            "system_scrape_interval": "1s"
+            "system_scrape_interval": "5s"
         },
         "mechanisms": [
             "fluidity_proxy"
@@ -63,30 +61,60 @@ def initialize():
         "latest_timestamp": None,
         "core": False,
         "scope": "application",
-        "current_placement": "mls-ubiw-2",
-        "moving_interval": "30s"
+        "current_placement": None,
+        "initial_deployment_finished": False,
+        "moving_interval": "30s",
+        "dynamic_placement_comp": None
     }
 
     return initialContext
 
+def get_first_node(cluster_description):
+    return cluster_description['nodes'][0]
 
-def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
-    # a simple policy that periodically changes the frequency of the node
-    # Analyze
-    print("Called analyze of relocation ", context)
+
+""" Plugin function to implement the initial deployment logic.
+"""
+def initial_plan(context, app_desc, system_description):
+    logger.info('initial deployment phase ', app_desc)
+
+    context['name'] = app_desc['name']
+    context['spec'] = app_desc['spec']
+    context['initial_deployment_finished'] = True
+    context['component_names'] = []
+    plan = {}
+
+    context['main_node'] = system_description['MLSysOpsCluster']['nodes'][0]
+    context['alternative_node'] = system_description['MLSysOpsCluster']['nodes'][1]
+    context["current_placement"] = get_first_node(system_description['MLSysOpsCluster'])
+
+    for component in app_desc['spec']['components']:
+        comp_name = component['metadata']['name']
+        logger.info('component %s', comp_name)
+        context['component_names'].append(comp_name)
+        node_placement = component.get("node_placement")
+        if node_placement:
+            node_name = node_placement.get("node", None)
+            if node_name:
+                logger.info('Found node name. Will continue')
+                continue
+        context['dynamic_placement_comp'] = comp_name
+        plan[comp_name] = [{'action': 'deploy', 'host': context["current_placement"]}]
+    logger.info('Initial plan %s', plan)
+    return plan, context
+
+async def analyze(context, application_description, system_description, mechanisms, telemetry, ml_connector):
     logger.info(f"\nTelemetry {telemetry}")
-    #await asyncio.sleep(10)
-    #time.sleep(30)
+    
     current_timestamp = time.time()
 
     # The first time called
     if context['latest_timestamp'] is None:
         context['latest_timestamp'] = current_timestamp
-        return False, context
+        return True, context
 
     # All the next ones, get it
     analyze_interval = parse_analyze_interval(context['moving_interval'])
-    print(f"{current_timestamp} - {context['latest_timestamp']}  = {current_timestamp - context['latest_timestamp']} with interval {analyze_interval}")
     if current_timestamp - context['latest_timestamp'] > analyze_interval:
         context['latest_timestamp'] = current_timestamp
         return True, context
@@ -95,42 +123,45 @@ def analyze(context, application_description, system_description, current_plan, 
 
 
 
-def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
-    print("Called relocation plan  ----- ", current_plan)
+async def plan(context, application_description, system_description, mechanisms, telemetry, ml_connector):
+    #logger.info(f"Called relocation plan  ----- {mechanisms}")
     
     context['initial_plan'] = False
-    main_node = node_one
-    alternative_node = node_two
-
+    
     plan_result = {}
     plan_result['deployment_plan'] = {}
-    plan_result['deployment_plan']['server-app'] = []
-    curr_plan = {}
-    if main_node == context["current_placement"]:
-        curr_plan = {
-            "action": "move",
-            "target_host": alternative_node,
-            "src_host": main_node,
-        }
-        context["current_placement"] = alternative_node
+    application = application_description[0]
+    
+    if 'initial_deployment_finished' in context and context['initial_deployment_finished'] == False:
+        initial_plan_result, new_context = initial_plan(context, application, system_description)
+        if initial_plan_result:
+            plan_result['deployment_plan'] = initial_plan_result
+            plan_result['deployment_plan']['initial_plan'] = True
 
-    elif alternative_node == context["current_placement"]:
-        curr_plan = {
-            "action": "move",
-            "target_host": main_node,
-            "src_host": alternative_node,
-        }
-        context["current_placement"] = main_node
+            comp_name = new_context['dynamic_placement_comp']
+    else:
+        comp_name = context['dynamic_placement_comp']
+        plan_result['deployment_plan']['initial_plan'] = False
+        plan_result['deployment_plan'][comp_name] = []
+        curr_plan = {}
 
-    plan_result['deployment_plan']['server-app'].append(curr_plan)
-    if not context['initial_plan']:
-        context['name'] = application_description[0]['name']
-        context['initial_plan'] = True
+        if context['main_node'] == context["current_placement"]:
+            curr_plan = {
+                "action": "move",
+                "target_host": context['alternative_node'],
+                "src_host": context['main_node'],
+            }
+            context["current_placement"] = context['alternative_node']
+        elif context['alternative_node'] == context["current_placement"]:
+            curr_plan = {
+                "action": "move",
+                "target_host": context['main_node'],
+                "src_host": context['alternative_node'],
+            }
+            context["current_placement"] = context['main_node']
         
-    # This policy produces a plan for reconfiguration and not for the initial
-    # deployment
-    plan_result['deployment_plan']['initial_plan'] = False
-
+        plan_result['deployment_plan'][comp_name].append(curr_plan)
+    
 
     if plan_result:
         plan_result['name'] = context['name']

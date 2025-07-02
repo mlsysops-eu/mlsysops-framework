@@ -12,7 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import traceback
 
+from ...logger_util import logger
 from spade.behaviour import OneShotBehaviour
 from spade.message import Message
 from spade.template import Template
@@ -29,17 +31,19 @@ class MessageSendingBehavior(OneShotBehaviour):
         self.payload = payload
         self.event = event
 
+
     async def run(self):
-        msg = Message(to=f"{self.recipient}@{self.agent.state.configuration.domain}")  # Recipient JID
-        msg.set_metadata("performative", "request")  # Standard performative
-        msg.set_metadata("event", self.event)  # Custom metadata field
-        msg.thread = str(uuid.uuid4())
+        try:
+            msg = Message(to=f"{self.recipient}@{self.agent.state.configuration.domain}")  # Recipient JID
+            msg.set_metadata("performative", "request")  # Standard performative
+            msg.set_metadata("event", self.event)  # Custom metadata field
+            msg.thread = str(uuid.uuid4())
 
-        payload = self.payload
+            payload = self.payload
 
-        print(f"Sending {self.event} to {self.recipient}")
+            serialized_payload = json.dumps(payload)
 
-        serialized_payload = json.dumps(payload)
-
-        msg.body = serialized_payload
-        await self.send(msg)
+            msg.body = serialized_payload
+            await self.send(msg)
+        except Exception as e:
+            logger.error(f"Error sending message: {traceback.format_exc()}")

@@ -47,9 +47,12 @@ class MechanismsController:
             return policy
 
     def is_mechanism_enabled(self,mechanism_name):
-        pass
+        if mechanism_name in self._state.active_mechanisms:
+            return True
+        else:
+            return False
 
-    def load_mechanisms_modules(self):
+    def load_mechanisms_modules(self, agent_state):
         """
         Lists all .py files in the given directory with prefix 'policy-', extracts the
         string between '-' and '.py', loads the Python module, and verifies
@@ -87,7 +90,7 @@ class MechanismsController:
                             raise AttributeError(f"Module {mechanism_name} is missing required method: {method}")
 
                     # Add the policy in the module
-                    self._state.assets[mechanism_name] = {
+                    self._state.active_mechanisms[mechanism_name] = {
                         "module" : module,
                         "state" : None,
                         "options": None,
@@ -100,13 +103,15 @@ class MechanismsController:
                         "inbound": asyncio.Queue(),
                         "outbound": asyncio.Queue(),
                     }
-                    self._state.assets[mechanism_name]["module"].initialize(
+                    self._state.active_mechanisms[mechanism_name]["module"].initialize(
                         inbound_queue=self.queues[mechanism_name]["inbound"],
-                        outbound_queue=self.queues[mechanism_name]["outbound"])
-                    self._state.assets[mechanism_name]["state"] = self._state.assets[mechanism_name]["module"].get_state()
-                    self._state.assets[mechanism_name]["options"] = self._state.assets[mechanism_name]["module"].get_options()
+                        outbound_queue=self.queues[mechanism_name]["outbound"],agent_state=agent_state)
+                    self._state.active_mechanisms[mechanism_name]["state"] = self._state.active_mechanisms[mechanism_name]["module"].get_state()
+                    self._state.active_mechanisms[mechanism_name]["options"] = self._state.active_mechanisms[mechanism_name]["module"].get_options()
 
-                    logger.debug(f"{self._state.assets[mechanism_name]}")
+
+
+                    logger.debug(f"{self._state.active_mechanisms[mechanism_name]}")
 
 
                 except Exception as e:

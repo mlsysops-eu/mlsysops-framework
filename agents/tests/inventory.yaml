@@ -1,0 +1,55 @@
+all:
+  children:
+    management_cluster:
+      hosts:
+        mls-test-karmada:
+          ansible_host: 192.168.5.34
+          ansible_user: mlsysops
+          ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+          ansible_python_interpreter: /usr/bin/python3
+          k3s_cluster_name: management
+          pod_cidr: "10.10.0.0/16"
+          service_cidr: "10.11.0.0/16"
+          labels:
+            is_vm: true
+            mlsysops/continuumLayer: continuum
+            vaccel: "false"
+
+    cluster1:
+      children:
+        master_nodes:
+          hosts:
+            mls-ubiw-1:
+              ansible_host: 192.168.5.14
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: mls-test-karmada
+              pod_cidr: "10.12.0.0/16"
+              service_cidr: "10.13.0.0/16"
+              labels:
+                is_vm: true
+                mlsysops/continuumLayer: cluster
+                vaccel: "false"
+        worker_nodes:
+          hosts:
+            mls-ubiw-2:
+              ansible_host: 192.168.5.6
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: mls-ubiw-1
+              labels:
+                is_vm: true
+                mlsysops/continuumLayer: node
+                vaccel: "false"
+            mls-ubiw-3:
+              ansible_host: 192.168.5.23
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: mls-ubiw-1
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: node
+                vaccel: "false"

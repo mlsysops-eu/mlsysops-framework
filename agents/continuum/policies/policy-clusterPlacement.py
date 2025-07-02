@@ -2,11 +2,12 @@
 from __future__ import print_function
 
 import inspect
+import random
 import re
 import time
 import logging
 
-logger = logging.getLogger(__name__)
+from mlsysops.logger_util import logger
 
 
 def parse_analyze_interval(interval: str) -> int:
@@ -44,32 +45,34 @@ def parse_analyze_interval(interval: str) -> int:
 
 
 def initialize():
-    print(f"Initializing policy {inspect.stack()[1].filename}")
-
     initialContext = {
         "telemetry": {
-            "metrics": [],
+            "metrics": ["cluster"],
             "system_scrape_interval": "1s"
         },
-        "mechanisms": [],
+        "mechanisms": ["clusterPlacement"],
         "packages": [],
         "configuration": {
-            "analyze_interval": "30s"
+            "analyze_interval": "5s"
         },
         "latest_timestamp": None,
-        "core": False,
-        "scope": "application"
+        "core": True,
+        "scope": "application",
+        "current_placement": "uth-prod-cluster",
+        "first_run": True
     }
 
     return initialContext
 
 
-def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
+async def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
     # a simple policy that periodically changes the frequency of the node
     # Analyze
     print("Called analyze of relocation ", context)
     current_timestamp = time.time()
 
+    if not context['first_run']:
+        return False, context
     # The first time called
     if context['latest_timestamp'] is None:
         context['latest_timestamp'] = current_timestamp
@@ -77,19 +80,26 @@ def analyze(context, application_description, system_description, current_plan, 
 
     # All the next ones, get it
     analyze_interval = parse_analyze_interval(context['configuration']['analyze_interval'])
-    print(f"{current_timestamp} - {context['latest_timestamp']}  = {current_timestamp - context['latest_timestamp']} with interval {analyze_interval}")
     if current_timestamp - context['latest_timestamp'] > analyze_interval:
         context['latest_timestamp'] = current_timestamp
+        context['first_run'] = False
         return True, context
 
     return False, context
 
 
+async def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
 
-def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
 
+
+    #Inference should dictate where to put the app description  and create the message new_plan
+    cluster_to_move = random.choice(["cluster1", "uth-prod-cluster"])
+    logger.info('App_desc received in the plan  %s', application_description)
     new_plan = {
-        "clusterPlacement": {"client-app": "uht-prod-cluster", "server-app": "uht-prod-cluster"},
+        "clusterPlacement": {"action": {
+            "component": cluster_to_move
+        },
+            "app": application_description}
     }
     logger.info('plan: New plan %s', new_plan)
 

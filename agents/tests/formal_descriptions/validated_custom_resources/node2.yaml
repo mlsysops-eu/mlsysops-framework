@@ -2,11 +2,12 @@ apiVersion: mlsysops.eu/v1
 kind: MLSysOpsNode
 metadata:
   name: node-2
+  namespace: mlsysops
 continuum_layer: edge
 cluster_id: uth-prod-cluster
 labels:
   - "node-type:rpi"
-mobility: False
+mobile: False
 location: [22.812791301, 29.82382932]
 sensors:
   - temperature:
@@ -16,6 +17,8 @@ sensors:
       measurement_unit: celsius
       accuracy: 0.4
       sampling_frequency: 10
+    protocol: RTSP
+    endpoint: "12.13.14.156:8090"
     instances: 1
 environment:
   node_type: native
@@ -40,32 +43,15 @@ network_resources:
   basic_interface:
     name: ethernet
     interface_name: eth0
+    application_traffic_permission: True
 permitted_actions:
   - "*"
 power:
+  max_consumption: 
+    value: 20
+    measurement_unit: kw
   target:
-    cost:
-      value: 35    
+    consumption:
+      value: 20
       relation: lower_than
       measurement_unit: kwh
-  availability:
-    - mode: brown
-      value: 2  # The node's max power consumption within the specified time window
-      measurement_unit: kwh
-      time_windows: ["00:00-23:59"]  
-      cost:
-        value: 35    
-        measurement_unit: kwh
-      co2_emission:
-        value: 40
-        measurement_unit: kt/kwh
-    - mode: green
-      value: 2 # The node's max power consumption within the specified time window
-      measurement_unit: kwh
-      time_windows: ["09:00-17:00", "21:00-22:00"]  # Each window has the same max consumption
-      cost:
-        value: 35    
-        measurement_unit: kwh
-      co2_emission:
-        value: 40
-        measurement_unit: kt/kwh

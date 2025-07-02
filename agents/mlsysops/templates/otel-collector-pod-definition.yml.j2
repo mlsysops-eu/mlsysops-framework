@@ -2,10 +2,11 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: "{{ pod_name }}"
-  namespace: "mls-telemetry"
+  namespace: "mlsysops-framework"
   labels:
-    mls-telemetry/app: "otel-collector"
+    mlsysops-framework/otel: "otel-collector"
 spec:
+  serviceAccountName: mlsysops-agents-sa
   containers:
     - name: "otel-collector"
       image: "otel/opentelemetry-collector-contrib:0.113.0"

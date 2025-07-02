@@ -21,39 +21,38 @@ from ..data.state import MLSState
 
 class ExecuteTask(BaseTask):
 
-    def __init__(self, asset, new_command, state: MLSState = None, plan_uuid=None):
+    def __init__(self, asset, new_command, state: MLSState = None, plan_uid=None):
         super().__init__(state)
 
         self.asset_name = asset
         self.new_command = new_command
         self.state = state
-        self.plan_uuid = plan_uuid
+        self.plan_uid = plan_uid
 
     async def run(self):
-        logger.debug("Running Execute Task ")
-        logger.debug(f"New command: {self.new_command} - plan {self.plan_uuid}")
-        logger.debug(f"Asset: {self.asset_name}")
 
-        logger.debug(f"Asset available: {self.state.configuration.mechanisms}")
-        logger.debug(f"Asset available: {self.state.assets}")
-
-        if self.asset_name in self.state.configuration.mechanisms and self.asset_name in self.state.assets:
+        if self.asset_name in self.state.configuration.mechanisms and self.asset_name in self.state.active_mechanisms:
             # Agent is configured to handle this mechanism
             # TODO we can do this check in scheduler?
-            mechanism_handler = self.state.assets[self.asset_name]['module']
-
-            print(mechanism_handler)
+            mechanism_handler = self.state.active_mechanisms[self.asset_name]['module']
+            logger.debug(f"New command for {self.asset_name} - plan id {self.plan_uid}")
 
             try:
-                logger.debug(f"Executing command for {self.asset_name} ")
                 # Inject plan UUID
-                self.new_command["plan_uuid"] = self.plan_uuid
-                await mechanism_handler.apply(self.new_command)
-                # TODO put some checks?
-                self.state.update_task_log(self.plan_uuid, updates={"status": "Pending"})
-
+                self.new_command["plan_uid"] = self.plan_uid
+                execute_async = await mechanism_handler.apply(self.new_command)
+                # TODO introduce fail checks?
+                if execute_async:
+                    logger.test(
+                        f"|1| Plan with planuid:{self.new_command['plan_uid']} executed by applying to mechanism:{self.asset_name} status:Success")
+                    self.state.update_plan_status(self.plan_uid, self.asset_name,"Success")
+                else:
+                    self.state.update_task_log(self.plan_uid, updates={"status": "Pending"})
+                    logger.test(
+                        f"|1| Plan with planuid:{self.new_command['plan_uid']} executed by applying to mechanism:{self.asset_name} status:Pending")
             except Exception as e:
                 logger.error(f"Error executing command: {e}")
+                self.state.update_task_log(self.plan_uid, updates={"status": "Failed"})
                 return False
 
         return True

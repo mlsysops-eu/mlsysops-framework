@@ -201,7 +201,7 @@ class Check_ml_deployment_Behaviour(OneShotBehaviour):
         # try:
         #     svc_obj = self.core_api.read_namespaced_service(
         #         name=self.comp_name,
-        #         namespace='default')
+        #         namespace=config.NAMESPACE)
         # except ApiException as exc:
         #     if exc.status != 404:
         #         print('Unknown error reading service: ' + exc)n

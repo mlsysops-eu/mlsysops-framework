@@ -1,0 +1,91 @@
+apiVersion: mlsysops.eu/v1
+cluster_placement:
+  cluster_id: [uth-prod-cluster]
+component_interactions:
+- {component_name1: client-app, component_name2: server-app, type: egress}
+components:
+- containers:
+  - command: [python, TcpServer.py]
+    env:
+    - {name: OTEL_RESOURCE_ATTRIBUTES, value: 'service.name=server-app, service.version=0.0.0,
+        service.experimentid=test'}
+    - {name: OTEL_SERVICE_NAME, value: server-app}
+    - name: NODE_IP
+      value_from:
+        field_ref: {field_path: status.hostIP}
+    - {name: TELEMETRY_ENDPOINT, value: '"$(NODE_IP):43170"'}
+    image: registry.mlsysops.eu/agent/agents/test_app:0.0.0
+    image_pull_policy: IfNotPresent
+    platform_requirements:
+      cpu:
+        architecture: [amd64]
+        frequency: 1.4
+        limits: 500m
+        requests: 250m
+      disk: '120'
+      memory: {limits: 128Mi, requests: 64Mi}
+      performance_indicator: 30.0
+    ports:
+    - {container_port: 10000, protocol: TCP}
+  host_network: false
+  metadata: {name: server-app, uid: a9jwduj9028uje}
+  node_placement:
+    continuum_layer: [edge]
+  qos_metrics:
+  - application_metric_id: metric-1
+    relation: lower_or_equal
+    system_metrics_hints: [cpu_frequency]
+    target: 20.0
+  restart_policy: on_failure
+  sensors:
+  - camera: {camera_type: rgb, minimum_framerate: 20, model: d455, resolution: 1024x768}
+    endpoint_variable: CAMERA_ENDPOINT
+    instances: 1.0
+- containers:
+  - command: [python, TcpClient.py]
+    env:
+    - {name: OTEL_RESOURCE_ATTRIBUTES, value: 'service.name=server-app, service.version=0.0.0,
+        service.experimentid=test'}
+    - {name: OTEL_SERVICE_NAME, value: server-app}
+    - name: NODE_IP
+      value_from:
+        field_ref: {field_path: status.hostIP}
+    - {name: TELEMETRY_ENDPOINT, value: '"$(NODE_IP):43170"'}
+    - {name: TCP_SERVER_IP, value: server-app}
+    image: registry.mlsysops.eu/agent/agents/test_app:0.0.0
+    image_pull_policy: IfNotPresent
+    platform_requirements:
+      cpu:
+        architecture: [arm64]
+        frequency: 1.4
+        limits: 500m
+        requests: 250m
+      disk: '100'
+      gpu: {memory: '2', model: k80, utilization_request: '10'}
+      memory: {limits: 128Mi, requests: 64Mi}
+      performance_indicator: 320.0
+    ports:
+    - {container_port: 10000, protocol: TCP}
+  metadata: {name: client-app, uid: jdaddwewed235uje}
+  node_placement:
+    continuum_layer: [edge]
+    labels: ["'node-type:rpi'"]
+  qos_metrics:
+  - {application_metric_id: metric-2, relation: equal, target: 30.0}
+  restart_policy: on_failure
+  sensors:
+  - endpoint_variable: TEMPERATURE_ENDPOINT
+    instances: 1.0
+    temperature: {accuracy: 0.4, measurement_max: 45.0, measurement_min: 13.0, measurement_unit: celsius,
+      model: sdc30, sampling_frequency: 10.0}
+global_satisfaction:
+  achievement_weights:
+  - {metric_id: metric-1, weight: 0.5}
+  - {metric_id: metric-2, weight: 0.5}
+  relation: greater_than
+  threshold: 0.7
+kind: MLSysOpsApp
+metadata: {name: test-application}
+permitted_actions: [component_relocation, traffic_redirection, change_container_image,
+  change_container_runtime_class, change_container_cpu_set, change_container_resource_requirements,
+  acceleration]

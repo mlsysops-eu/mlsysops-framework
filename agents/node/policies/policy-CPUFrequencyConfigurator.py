@@ -54,12 +54,10 @@ def parse_analyze_interval(interval: str) -> int:
 
 
 def initialize():
-    print(f"Initializing policy {inspect.stack()[1].filename}")
-
     initialContext = {
         "telemetry": {
             "metrics": ["node_load1"],
-            "system_scrape_interval": "1s"
+            "system_scrape_interval": "10s"
         },
         "mechanisms": [
             "CPUFrequencyConfigurator"
@@ -78,11 +76,9 @@ def initialize():
     return initialContext
 
 
-def analyze(context, application_description, system_description, assets, telemetry, ml_connector):
+async def analyze(context, application_description, system_description, mechanisms, telemetry, ml_connector):
     # a simple policy that periodically changes the frequency of the node
     # Analyze
-    print(f"Called analyze of cpufreq {context}\n")
-    print(f"Assets {assets}\n")
     current_timestamp = time.time()
 
     # The first time called
@@ -92,7 +88,6 @@ def analyze(context, application_description, system_description, assets, teleme
 
     # All the next ones, get it
     analyze_interval = parse_analyze_interval(context['configuration']['analyze_interval'])
-    print(f"{current_timestamp} - {context['latest_timestamp']}  = {current_timestamp - context['latest_timestamp']} with interval {analyze_interval}")
     if current_timestamp - context['latest_timestamp'] > analyze_interval:
         context['latest_timestamp'] = current_timestamp
         return True, context
@@ -101,35 +96,13 @@ def analyze(context, application_description, system_description, assets, teleme
 
 
 
-def plan(context, application_description, system_description, current_plan, telemetry, ml_connector, available_assets):
-    print("Called plan of cpurfreq ----- ", current_plan)
-    # if "CPUFrequencyConfigurator" not in context['mechanisms'] and "CPUFrequencyConfigurator" not in available_assets:
-    #     return {}, context
+async def plan(context, application_description, system_description, mechanisms, telemetry, ml_connector):
 
-    if current_plan is None:
-        cpu_command = {
-            "command": "set",
-            "cpu": "all",
-            "frequency": "max"
-        }
-    elif current_plan["CPUFrequencyConfigurator"]["frequency"] == "min":
-        cpu_command = {
-            "command": "set",
-            "cpu": "all",
-            "frequency": "max"
-        }
-    elif current_plan["CPUFrequencyConfigurator"]["frequency"] == "max":
-        cpu_command = {
-            "command": "set",
-            "cpu": "all",
-            "frequency": "min"
-        }
-    else:
-        cpu_command = {
-            "command": "set",
-            "cpu": "all",
-            "frequency": "min"
-        }
+    cpu_command = {
+        "command": "set",
+        "cpu": "all",
+        "frequency": "min"
+    }
 
     new_plan = {
         "CPUFrequencyConfigurator": cpu_command,

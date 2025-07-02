@@ -1,11 +1,11 @@
 from cpufreq import cpuFreq
 
 
-def initialize(inbound_queue, outbound_queue):
+def initialize(inbound_queue, outbound_queue,agent_state=None):
     pass
 
 # TODO change to paylod
-async def apply(value: dict[str, any]):
+async def apply(value: dict[str, any]) -> bool:
     """
     Applies the given CPU frequency settings based on the provided parameters.
 
@@ -21,11 +21,10 @@ async def apply(value: dict[str, any]):
             "frequency" : "min" | "max" | "1000000 Hz"
         }
     """
-    print(f"-----------CPU Set success ------> {value} ")
-    return
+    return True
 
     if "command" not in value:
-        return
+        return True
 
 
     match value['command']:

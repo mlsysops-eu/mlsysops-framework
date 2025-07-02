@@ -20,46 +20,337 @@ from __future__ import print_function
 import logging
 import os
 import sys
+import uuid
+import operator
 
 from kubernetes import client, config
-# from kubernetes import config, watch
+#from kubernetes.client import ApiClient
 from kubernetes.client.rest import ApiException
-# from ruamel.yaml import YAML
-
-# from fluidity_crds_api  import register_all_fluidity_crd, FluidityCrdsApiException
-# from fluidity_crds_config import CRDS_INFO_LIST, API_GROUP
 from objects_api import FluidityObjectsApi, FluidityApiException
-from objects_util import get_crd_info
+from util import human_to_byte, cpu_human_to_cores
+from uuid import UUID
+import cluster_config
+from cluster_config import API_GROUP, VERSION
+
+from mlsysops.logger_util import logger
 
 
-logger = logging.getLogger(__name__)
+def update_resource(name, spec, resource, nodes):
+    logger.info(f"Updating resource {resource} with name {name}")
+    # If node with the same name exists, replace it.
+    # Otherwise append it to the list.
+    if resource == 'Node':
+        api_client = client.ApiClient()
+        node_obj = api_client._ApiClient__deserialize(spec, "V1Node")
 
-def get_app_desc(app_name):
-    """Get the Fluidity app k8s object.
+        for i, node in enumerate(nodes['kubernetes']):
+            if node.metadata.name == name:
+                nodes['kubernetes'][i] = node_obj
+                return
+        nodes['kubernetes'].append(node_obj)
+    elif resource == 'mlsysopsnodes':
+        layer = spec.get('continuum_layer', 'generic')
+        for i, node in enumerate(nodes['mlsysops'][layer]):
+            if node.get("metadata", {}).get("name") == name:
+                nodes['mlsysops'][layer][i] = spec
+                return
+        nodes['mlsysops'][layer].append(spec)
+
+def delete_resource(name, spec, resource, nodes):
+    logger.info(f"Deleting resource {resource} with name {name}")
+    # Find the name of node and delete it 
+    if resource == 'Node':
+        nodes[:] = [node for node in nodes if node.get("metadata", {}).get("name") != name]
+        logger.info(f'Removed node {name}, curr list: {nodes}')
+    elif resource == 'mlsysopsnodes':
+        layer = spec.get('continuum_layer', 'generic')
+        node_list = nodes['mlsysops'][layer]
+        node_list[:] = [node for node in node_list if node.get("metadata", {}).get("name") != name]
+        logger.info(f'Removed node {name}, curr list: {node_list}')
+
+def append_host_to_list(entry_dict, hosts, remove=False):
+    """Appends host dictionary in the component's host list with the modified host status
+    (if not already stored).
+
+    Args:
+        entry_dict (dict): dictionary to be added/modified
+        hosts (list): component host list.
 
     Returns:
-        dict: The fluidityapp description.
+        void
     """
-    crd_info = get_crd_info('fluidityapps')[1]
-    cr_api = FluidityObjectsApi()
-    app = cr_api.get_fluidity_object('fluidityapps', app_name)
-
-def update_app_resources(app_name, resource_list):
-    """Update the FluidityApp updatedResources field
+    #found = False
+    for host in hosts:
+        if host['host'] == entry_dict['host']:
+            host['status'] = entry_dict['status']
+            return True
     
+    if remove:
+        return False
+    
+    # At this point we did not find the entry, so we append it to the list.
+    hosts.append(entry_dict)
+
+def get_node_internal_ip(node_name):
+    """Get the cluster-internal IP of a node.
+
+    Args:
+        node_name (str): The node's name.
+
     Returns:
-        True in case of success,
-        otherwise False.
+        str: The IPv6 address.
     """
-    cr_api = FluidityObjectsApi()
-    app_desc = cr_api.get_fluidity_object('fluidityapps', app_name)
-    app_desc['updatedResources'] = resource_list
-    try:
-        cr_api.update_fluidity_object('fluidityapps', app_name, app_desc)
-    except FluidityApiException:
-        logger.error('Updating updatedResources failed')
+    node_address = None
+    v1 = client.CoreV1Api()
+    node = v1.read_node(node_name)
+    for addr in node.status.addresses:
+        if addr.type == 'InternalIP':
+            node_address = addr.address
+    return node_address
+
+def node_provides_resources(node_name, target, nodes_list):
+    """Check if resource requests of component(s) fit at a node.
+
+    Args:
+        node_name (str): The name of the node.
+        target (dict): Target resources (cpu, memory).
+
+    Returns:
+        bool: True, if the node can provide these resources, False otherwise
+    """
+
+    node_exists = False
+    logger.info(node_name)
+
+    for node in nodes_list:
+        if node.metadata.name == node_name:
+            node_exists = True
+            logger.debug('Check resources - node exists: %s', node_name)
+    
+    if not node_exists:
+        logger.error('Node does not exist.')
+        return False
+
+    core_api = client.CoreV1Api()
+    node = core_api.read_node(node_name)
+    # status = node.status
+    allocatable = node.status.allocatable
+    
+    if target['cpu']:
+        allocatable_cpu = cpu_human_to_cores(allocatable['cpu'])
+        target_cpu = cpu_human_to_cores(target['cpu'])
+        if allocatable_cpu < target_cpu:
+            logger.info('Check resources - node does not have cpu: %s', node_name)
+            return False
+
+    if target['memory']:
+        allocatable_memory = human_to_byte(allocatable['memory'])
+        target_memory = human_to_byte(target['memory'])
+        if allocatable_memory < target_memory:
+            logger.info('Check resources - node does not have memory: %s', node_name)
+            return False
+
+    logger.info('Check resources - node provides resources: %s', node_name)
+    return True
+
+def cmp_fields(comp_field, node_field, op, resource):
+    if comp_field and (not node_field or op(comp_field, node_field)):
+        logger.error(f"{resource}: Node field {node_field} does not match comp requirement: {comp_field}")
         return False
     return True
+
+def node_matches_requirements(node, comp_spec):
+    """Check if node matches description-related requirements.
+
+    Args:
+        node (dict): The MLSysOpsNode description.
+        comp_spec (dict): A component's extended spec.
+
+    Returns:
+        bool: True, if the node matches the requirements, False otherwise
+    """
+    logger.info(f"Checking requirements for node: {node['metadata']['name']}")
+    node_name = node.get("metadata").get("name")
+    placement = comp_spec.get("node_placement", None)
+    logger.info(f"node {node}")
+    if placement:
+        host = placement.get("node", None)
+
+        if host and host != node_name:
+            logger.error(f"Selected host {node_name} does not match description-related host {host}")
+            return False
+
+        node_layer = placement.get("continuum_layer", None)
+        if node_layer and "*" not in node_layer:
+            if 'continuum_layer' not in node:
+                logger.error(f"Node {node_name} does not have continuum_layer")
+                return False
+            match_layer = False
+            for layer in node_layer:
+                if layer == node['continuum_layer']:
+                    match_layer = True
+                    break
+
+            if not match_layer:
+                logger.error(f"Node {node} does not match node layer")
+                return False
+
+        mobility = placement.get("mobile", False)
+        if mobility and not node.get("mobile", False):
+            logger.error(f"Node {node_name} is not mobile")
+            return False
+
+        comp_labels = placement.get("labels", None)
+        logger.info(f"comp_labels {comp_labels}")
+
+        node_labels = node.get("labels", None)
+        logger.info(f"node_labels {node_labels}")
+
+        if comp_labels:
+            
+            if not node_labels:
+                logger.error(f"Node {node_name} does not match comp labels {comp_labels}")
+                return False
+
+            for label in comp_labels:
+                if label not in node_labels:
+                    logger.error(f"Node {node_name} does not match comp label {label}")
+                    return False
+    
+    sensors = comp_spec.get("sensors", None)
+    if sensors:
+        for sensor in sensors:
+            camera = sensor.get("camera", None)
+            if camera:
+                node_camera = None
+                for node_sensor in node['sensors']:
+                    if 'camera' in node_sensor:
+                        node_camera = node_sensor['camera']
+                        break
+
+                if not node_camera:
+                    logger.error(f"Node does not have camera sensor")
+                    return False
+
+                if not cmp_fields(camera.get("model", None), node_camera.get("model", None), operator.ne, "camera model"):
+                    return False
+
+                if not cmp_fields(camera.get("camera_type", None), node_camera.get("camera_type", None), operator.ne, "camera type"):
+                    return False
+
+                if not cmp_fields(camera.get("minimum_framerate", None), node_camera.get("framerate", None), operator.gt, "camera framerate"):
+                    return False
+
+                resolution = camera.get("resolution", None)
+                node_resolutions = node_camera.get("supported_resolutions", [])
+                if resolution and resolution not in node_resolutions:
+                    logger.error(f"Node does not match camera resolution requirements")
+                    return False
+
+            temperature = sensor.get("temperature", None)
+            if temperature:
+                node_temperature = None
+                for node_sensor in node['sensors']:
+                    if 'temperature' in node_sensor:
+                        node_temperature = node_sensor['temperature']
+                        break
+                
+                if not node_temperature:
+                    logger.error(f"Node does not have temperature sensor")
+                    return False
+
+                if not cmp_fields(temperature.get("model", None), node_temperature.get("model", None), operator.ne, "temperature model"):
+                    return False
+    node_env = node.get("environment", None)
+    if  not cmp_fields(comp_spec.get("node_type", None), node_env.get("node_type", None), operator.ne, "node type"):
+        return False
+
+    if not cmp_fields(comp_spec.get("os", None), node_env.get("os", None), operator.ne, "os"):
+        return False
+    
+    container_runtime = comp_spec.get("container_runtime", None)
+    node_container_runtimes = node_env.get("container_runtime", [])
+    if container_runtime and container_runtime not in node_container_runtimes:
+        logger.error(f"Node does not match container runtime requirements")
+        return False
+        
+    # NOTE: We assume single container components
+    container = comp_spec.get("containers")[0]
+    #logger.info(f"comp_spec {comp_spec}")
+    platform_requirements = container.get("platform_requirements")
+    if platform_requirements:
+        cpu = platform_requirements.get("cpu", None)
+        node_hw = node.get("hardware", None)
+        if cpu:
+            node_cpu = node_hw.get("cpu", None)
+            cpu_arch_list = cpu.get("architecture", None)
+            if cpu_arch_list and not node_cpu:
+                logger.error(f"Node does not have cpu arch info")
+                return False
+            
+            node_cpu_arch = node_cpu.get("architecture", None)
+            if (cpu_arch_list and not node_cpu_arch) or (node_cpu_arch and node_cpu_arch not in cpu_arch_list):
+                logger.error(f"Node {node_cpu_arch} does not have any of the required cpu architectures {cpu_arch_list}")
+                return False
+
+            cpu_freq = cpu.get("frequency", None)
+            if cpu_freq and not node_cpu:
+                logger.error(f"Node does not have cpu freq info")
+                return False
+
+            node_cpu_freq = node_cpu.get("frequency", [])
+            if cpu_freq:
+                found = False
+                for freq in node_cpu_freq:
+                    if cpu_freq <= freq:
+                        found = True
+                        break
+
+                if not found:
+                    logger.error(f"Node does not have cpu freq equal to or greater than the requested")
+                    return False
+
+            cpu_perf = cpu.get("performance_indicator", None)
+            if cpu_perf and not node_cpu:
+                logger.error(f"Node does not have cpu perf info")
+                return False
+            
+            if not cmp_fields(cpu_perf, node_cpu.get("performance_indicator", None), operator.gt, "cpu perf indicator"):
+                return False
+
+        
+        if not cmp_fields(platform_requirements.get("disk", None), node_hw.get("disk", None), operator.gt, "disk"):
+            return False
+
+        gpu = platform_requirements.get("gpu", None)
+        if gpu:
+            node_gpu = node_hw.get("gpu", None)
+            gpu_model = gpu.get("model", None)
+            if gpu_model and not node_gpu:
+                logger.error(f"Node does not have gpu info")
+                return False
+
+            if not cmp_fields(gpu_model, node_gpu.get("model", None), operator.ne, "gpu model"):
+                return False
+
+            gpu_mem = gpu.get("memory", None)
+            if gpu_mem and not node_gpu:
+                logger.error(f"Node does not have gpu info")
+                return False
+            
+            if not cmp_fields(gpu_mem, node_gpu.get("memory", None), operator.gt, "gpu memory"):
+                return False
+
+            gpu_perf = gpu.get("performance_indicator", None)
+            if gpu_perf and not node_gpu:
+                logger.error(f"Node does not have gpu info")
+                return False
+
+            if not cmp_fields(gpu_perf, node_gpu.get("performance_indicator", None), operator.gt, "gpu perf indicator"):
+                return False
+
+    return True
+
 
 def get_custom_nodes(node_type_plural, label_selector):
     """Currently used to get all types of nodes represented via CRDs
@@ -67,8 +358,6 @@ def get_custom_nodes(node_type_plural, label_selector):
     Returns:
         list: The list of node dictionaries based on the given node_type
     """
-    # Indicative usage below
-    # crs = cr_api.list_fluidity_object('cloudnodes', label_select='node_type=cloud')
     cr_api = FluidityObjectsApi()
     try:
         crs = cr_api.list_fluidity_object(node_type_plural, label_select='node-type={}'.format(label_selector))
@@ -77,98 +366,34 @@ def get_custom_nodes(node_type_plural, label_selector):
         return []
     return crs['items']
 
-
-def get_cloudnodes():
-    """Get the list of Fluidity cloudnodes k8s objects.
-    Returns:
-        list: The cloudnodes dictionaries.
-    """
-    crd_info = get_crd_info('cloudnodes')[1]
-    cr_api = FluidityObjectsApi()
-    try:
-        crs = cr_api.list_fluidity_object(crd_info['plural'])
-    except FluidityApiException:
-        logger.error('Retrieving %s failed', crd_info['kind'])
+def get_mls_nodes(node_plural, type):
+    """Get all types of MLSysOpsNodes
     
-    return crs['items']
-
-def get_drones():
-    """Get the list of Fluidity drone k8s objects.
-
     Returns:
-        list: The drones dictionaries.
+        list: The list of node dictionaries based on the given node_plural
     """
-    crd_info = get_crd_info('drones')[1]
-    cr_api = FluidityObjectsApi()
+    # Create dynamic client for CRDs
+    api = client.CustomObjectsApi()
+    node_list = []
+
+    # List all CRs
     try:
-        crs = cr_api.list_fluidity_object(crd_info['plural'])
-    except FluidityApiException:
-        logger.error('Retrieving %s failed', crd_info['kind'])
-    # Return the custom resource instances list
-    # cr_list = []
-    # for cri in crs['items']:
-    #     cr_item = {
-    #         'name': cri['metadata']['name'],
-    #         'uid': cri['metadata']['uid'],
-    #         'spec': cri['spec']
-    #     }
-    #     cr_list.append(cr_item)
-    return crs['items']
+        crs = api.list_namespaced_custom_object(API_GROUP, VERSION, cluster_config.NAMESPACE, node_plural)
+    except ApiException as exc:
+        logger.error('List node CRs failed: %s', exc)
+        return []
 
-
-def get_edgenodes():
-    """Get the list of Fluidity edgenode k8s objects.
-
-    Returns:
-        list: The edgenodes dictionaries.
-    """
-    crd_info = get_crd_info('edgenodes')[1]
-    cr_api = FluidityObjectsApi()
-    try:
-        crs = cr_api.list_fluidity_object(crd_info['plural'])
-    except FluidityApiException:
-        logger.error('Retrieving %s failed', crd_info['kind'])
-    # Return the custom resource instances list
-    return crs['items']
-
-def get_mobilenodes():
-    """Get the list of Fluidity mobilenode k8s objects.
-
-    Returns:
-        list: The mobilenodes dictionaries.
-    """
-    crd_info = get_crd_info('mobilenodes')[1]
-    cr_api = FluidityObjectsApi()
-    try:
-        crs = cr_api.list_fluidity_object(crd_info['plural'])
-    except FluidityApiException:
-        logger.error('Retrieving %s failed', crd_info['kind'])
-    # Return the custom resource instances list
-    return crs['items']
-
-def get_dronestations():
-    """Get the list of Fluidity dronestation k8s objects.
-
-    Returns:
-        list: The dronestations dictionaries.
-    """
-    crd_info = get_crd_info('dronestations')[1]
-    cr_api = FluidityObjectsApi()
-    try:
-        crs = cr_api.list_fluidity_object(crd_info['plural'])
-    except FluidityApiException:
-        logger.error('Retrieving %s failed', crd_info['kind'])
-    # Return the custom resource instances list
-    return crs['items']
-
-
-# def map_drone_to_station(drones, dronestations):
-#     """Map drone objects to dronestation objects."""
-#     pass
-
+    # Filter based on spec.continuum_layer
+    for item in crs['items']:
+        layer = item.get('continuum_layer', None)
+        if type == 'generic' and layer is None:
+            node_list.append(item)
+        elif layer == type:
+            node_list.append(item)
+           
+    return node_list
 
 def get_node_availability(node_name, nodes):
-    #logger.info(nodes)
     for node in nodes:
         if node.metadata.name == node_name:
             for condition in node.status.conditions:
@@ -197,171 +422,4 @@ def get_k8s_nodes():
     except ApiException as exc:
         logger.error('List node failed: %s', exc)
         return []
-    #logger.info(node_list.items)
     return node_list.items
-
-
-def set_node_label(node_name, label, value):
-    """Add/update a specific label to a k8s node object.
-
-    Args:
-        node_name (str): The name of the node.
-        label (str): The label to add or update.
-        value (str): The value to set.
-    """
-    api_instance = client.CoreV1Api()
-    body = {
-        'metadata': {
-            'labels': {
-                '{}'.format(label): '{}'.format(value)}
-        }
-    }
-    # Patch the node label
-    try:
-        api_response = api_instance.patch_node(node_name, body)
-        logger.debug('Set node label: %s', api_response)
-    except ApiException as exc:
-        logger.error('Setting node label failed: %s', exc)
-
-
-def remove_node_label(node_name, label):
-    """Remove a specific label from a k8s node object.
-
-    Args:
-        node_name (str): The name of the node.
-        label (str): The label to add or update.
-    """
-    api_instance = client.CoreV1Api()
-    body = {
-        'metadata': {
-            'labels': {
-                '{}'.format(label): None}
-        }
-    }
-    try:
-        api_response = api_instance.patch_node(node_name, body)
-        logger.debug('Remove node label: %s', api_response)
-    except ApiException as exc:
-        logger.error('Removing node label failed: %s', exc)
-
-
-def set_node_annotation(node_name, key, value):
-    """Attach a specific annotation to a k8s node object.
-
-    Args:
-        node_name (str): The name of the node.
-        key (str): The annotation's key.
-        value (str): The value to set.
-    """
-    api_instance = client.CoreV1Api()
-    body = {
-        'metadata': {
-            'annotations': {
-                '{}'.format(key): '{}'.format(value)}
-        }
-    }
-    try:
-        api_response = api_instance.patch_node(node_name, body)
-        logger.debug('Set node annotation: %s', api_response)
-    except ApiException as exc:
-        logger.error('Setting node annotation failed: %s', exc)
-
-
-def remove_node_annotation(node_name, key):
-    """Remove a specific annotation to a k8s node object.
-
-    Args:
-        node_name (str): The name of the node.
-        key (str): The annotation to remove.
-    """
-    api_instance = client.CoreV1Api()
-    body = {
-        'metadata': {
-            'annotations': {
-                '{}'.format(key): None}
-        }
-    }
-    try:
-        api_response = api_instance.patch_node(node_name, body)
-        logger.debug('Remove node label: %s', api_response)
-    except ApiException as exc:
-        logger.error('Removing node annotation failed: %s', exc)
-
-
-def set_mobile_label(mobile_name, label, value):
-    """Add/update a specific label to a Fluidity mobile k8s object.
-
-    Args:
-        mobile_name (str): The name of the mobile node.
-        label (str): The label to add or update.
-        value (str): The value to set.
-    """
-    cr_api = FluidityObjectsApi()
-    mobile = cr_api.get_fluidity_object('mobilenodes', mobile_name)
-    # Ensure labels field exists at metadata section
-    if 'labels' not in mobile['metadata']:
-        mobile['metadata']['labels'] = {}
-    labels = mobile['metadata']['labels']
-    labels[label] = value
-    try:
-        cr_api.update_fluidity_object('mobilenodes', mobile_name, mobile)
-    except FluidityApiException:
-        logger.error('Updating mobile label failed')
-
-def set_drone_label(drone_name, label, value):
-    """Add/update a specific label to a Fluidity drone k8s object.
-
-    Args:
-        drone_name (str): The name of the drone.
-        label (str): The label to add or update.
-        value (str): The value to set.
-    """
-    cr_api = FluidityObjectsApi()
-    drone = cr_api.get_fluidity_object('drones', drone_name)
-    # Ensure labels field exists at metadata section
-    if 'labels' not in drone['metadata']:
-        drone['metadata']['labels'] = {}
-    labels = drone['metadata']['labels']
-    labels[label] = value
-    try:
-        cr_api.update_fluidity_object('drones', drone_name, drone)
-    except FluidityApiException:
-        logger.error('Updating drone label failed')
-
-# Modified to satisfy the fluiditynode type.
-def set_fluiditynode_label(fluiditynode_name, label, value):
-    """Add/update a specific label to a Fluidity fluidity k8s object.
-
-    Args:
-        fluiditynode_name (str): The name of the node.
-        label (str): The label to add or update.
-        value (str): The value to set.
-    """
-    cr_api = FluidityObjectsApi()
-    node = cr_api.get_fluidity_object('fluiditynodes', fluiditynode_name)
-    # Ensure labels exists at metadata section
-    if 'labels' not in node['metadata']:
-        node['metadata']['labels'] = {}
-    labels = node['metadata']['labels']
-    labels[label] = value
-    try:
-        cr_api.update_fluidity_object('fluiditynodes', fluiditynode_name, node)
-    except FluidityApiException:
-        logger.error('Updating fluiditynode label failed')
-
-
-if __name__ == '__main__':
-    # Configure logging
-    logger = logging.getLogger('')
-    formatter = logging.Formatter('[%(asctime)s] %(levelname)s '
-                                  '[%(filename)s] %(message)s')
-    f_hdlr = logging.FileHandler('/var/tmp/Fluidity_nodes.log')
-    f_hdlr.setFormatter(formatter)
-    f_hdlr.setLevel(logging.DEBUG)
-    logger.addHandler(f_hdlr)
-    s_hdlr = logging.StreamHandler(sys.stdout)
-    s_hdlr.setFormatter(formatter)
-    s_hdlr.setLevel(logging.DEBUG)
-    logger.addHandler(s_hdlr)
-    logger.setLevel(logging.DEBUG)
-    get_nodes()

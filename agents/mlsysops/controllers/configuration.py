@@ -40,11 +40,27 @@ class ConfigurationController:
         """
         # Load environment variables from the .env file
         load_dotenv()
+        mlsysops_path = os.path.join(os.getenv("MLSYSOPS_INSTALL_PATH","/etc/mlsysops"))
 
+        if not os.path.exists(mlsysops_path):
+            try:
+                # Create the directory
+                os.makedirs(mlsysops_path)
+                os.makedirs(mlsysops_path+"/config")
+                os.makedirs(mlsysops_path+"/descriptions")
+                os.makedirs(mlsysops_path+"/policies")
+                os.makedirs(mlsysops_path+"/kubeconfigs")
+                os.makedirs(mlsysops_path+"/logs")
+                logger.info(f"Directory {mlsysops_path} created successfully.")
+            except PermissionError:
+                logger.error(f"Permission denied: Unable to create {mlsysops_path}. Run as root or check permissions.")
+            except Exception as e:
+                logger.error(f"An error occurred while creating {mlsysops_path}: {e}")
+        else:
+            logger.info(f"Directory {mlsysops_path} already exists.")
 
-
-        self.config_path = os.getenv("CONFIG_PATH", "config.yaml")
-        self.description_path = os.getenv("DESCRIPTION_PATH", "descriptions")
+        self.config_path = os.getenv("CONFIG_PATH", f"{mlsysops_path}/config/{os.getenv('NODE_NAME',socket.gethostname())}-config.yaml")
+        self.description_path = os.getenv("DESCRIPTION_PATH", f"{mlsysops_path}/descriptions")
         logger.info(f"Using configuration file: {self.config_path}")
 
         self.agent_state = agent_state
@@ -57,10 +73,13 @@ class ConfigurationController:
         Loads the configuration from the YAML file into the AppConfig dataclass.
         """
         if not os.path.exists(self.config_path):
-            raise FileNotFoundError(f"Configuration file '{self.config_path}' not found.")
+            logger.debug(f"Configuration file '{self.config_path}' not found, fallback to default values.")
+            self.config_path = "config.yaml"
 
         with open(self.config_path, "r") as file:
             data = yaml.safe_load(file)
+            logger.debug(f"Configuration file '{self.config_path}' loaded.")
+
 
         # Update dataclass with parsed values
         for key, value in data.items():
@@ -90,13 +109,15 @@ class ConfigurationController:
             logger.error(f"System description file '{self.description_path}' not found.")
 
         try :
-            description_file_path = os.path.join(self.description_path, os.getenv("NODE_NAME", socket.gethostname())+".yaml")
+            description_file_path = os.path.join(self.description_path, f"{self.agent_state.configuration.node}.yaml")
             with open(description_file_path, "r") as file:
                 data = yaml.safe_load(file)
                 self.agent_state.configuration.system_description = data
-
+                if self.agent_state.configuration.continuum_layer in ['node', 'cluster']:
+                    self.agent_state.configuration.cluster = data[f'MLSysOps{self.agent_state.configuration.continuum_layer.capitalize()}']['cluster_id']
+                else:
+                    self.agent_state.configuration.cluster = self.agent_state.configuration.node
             logger.debug(f"System description file loaded: {description_file_path}")
-            print(data)
         except Exception as e:
             logger.error(f"Error loading system description file: {e}")
 

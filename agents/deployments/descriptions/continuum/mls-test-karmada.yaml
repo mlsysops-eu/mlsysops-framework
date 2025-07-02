@@ -1,0 +1,3 @@
+MLSysOpsContinuum:
+  continuumID: uth-slice
+  clusters: ["mls-ubiw-1"]

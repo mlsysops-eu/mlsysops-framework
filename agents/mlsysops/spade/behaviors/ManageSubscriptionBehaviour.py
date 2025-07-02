@@ -45,5 +45,6 @@ class ManageSubscriptionBehaviour(CyclicBehaviour):
             response = Message(to=cluster_jid)
             response.set_metadata("performative", "cluster_subs")
             response.body = "Subscription successful"
+
             await self.send(response)
             logger.debug(f" Node {cluster_jid} registered or updated in Redis.")

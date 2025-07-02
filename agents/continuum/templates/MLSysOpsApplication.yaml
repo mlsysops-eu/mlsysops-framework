@@ -23,12 +23,10 @@ spec:
           properties:
             name:
               type: string
-            mlsysops-id:
-              type: string
-            clusterPlacement:
+            cluster_placement:
               type: object
               properties:
-                clusterID:
+                cluster_id:
                   type: array
                   items:
                     type: string
@@ -47,65 +45,65 @@ spec:
                           - Europe
                           - Asia
                         description: The required continent (optional)
-                    country: # See reference list  
+                    country: # See reference list
                       type: array
                       items:
                         type: string
                         enum:
-                          - EL # Greece
-                          - IT # Italy
-                          - FR # France
-                          - NL # Netherlands
-                          - IE # Ireland
-                          - PT # Portugal
-                          - DK # Denmark
-                          - IL # Israel
+                          - el # Greece
+                          - it # Italy
+                          - fr # France
+                          - nl # Netherlands
+                          - ie # Ireland
+                          - pt # Portugal
+                          - dk # Denmark
+                          - il # Israel
                       description: The required country (optional)
                     city:
                       type: array
                       items:
                         type: string
                         enum:
-                          - Volos
-                          - Athens
-                          - Rende
-                          - Milan
-                          - Lille
-                          - Delft
-                          - Dublin
-                          - Aveiro
-                          - Porto
-                          - Aarhus
-                          - Jerusalem
+                          - volos
+                          - athens
+                          - rende
+                          - milan
+                          - lille
+                          - delft
+                          - dublin
+                          - aveiro
+                          - porto
+                          - aarhus
+                          - jerusalem
                         description: The required city (optional)
-                cloudProvider:
+                cloud_provider:
                   type: string
                   enum:
                     - private
-                    - AWS
-                    - MicrosoftAzure
-                    - GCP
+                    - aws
+                    - microsoft_azure
+                    - gcp
                 accelerators:
                   type: array
                   items:
                     type: string
                     enum:
-                      - GPU
-                      - FPGA
-                      - TPU
+                      - gpu
+                      - fpga
+                      - tpu
                   description: The candidate clusters should have nodes containing at least one instance of the specified accelerators.
-                nodeTypes:
+                node_types:
                   type: array
                   items:
                     type: string
                     enum:
-                      - Cloud
-                      - FarEdge
-                      - EdgeInfrastructure
-                      - Edge
-                    description: The required 
+                      - cloud
+                      - far_edge
+                      - edge_infrastructure
+                      - edge
+                    description: The required
                   description: The candidate clusters should contain at least one node of each specified type.
-            singleNode:
+            single_node:
               type: array
               items:
                 type: object
@@ -118,21 +116,21 @@ spec:
                     items:
                       type: string
                     description: The array of components to be deployed on the same Node.
-                  continuumLayer:
+                  continuum_layer:
                     type: array
                     items:
                       type: string
                       enum:
-                        - Cloud
-                        - FarEdge
-                        - EdgeInfrastructure
-                        - Edge
+                        - cloud
+                        - far_edge
+                        - edge_infrastructure
+                        - edge
                         - "*"
                       description: The required component placement on the continuum. "*" symbol means "anywhere on the continuum".
-                  Scaling:
+                  scaling:
                     type: object
                     properties:
-                      scalingMode:
+                      scaling_mode:
                         type: string
                         enum:
                           - manual
@@ -140,22 +138,22 @@ spec:
                       instances:
                         type: integer
                         description: In case of manual scaling of the component, specify the number of instances.
-                      scalingCriteria:
+                      scaling_criteria:
                         type: string
                         enum:
-                          - MinCPUutilization
-                          - MaxCPUutilization
-                          - MinMemoryPercent
-                          - MaxMemoryPercent
-                          - MinRequestsPerSec
-                          - MaxRequestPerSec
-                          - MinNumberOfInstances
-                          - MaxNumberOfInstances
+                          - min_cpu_utilization
+                          - max_cpu_utilization
+                          - min_memory_percent
+                          - max_memory_percent
+                          - min_requests_per_sec
+                          - max_request_per_sec
+                          - min_number_of_instances
+                          - max_number_of_instances
                         description: Scaling criteria for the component, related to the "auto" scaling type.
                     description: The component scaling information.
-                  mobility:
+                  mobile:
                     type: boolean
-                    description: Specify if the component needs to be deployed on a mobile node (optional)
+                    description: Specify if the component must be deployed on a mobile node (optional)
                   labels:
                     type: array
                     items:
@@ -169,33 +167,33 @@ spec:
               items:
                 type: object
                 properties:
-                  Component:
+                  metadata:
                     type: object
                     properties:
                       name:
                         type: string
                         description: The unique name of the component
-                      uid: 
+                      uid:
                         type: string
                         description: The unique identifier of the component (not given by app provider).
-                  nodePlacement:
+                  node_placement:
                     type: object
                     properties:
-                      continuumLayer:
+                      continuum_layer:
                         type: array
                         items:
                           type: string
                           enum:
-                            - Cloud
-                            - FarEdge
-                            - EdgeInfrastructure
-                            - Edge
+                            - cloud
+                            - far_edge
+                            - edge_infrastructure
+                            - edge
                             - "*"
                           description: The required component placement on the continuum. "*" symbol means "anywhere on the continuum".
-                      Scaling:
+                      scaling:
                         type: object
                         properties:
-                          scalingMode:
+                          scaling_mode:
                             type: string
                             enum:
                               - manual
@@ -203,20 +201,20 @@ spec:
                           instances:
                             type: integer
                             description: In case of manual scaling of the component, specify the number of instances.
-                          scalingCriteria:
+                          scaling_criteria:
                             type: string
                             enum:
-                              - MinCPUutilization
-                              - MaxCPUutilization
-                              - MinMemoryPercent
-                              - MaxMemoryPercent
-                              - MinRequestsPerSec
-                              - MaxRequestPerSec
-                              - MinNumberOfInstances
-                              - MaxNumberOfInstances
+                              - min_cpu_utilization
+                              - max_cpu_utilization
+                              - min_memory_percent
+                              - max_memory_percent
+                              - min_requests_per_sec
+                              - max_request_per_sec
+                              - min_number_of_instances
+                              - max_number_of_instances
                             description: Scaling criteria for the component, related to the "auto" scaling type.
                         description: The component scaling information.
-                      mobility:
+                      mobile:
                         type: boolean
                         description: Specify if the component needs to be deployed on a mobile node (optional)
                       labels:
@@ -227,23 +225,23 @@ spec:
                       node:
                         type: string
                         description: The required node name to be the host of the component (optional).
-                  DependsOn:
+                  depends_on:
                     type: array
                     items:
                       type: string
                       description: The name of the related components.
                     description: The given component should be deployed after all the components
-                                 specified in the Components list have already started running. 
-                  runtimeConfiguration:
+                                 specified in the Components list have already started running.
+                  runtime_configuration:
                     type: object
                     description: Enables runtime (node-level) configuration for app components.
-                    properties: 
-                      configSpecificationFile:
+                    properties:
+                      config_specification_file:
                         type: string
                         description: The actual specification file describing the available runtime
                                      configuration knobs (expected in json format).
                                      This file is provided by the app developer.
-                      configFilePath:
+                      config_file_path:
                         type: string
                         description: The absolute path inside the container where the application code
                                      expects to find the configSpecificationFile.
@@ -255,171 +253,126 @@ spec:
                         camera:
                           type: object
                           properties:
-                            methods:
-                              type: array
-                              items:
-                                type: object
-                                description: The list of camera service methods.
-                                properties:
-                                  methodName:
-                                    type: string
-                                    enum:
-                                      - CaptureImage
-                                      - CaptureImagePeriodic
-                                      - CaptureVideo
-                                      - ListImages
-                                      - GetImageInfo
-                                      - RetrieveImage
-                                      - GetCameraInfo
                             model:
                               type: string
                               enum:
-                                - D455
-                                - IMX477
+                                - d455
+                                - imx477
                                 - picamera-v2
                               description: The model name of the camera sensor
-                            cameraType:
+                            camera_type:
                               type: string
                               enum:
-                                - RGB
-                                - NIR
-                                - Thermal
-                                - Monocular
+                                - rgb
+                                - nir
+                                - thermal
+                                - monocular
                               description: The camera sensor type.
-                            minimumFramerate: 
+                            minimum_framerate:
                               type: integer
-                            resolutions:
-                              type: array
-                              items:
-                                type: string
-                                enum:
-                                  - 1024x768
-                                  - 4056x3040
+                            resolution:
+                              type: string
+                              enum:
+                                - 1024x768
+                                - 4056x3040
                         temperature:
                           type: object
                           properties:
-                            methods:
-                              type: array
-                              items:
-                                type: object
-                                description: The list of temperature service methods.
-                                properties:
-                                  methodName:
-                                    type: string
-                                    enum:
-                                      - GetTemperature
                             model:
                               type: string
                               enum:
-                                - SDC30
-                                - DS18B20
+                                - sdc30
+                                - ds18b20
                               description: The model name of the temperature sensor
-                            measurementMin:
+                            measurement_min:
                               type: number
-                            measurementMax:
+                            measurement_max:
                               type: number
-                            measurementUnit:
+                            measurement_unit:
                               type: string
                               enum:
-                                - Celsius
-                                - Fahrenheit
+                                - celsius
+                                - fahrenheit
                             accuracy:
                               type: number
-                            samplingFrequency:
+                            sampling_frequency:
                               type: number
                         accelerometer:
                           type: object
                           properties:
-                            methods:
-                              type: array
-                              items:
-                                type: object
-                                description: The list of accelerometer service methods.
-                                properties:
-                                  methodName:
-                                    type: string
-                                    enum:
-                                      - GetAcceleration
                             model:
                               type: string
                               enum:
-                                - 3038-SMT
-                            measurementMin:
+                                - 3038-smt
+                            measurement_min:
                               type: number
-                            measurementMax:
+                            measurement_max:
                               type: number
-                            measurementUnit:
+                            measurement_unit:
                               type: string
                               enum:
-                                - "m/s^2"
+                                - m/s^2
                             accuracy:
                               type: number
-                            samplingFrequency:
+                            sampling_frequency:
                               type: number
                         barometer:
                           type: object
                           properties:
-                            methods:
-                              type: array
-                              items:
-                                type: object
-                                description: The list of barometer service methods.
-                                properties:
-                                  methodName:
-                                    type: string
-                                    enum:
-                                      - GetAtmosphericPressure
                             model:
                               type: string
                               enum:
-                                - SB-100
-                            measurementMin:
+                                - sb-100
+                            measurement_min:
                               type: number
-                            measurementMax:
+                            measurement_max:
                               type: number
-                            measurementUnit:
+                            measurement_unit:
                               type: string
                               enum:
-                                - "Pa" # Pascal
+                                - pa # Pascal
                             accuracy:
                               type: number
-                            samplingFrequency:
+                            sampling_frequency:
                               type: number
-                        airQuality:
+                        air_quality:
                           type: object
                           properties:
-                            methods:
-                              type: array
-                              items:
-                                type: object
-                                description: The list of airQuality service methods.
-                                properties:
-                                  methodName:
-                                    type: string
-                                    enum:
-                                      - DetectAirContaminants
                             model:
                               type: string
                               enum:
-                                - MQ-135
-                            measurementMin:
+                                - mq-135
+                            measurement_min:
                               type: number
-                            measurementMax:
+                            measurement_max:
                               type: number
-                            measurementUnit:
+                            measurement_unit:
                               type: string
                               enum:
-                                - "μg/m^3" # micrograms per cubic meter
+                                - ug/m^3 # micrograms per cubic meter
                             accuracy:
                               type: number
-                            samplingFrequency:
+                            sampling_frequency:
                               type: number
-                  QoS-Metrics:
+                        endpoint_variable:
+                          type: string
+                          description: The env variable that the app will retrieve the endpoint
+                                       to get the sensor measurements.
+                        protocol:
+                          type: string
+                          enum:
+                            - MQTT
+                            - RTSP
+                          description: The protocol of the sensor service.
+                        instances:
+                          type: number
+                          description: The number of required sensor instances.
+                  qos_metrics:
                     type: array
                     items:
                       type: object
                       properties:
-                        ApplicationMetricID:
+                        application_metric_id:
                           type: string
                           description: This is an indicative list of metrics. It can be extended as needed.
                         target:
@@ -427,18 +380,18 @@ spec:
                         relation:
                           type: string
                           enum:
-                            - LowerOrEqual
-                            - GreaterOrEqual
-                            - Equal
-                            - LowerThan
-                            - GreaterThan
-                        systemMetricsHints:
+                            - lower_or_equal
+                            - greater_or_equal
+                            - equal
+                            - lower_than
+                            - greater_than
+                        system_metrics_hints:
                           type: array
                           description: System-level metrics affecting the application metric.
                           items:
                             type: string
                             enum:
-                              - CPUFrequency
+                              - cpu_frequency
                   storage: # Refers to CC storage service.
                     type: object
                     properties:
@@ -447,70 +400,88 @@ spec:
                         items:
                           type: object
                           properties:
-                            bucketID:
+                            bucket_id:
                               type: string
                               description: The bucket's unique identifier.
-                            policyUpdateToken: 
+                            policy_update_token:
                               type: string
                               description: The required token for the MLSysOps to update the bucket's policy at runtime.
-                            locationRestrictions:
+                            location_restrictions:
                               type: object
                               description: These restrictions are used to exclude storage locations that host data of the application.
                               properties:
-                                GDPR:
+                                gdpr:
                                   type: boolean
-                                  description: For EU citizens only GDPR-compliant storage locations can legally be used.   
+                                  description: For EU citizens only GDPR-compliant storage locations can legally be used.
                             reduncancy:
                               type: string
                               enum:
-                                - High
-                                - One
-                                - None
-                            maxLatency:
+                                - high
+                                - one
+                                - none
+                            max_latency:
                               type: number
-                            minDownloadSpeed:
+                            min_download_speed:
                               type: number
-                            serverSideEncryption:
+                            server_side_encryption:
                               type: string
                               enum:
-                                - "ON"
-                                - "OFF"
+                                - on
+                                - off
                           required:
-                            - bucketID
-                  dataSensitivity:
+                            - bucket_id
+                  data_sensitivity:
                     type: boolean
                     description: The indication to specify whether a component has sensitive data or not (useful for the data storage).
-                  dataCriticality:
+                  data_criticality:
                     type: string
                     enum:
-                      - Low
-                      - Medium
-                      - High
+                      - low
+                      - medium
+                      - high
                     description: Used to provide information referring to the trust aspect for a given component.
-                  externalComponent:
+                  external_component:
                     type: boolean
                     description: This property indicates whether the component can be managed by MLSysOps or not. 
                      If not the MLSysOps platform merely deploys the component(s), based on the provided instances,
                      and subsequently deletes it whenever the application needs to be removed.
-                  externalAccess:
+                  external_access:
                     type: boolean
                     description: This property indicates whether the component can be accessed outside of its cluster.
-                  hostNetwork:
-                    type: boolean 
+                  host_network:
+                    type: boolean
                     description: Host networking requested for this component. 
                       Use the host's network namespace. If this option is set,
                       the ports that will be used must be specified. Default to false.
-                  runtimeClassName:
+                  runtime_class_name:
                     type: string
                     enum:
                       - nvidia
-                  restartPolicy:
+                  restart_policy:
                     type: string
                     enum:
-                      - Always
-                      - OnFailure
-                      - Never
+                      - always
+                      - on_failure
+                      - never
                     description: Restart policy for the container. Default to Always.
+                  os:
+                    type: string
+                    enum:
+                      - ubuntu
+                      - kali
+                      - zephyr
+                  node_type:
+                    type: string
+                    enum:
+                      - virtualized # In the form of a Virtual Machine
+                      - native # Non-virtualized, including OS
+                      - bare_metal # Non-virtualized, without OS
+                  container_runtime:
+                    type: string
+                    enum:
+                      - containerd
+                      - docker
+                      - emb_serve
                   containers:
                     type: array
                     items:
@@ -519,38 +490,11 @@ spec:
                         image:
                           type: string
                           description: The name of the container image.
-                        resources:
-                          type: object
-                          properties:
-                            requests:
-                              type: object
-                              properties:
-                                cpu:
-                                  type: string
-                                memory:
-                                  type: string
-                                nvidia.com/gpu:
-                                  type: integer
-                            limits:
-                              type: object
-                              properties:
-                                cpu:
-                                  type: string
-                                memory:
-                                  type: string
-                                nvidia.com/gpu:
-                                  type: integer
-                        securityContext:
-                          type: object
-                          properties:
-                            allowPrivilegeEscalation:
-                              type: boolean
-                          description: SecurityContext defines the security options the container should be run with.
                         command:
                           type: array
                           items:
                             type: string
-                        imagePullPolicy:
+                        image_pull_policy:
                           type: string
                           enum:
                             - Always
@@ -558,134 +502,123 @@ spec:
                             - IfNotPresent
                           description: Image pull policy. Defaults to Always if :latest tag is specified,
                            or IfNotPresent otherwise.
-                        accelerationAPI:
+                        acceleration_api:
                           type: array
                           items:
                             type: object
                             properties:
-                              callName:
+                              call_name:
                                 type: string
                                 description: The (unique) API call name.
                                 enum:
-                                  - CalcOpticalFlow
-                                  - ImageInference
-                              requiredFramework:
+                                  - calc_optical_flow
+                                  - image_inference
+                              required_framework:
                                 type: string
                                 description: Asterisk means any of the available frameworks.
                                 enum:
-                                  - PyTorch
-                                  - TensorFlow
-                                  - OpenCL
+                                  - pytorch
+                                  - tensorflow
+                                  - opencl
                                   - "*"
                             required:
-                              - callName
-                        resourceRequirements:
+                              - call_name
+                        platform_requirements:
                           type: object
                           description: The resource requirements of the container.
                           properties:
-                            CPU:
+                            cpu:
                               type: object
                               properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
                                 architecture:
                                   type: array
                                   items:
                                     type: string
                                     enum:
-                                      - x86
                                       - arm64
-                                cores:
-                                  type: integer
-                                  description: required cores
+                                      - amd64
                                 frequency:
                                   type: number
-                                  description: required frequency in GHz.
-                            MCU:
+                                  description: required frequency in Hz.
+                            memory:
                               type: object
                               properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
+                            mcu:
+                              type: object
+                              properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
                                 architecture:
                                   type: array
                                   items:
                                     type: string
                                     enum:
-                                      - arm-M4
-                                Flash:
+                                      - arm-m4
+                                flash:
                                   type: string
                                   description: Flash memory size (related to far edge devices)
-                                cores:
-                                  type: integer
-                                  description: required cores
                                 frequency:
                                   type: number
                                   description: required frequency in GHz.
-                            RAM:
-                              type: string
-                              description: required RAM (in GB).
-                            Disk:
+                            disk:
                               type: string
                               description: required Disk space (in GB).
-                            GPU:
+                            gpu:
+                              type: object
+                              properties:
+                                requests:
+                                  type: integer
+                                limits:
+                                  type: integer
+                                model:
+                                  type: string
+                                  enum:
+                                    - k80
+                                    - k40
+                                memory:
+                                  type: string
+                                utilization_request:
+                                  type: string
+                                  description: Percentage of expected utilization.
+                            fpga:
                               type: object
                               properties:
                                 model:
                                   type: string
                                   enum:
-                                    - K80
-                                    - K40
+                                    - zcu102
                                 memory:
                                   type: string
-                                utilizationRequest:
+                                utilization_request:
                                   type: string
                                   description: Percentage of expected utilization.
-                            FPGA:
-                              type: object
-                              properties:
-                                model:
-                                  type: string
-                                  enum:
-                                    - ZCU102
-                                memory:
-                                  type: string
-                                utilizationRequest:
-                                  type: string
-                                  description: Percentage of expected utilization.
-                            performanceIndicator:
+                            performance_indicator:
                               type: number
                               description: This field assists MLSysOps with an initial hint in order to
                                           filter out nodes based on their performance capabilities.
-                        environmentRequirements: 
-                          type: object
-                          properties:
-                            nodeType:
-                              type: string
-                              enum:
-                                - Virtualized # In the form of a Virtual Machine
-                                - Native # Non-virtualized, including OS
-                                - BareMetal # Non-virtualized, without OS
-                            OS:
-                              type: string
-                              enum:
-                                - Ubuntu
-                                - Kali
-                                - Zephyr
-                            container-runtime:
-                              type: string
-                              enum:
-                                - containerd
-                                - Docker
-                                - embServe
                         ports:
                           type: array
                           items:
                             type: object
                             properties:
-                              containerPort:
+                              container_port:
                                 type: integer
                                 description: Number of port to expose on the component's IP address.
                                   This must be a valid port number, 0 < x < 65536.
-                              hostIP:
+                              host_ip:
                                 type: string
                                 description: What host IP to bind the external port to.
-                              hostPort:
+                              host_port:
                                 type: integer
                                 description: Number of port to expose on the host.
                                   If specified, this must be a valid port number, 0 < x < 65536.
@@ -710,13 +643,13 @@ spec:
                               name:
                                 type: string
                                 description: Name of the environment variable.
-                              valueFrom:
+                              value_from:
                                 type: object
                                 properties:
-                                  fieldRef:
+                                  field_ref:
                                     type: object
                                     properties:
-                                      fieldPath: 
+                                      field_path:
                                         type: string
                               value:
                                 type: string
@@ -724,13 +657,13 @@ spec:
                           description: Environment variables for the container.
                 required:
                 - containers
-                - Component
-            componentInteractions:
+                - metadata
+            component_interactions:
               type: array
               items:
                 type: object
                 properties:
-                  componentName1:
+                  component_name1:
                     type: string
                     description: The "source" component.
                   type:
@@ -738,31 +671,31 @@ spec:
                     enum:
                       - ingress
                       - egress
-                  componentName2:
+                  component_name2:
                     type: string
                     description: The "destination" component.
-                  interactionCriticality:
+                  interaction_criticality:
                     type: string
                     enum:
-                      - Low
-                      - Medium
-                      - High
+                      - low
+                      - medium
+                      - high
                     description: Used to provide information referring to the trust aspect for a given interaction.
-                  interactionMetrics:
+                  interaction_metrics:
                     type: array
                     items:
                       type: object
                       properties:
-                        SystemMetricID:
+                        system_metric_id:
                           type: string
                           enum:
-                            - Latency
-                            - Bandwidth
-                            - End2EndInvocationDelay
+                            - latency
+                            - bandwidth
+                            - end_to_end_invocation_delay
                           description: The unique identifier of the system-level metric related to this interaction.
                         target:
                           type: number
-                        measurementUnit:
+                        measurement_unit:
                           type: string
                           enum:
                             - milliseconds # latency, E2E invocation delay
@@ -771,12 +704,29 @@ spec:
                         relation:
                           type: string
                           enum:
-                            - LowerOrEqual
-                            - GreaterOrEqual
-                            - Equal
-                            - LowerThan
-                            - GreaterThan
-            globalSatisfaction:
+                            - lower_or_equal
+                            - greater_or_equal
+                            - equal
+                            - lower_than
+                            - greater_than
+            permitted_actions:
+              type: array
+              items:
+                type: string
+                enum:
+                  - component_relocation
+                  - traffic_redirection
+                  - change_container_image
+                  - change_container_runtime_class
+                  - change_container_cpu_set
+                  - change_container_resource_requirements
+                  - acceleration
+                  - "*"
+              description: List of desired actions that can be performed by
+                           the MLSysOps agents. For traffic redirection, it must 
+                           be enabled in the respective node description in order
+                           for MLSysOps to apply it.
+            global_satisfaction:
               type: object
               properties:
                 threshold:
@@ -785,15 +735,15 @@ spec:
                 relation:
                   type: string
                   enum:
-                    - GreaterOrEqual
-                    - Equal
-                    - GreaterThan
-                achievementWeights:
+                    - greater_or_equal
+                    - equal
+                    - greater_than
+                achievement_weights:
                   type: array
                   items:
                     type: object
                     properties:
-                      metricID:
+                      metric_id:
                         type: string
                       weight:
                         type: number       
