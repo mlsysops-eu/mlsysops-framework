@@ -42,6 +42,7 @@ class MLSSpade(Agent):
 
     def __init__(self, state: MLSState, message_queue: asyncio.Queue):
         super().__init__(state.configuration.n_jid, state.configuration.n_pass)
+
         self.is_subscribed = None
         self.cluster = state.configuration.cluster
         self.snapshot_queue = Queue()
@@ -68,6 +69,9 @@ class MLSSpade(Agent):
     async def send_message(self, recipient: str, event: str, payload: dict):
         behavior = MessageSendingBehavior(recipient, event, payload)
         self.add_behaviour(behavior)
+
+    async def new_agent_appeared(self,agent_jid):
+        pass
 
     async def setup(self):
         self.is_subscribed = False

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: "{{ name }}"
-  namespace: "mls-telemetry"
+  namespace: "mlsysops-framework"
 spec:
   type: "{{ type }}"
   ports:
@@ -19,4 +19,4 @@ spec:
       protocol: "TCP"
       targetPort: {{ otlp_prometheus_port }}
   selector:
-    mls-telemetry/app: "{{ selector }}"
+    mlsysops-framework/otel: "{{ selector }}"

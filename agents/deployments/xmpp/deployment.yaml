@@ -1,0 +1,282 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ejabberd
+  namespace: mlsysops-framework
+spec:
+  selector:
+    app: ejabberd
+  ports:
+    - name: xmpp
+      port: 5222
+      targetPort: 5222
+    - name: web
+      port: 5280
+      targetPort: 5280
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ejabberd
+  namespace: mlsysops-framework
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ejabberd
+  template:
+    metadata:
+      labels:
+        app: ejabberd
+    spec:
+      containers:
+      - name: ejabberd
+        image: ghcr.io/processone/ejabberd:latest
+        ports:
+          - containerPort: 5222
+            hostPort: 5222
+            protocol: "TCP"
+          - containerPort: 5280
+            hostPort: 5280
+            protocol: "TCP"
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "📥 Generating ejabberd.yml with pod IP = ${POD_IP}" && \
+            sed "s/__POD_IP__/{{ POD_IP }}/g" /config/ejabberd.yml.template \
+              > /opt/ejabberd/conf/ejabberd.yml && \
+            echo "✅ Starting ejabberd..." && \
+            exec ejabberdctl foreground
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+          readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ejabberd-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ejabberd-config
+  namespace: mlsysops-framework
+data:
+  ejabberd.yml.template: |
+    ###
+    ###              ejabberd configuration file
+    ###
+    ### The parameters used in this configuration file are explained at
+    ### https://docs.ejabberd.im/admin/configuration
+    ###
+    ### *******************************************************
+    ### *******     YAML IS INDENTATION SENSITIVE       *******
+    ### *******************************************************
+    registration_timeout: infinity
+    
+    hosts:
+    - __POD_IP__
+    loglevel: info
+    ca_file: /opt/ejabberd/conf/cacert.pem
+
+    certfiles:
+    - /opt/ejabberd/conf/server.pem
+
+    listen:
+    - port: 5222
+      ip: "::"
+      module: ejabberd_c2s
+      max_stanza_size: 262144
+      shaper: c2s_shaper
+      access: c2s
+      starttls_required: true
+    - port: 5223
+      ip: "::"
+      module: ejabberd_c2s
+      max_stanza_size: 262144
+      shaper: c2s_shaper
+      access: c2s
+      tls: true
+    - port: 5269
+      ip: "::"
+      module: ejabberd_s2s_in
+      max_stanza_size: 524288
+      shaper: s2s_shaper
+    - port: 5443
+      ip: "::"
+      module: ejabberd_http
+      tls: true
+      request_handlers:
+        /admin: ejabberd_web_admin
+        /api: mod_http_api
+        /bosh: mod_bosh
+        /captcha: ejabberd_captcha
+        /upload: mod_http_upload
+        /ws: ejabberd_http_ws
+    - port: 5280
+      ip: "::"
+      module: ejabberd_http
+      request_handlers:
+        /admin: ejabberd_web_admin
+        /.well-known/acme-challenge: ejabberd_acme
+    - port: 3478
+      ip: "::"
+      transport: udp
+      module: ejabberd_stun
+      use_turn: true
+    - port: 1883
+      ip: "::"
+      module: mod_mqtt
+      backlog: 1000
+
+    s2s_use_starttls: optional
+
+    acl:
+      admin:
+        user:
+        - admin@__POD_IP__
+        - admin@localhost
+      local:
+        user_regexp: ""
+      loopback:
+        ip:
+        - 127.0.0.0/8
+        - ::1/128
+
+    access_rules:
+      local:
+        allow: local
+      c2s:
+        deny: blocked
+        allow: all
+      announce:
+        allow: admin
+      configure:
+        allow: admin
+      muc_create:
+        allow: local
+      pubsub_createnode:
+        allow: local
+      trusted_network:
+        allow: loopback
+
+    api_permissions:
+      "console commands":
+        from:
+        - ejabberd_ctl
+        who: all
+        what: "*"
+      "admin access":
+        who:
+          access:
+            allow:
+            - acl: loopback
+            - acl: admin
+          oauth:
+            scope: "ejabberd:admin"
+            access:
+              allow:
+              - acl: loopback
+              - acl: admin
+        what:
+        - "*"
+        - "!stop"
+        - "!start"
+      "public commands":
+        who:
+          ip: 127.0.0.1/8
+        what:
+        - status
+        - connected_users_number
+
+    shaper:
+      normal:
+        rate: 3000
+        burst_size: 20000
+      fast: 100000
+
+    shaper_rules:
+      max_user_sessions: 10
+      max_user_offline_messages:
+        5000: admin
+        100: all
+      c2s_shaper:
+        none: admin
+        normal: all
+      s2s_shaper: fast
+
+    modules:
+      mod_adhoc: {}
+      mod_admin_extra: {}
+      mod_announce:
+        access: announce
+      mod_avatar: {}
+      mod_blocking: {}
+      mod_bosh: {}
+      mod_caps: {}
+      mod_carboncopy: {}
+      mod_client_state: {}
+      mod_configure: {}
+      mod_disco: {}
+      mod_fail2ban: {}
+      mod_http_api: {}
+      mod_http_upload:
+        put_url: https://__POD_IP__:5443/upload
+        custom_headers:
+          "Access-Control-Allow-Origin": "https://@HOST@"
+          "Access-Control-Allow-Methods": "GET,HEAD,PUT,OPTIONS"
+          "Access-Control-Allow-Headers": "Content-Type"
+      mod_last: {}
+      mod_mam:
+        assume_mam_usage: true
+        default: always
+      mod_mqtt: {}
+      mod_muc:
+        access:
+        - allow
+        access_admin:
+        - allow: admin
+        access_create: muc_create
+        access_persistent: muc_create
+        access_mam:
+        - allow
+        default_room_options:
+          mam: true
+      mod_muc_admin: {}
+      mod_offline:
+        access_max_user_messages: max_user_offline_messages
+      mod_ping: {}
+      mod_privacy: {}
+      mod_private: {}
+      mod_proxy65:
+        access: local
+        max_connections: 5
+      mod_pubsub:
+        access_createnode: pubsub_createnode
+        plugins:
+        - flat
+        - pep
+        force_node_config:
+          storage:bookmarks:
+            access_model: whitelist
+      mod_push: {}
+      mod_push_keepalive: {}
+      mod_register:
+        ip_access: all
+      mod_roster:
+        versioning: true
+      mod_s2s_dialback: {}
+      mod_shared_roster: {}
+      mod_stream_mgmt:
+        resend_on_timeout: if_offline
+      mod_stun_disco: {}
+      mod_vcard: {}
+      mod_vcard_xupdate: {}
+      mod_version:
+        show_os: false

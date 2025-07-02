@@ -12,27 +12,27 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-import json
-import socket
-import time
-import types
-from dataclasses import dataclass, field, fields, asdict
-from datetime import datetime
-from typing import Dict, List, BinaryIO, Optional, Any
 import asyncio
-import pickle
-import tempfile
+import json
 import os
-import pandas as pd
-import uuid
+import pickle
+import socket
+import tempfile
+import time
+from dataclasses import dataclass, field, fields
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 
-from ..logger_util import logger
+import pandas as pd
+
 from ..application import MLSApplication
 from ..data.configuration import AgentConfig
 from ..data.monitor import MonitorData
-from ..data.task_log import TaskLogEntry
-from ..policy import Policy
 from ..data.plan import Plan
+from ..data.task_log import TaskLogEntry, Status
+from ..logger_util import logger
+from ..policy import Policy
+
 
 @dataclass
 class MLSState:
@@ -55,14 +55,15 @@ class MLSState:
         _last_save_file (str): Tracks the last file used for saving state, enabling recovery.
     """
     monitor_data: MonitorData = MonitorData()
-    applications: Dict[str, MLSApplication] = field(default_factory=dict)  # Map of key to MLSApplication
+    applications: Dict[str, MLSApplication] = field(default_factory=dict)
     task_log: pd.DataFrame = field(
         default_factory=lambda: pd.DataFrame(
+            [],
             columns=[f.name for f in fields(TaskLogEntry)]
         )
     )
     plans: asyncio.Queue[Plan] = field(default_factory=asyncio.Queue)
-    assets: Dict = field(default_factory=dict)
+    active_mechanisms: Dict = field(default_factory=dict)
     policies: List[Policy] = field(default_factory=list)
     hostname: str = field(default_factory=lambda: os.getenv("NODE_NAME", socket.gethostname()))
     configuration: AgentConfig = None
@@ -81,7 +82,8 @@ class MLSState:
         :raises ValueError: If app_id already exists in the dictionary.
         """
         if app_id in self.applications:
-            raise ValueError(f"Application with ID '{app_id}' already exists.")
+            logger.error(f"Application with ID '{app_id}' already exists.")
+            return
 
         self.applications[app_id] = application
         logger.debug(f"Application '{app_id}' added successfully.")
@@ -101,7 +103,7 @@ class MLSState:
 
         if app_id not in self.applications:
             raise KeyError(f"Application with ID '{app_id}' does not exist.")
-        self.applications[app_id].app_desc = app_desc
+        self.applications[app_id].application_description = app_desc
         logger.info(f"Application '{app_id}' updated successfully.")
 
     def add_policy(self, policy: Policy):
@@ -137,7 +139,7 @@ class MLSState:
                 }, f)
             self.task_log.to_pickle("temp_task_log.pkl", protocol=4)
             self._last_save_file = temp_file.name  # Track the last save location
-            print(f"State saved to {temp_file.name}")
+            logger.info(f"State saved to {temp_file.name}")
 
     async def load_state(self, file_path: str = None):
         """
@@ -157,7 +159,7 @@ class MLSState:
                 self.applications = state.get("applications", {})
                 self.policies = state.get("policy", None)
                 self.task_log = pd.read_pickle("temp_task_log.pkl")
-            print(f"State loaded from {file_to_load}")
+            logger.info(f"State loaded from {file_to_load}")
 
     async def _periodic_save(self):
         """
@@ -183,9 +185,9 @@ class MLSState:
 
     async def _period_log_dump(self):
         while True:
-            await asyncio.sleep(10)
+            await asyncio.sleep(1)
             logger.debug("Dumping task log...")
-            self.task_log.to_csv("task_log.csv",index=False)
+            self.task_log.to_csv(f"task_log_{self.configuration.node}.csv",index=False)
 
     def start_period_log_dump(self):
         if not self._log_dump_task or self._log_dump_task.done():
@@ -193,7 +195,7 @@ class MLSState:
 
 
     def add_task_log(self, new_uuid: str, application_id: str, task_name: str, arguments: Dict[str, Any], start_time: float,
-                     end_time: float, status: Optional[str] = None, result: Optional[Any] = None, assets: Optional[Dict] = None):
+                     end_time: float, status: Optional[str] = None, plan: Optional[Any] = None, mechanisms: Optional[Dict] = None, result: Optional[Any] = None):
         """
         Adds a new task log entry to the task_log list.
         """
@@ -206,14 +208,13 @@ class MLSState:
             start_time=start_time,
             end_time=end_time,
             status=status,
+            plan=json.dumps(plan),
             result=json.dumps(result),
-            asset=json.dumps(assets) if assets else None
+            mechanism=json.dumps(mechanisms) if mechanisms else None
         )
 
         new_row = pd.DataFrame([entry.to_dict()])
         self.task_log = pd.concat([self.task_log, new_row], ignore_index=True)
-
-        logger.debug(f"Added task log entry: {entry}")
 
     def remove_task_log(self, timestamp: datetime):
         """
@@ -230,10 +231,20 @@ class MLSState:
 
     def update_task_log(self, uuid: str, updates: Dict[str, Any]):
         """
-        Updates an existing task log entry in the task_log DataFrame using the specified uuid.
+        Updates the task log with the provided changes for a specific task identified
+        by its UUID.
 
-        :param uuid: The unique identifier of the task log entry to update.
-        :param updates: A dictionary containing column names as keys and the new values to be updated.
+        The method locates the row in the task log that matches the given UUID and
+        applies the updates to the specified columns. If no matching UUID is found,
+        a warning is logged, and the method returns False.
+
+        Args:
+            uuid (str): The unique identifier representing the task to be updated.
+            updates (Dict[str, Any]): A dictionary containing column names as keys and
+                respective values to be updated.
+
+        Returns:
+            bool: True if the task log was successfully updated, False otherwise.
         """
         # Locate the row where the uuid matches
         row_index = self.task_log[self.task_log['uuid'] == uuid].index
@@ -242,17 +253,48 @@ class MLSState:
             # Update the specific columns with new values
             for column, value in updates.items():
                 self.task_log.loc[row_index, column] = value
-
-            logger.debug(f"Updated task log entry for uuid={uuid} with updates: {updates}")
+            return True
         else:
             logger.warning(f"No task log entry found with uuid={uuid}")
+            return False
 
     def get_task_log(self, uuid: str):
         result = self.task_log[self.task_log['uuid'] == uuid].reset_index(drop=True).to_dict(orient='records')
         row =  result[0] if result else None
-        row["asset"] = json.loads(row['asset'])
+        if row:
+            row['mechanism'] = json.loads(row['mechanism'])
         return row
 
+    def update_plan_status(self,plan_uid:str, mechanism: str, status:str):
+        """
+        Updates the status of a specific mechanism in the task log associated with the given
+        plan UID and checks if all mechanisms are completed. If all mechanisms are completed,
+        it marks the task as completed in the log.
 
+        Args:
+            plan_uid (str): The unique identifier of the plan.
+            mechanism (str): The name of the mechanism to update.
+            status (str): The new status of the mechanism.
 
-    
+        Returns:
+            bool: True if the task log was updated successfully, False otherwise.
+        """
+        # Get the current task log
+        task_log = self.get_task_log(plan_uid)
+
+        if not task_log:
+            return False
+
+        # Update the specific mechanism's status
+        if mechanism in task_log['mechanism']:
+            task_log["mechanism"][mechanism] = status  # Set the status for the specific asset
+
+            # Check if all active_mechanisms are True
+            all_assets_status = all(value != "Pending" for value in task_log["mechanism"].values())
+            updates = {"mechanism": json.dumps(task_log["mechanism"])}
+
+            if all_assets_status:
+                updates['status'] = Status.COMPLETED.value
+
+            # Send updates to the task log
+            return self.update_task_log(plan_uid, updates=updates)

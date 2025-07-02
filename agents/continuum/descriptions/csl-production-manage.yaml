@@ -1,0 +1,4 @@
+MLSysOpsCluster:
+  cluster_id: uth-prod-cluster
+  datacenter_id: x
+  nodes: ["csl-vader", "csl-jetson1"]

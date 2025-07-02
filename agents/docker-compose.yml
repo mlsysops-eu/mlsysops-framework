@@ -1,6 +1,6 @@
 services:
   continuum_agent:
-    image: mlsysops-framework/continuum_agent:0.0.1
+    image: registry.mlsysops.eu/agent/agents/continuum:0.0.0
     network_mode: host
     environment:
       KUBECONFIG: uthprod.kubeconfig
@@ -10,7 +10,7 @@ services:
       NODE_PASSWORD: 1234
 
   cluster_agent:
-    image: mlsysops-framework/cluster_agent:0.0.1
+    image: registry.mlsysops.eu/agent/agents/cluster:0.0.0
     network_mode: host
     environment:
       KUBECONFIG: uthprod.kubeconfig
@@ -18,9 +18,10 @@ services:
       CLUSTER_NAME: cluster
       EJABBERD_DOMAIN: karmada.mlsysops.eu
       NODE_PASSWORD: 1234
+      PYTHONPATH: "/workdir:/workdir/fluidity"
 
   node_agent:
-    image: mlsysops-framework/node_agent:0.0.1
+    image: registry.mlsysops.eu/agent/agents/node:0.0.0
     network_mode: host
     environment:
       NODE_NAME: csl-rpi5-1

@@ -16,11 +16,14 @@
 import importlib
 import os
 import time
+import traceback
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 import asyncio
 
+import mlsysops
 import mlsysops.tasks.analyze as AnalyzeClass
 from ..data.state import MLSState
 from ..policy import Policy
@@ -38,6 +41,7 @@ class PolicyController:
     _instance = None
     __initialized = False  # Tracks whether __init__ has already run
     state = None
+    agent = None
     active_policies = {"global" : {}, "application": {}}
     observer = None
 
@@ -46,18 +50,12 @@ class PolicyController:
             cls._instance = super(PolicyController, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
-    def init(self,state: MLSState):
+    def init(self,agent, state: MLSState):
         if not self.__initialized:
             self.__initialized = True
             self.state = state
+            self.agent = agent
         return self._instance
-
-    def get_policy_for_application(self,application_id):
-        for policy in self.state.policies:
-            # development - always fetch the first one loaded
-            logger.debug(f"returning policy {policy.name}")
-            return policy
-        return None
 
     def get_policy_instance(self, scope: str, id: str, policy_name: str = None ):
         """
@@ -72,29 +70,33 @@ class PolicyController:
             None if no matching policy exists or an error occurs.
         """
         try:
-            logger.debug(f"Getting policy instance for scope: {scope} and id: {id} list {self.active_policies[scope]} name {policy_name}")
+            # logger.debug(f"Getting policy instance for scope: {scope} and id: {id} name {policy_name}")
             if policy_name is None: # analyze calls
                 if scope == PolicyScopes.APPLICATION.value:
                    return self.active_policies[scope][id].items()
                 elif scope == PolicyScopes.GLOBAL.value:
-                    return {id: self.active_policies[scope][id]}.items()
+                    object_to_return = {id: self.active_policies[scope][id]}
+                    return object_to_return.items()
                 else:
                     return None
             else: # plan calls
-                return {policy_name: self.active_policies[scope][id][policy_name] }
+                if id != policy_name:
+                    return {policy_name: self.active_policies[scope][id][policy_name]}
+                else:
+                    return self.active_policies[scope][policy_name]
         except Exception as e:
             logger.error(f"Invalid policy instance: {e}")
+            logger.error(f"active_policies {traceback.format_exc()}")
             return None
 
-    def start_global_policies(self):
+    async def start_global_policies(self):
         logger.debug(f"Starting Global Policies {self.state.policies}")
 
         for policy_template in self.state.policies:
             if policy_template.scope == PolicyScopes.GLOBAL.value:
-                print("Got  global for ", policy_template)
                 new_policy_object = policy_template.clone()
                 new_policy_object.load_module()
-                new_policy_object.initialize()
+                new_policy_object.initialize(self.agent)
                 # TODO put some check, if the policies handle mechanism that are not available
                 new_analyze_task = AnalyzeClass.AnalyzeTask(
                     id=new_policy_object.name,
@@ -113,8 +115,7 @@ class PolicyController:
                 if policy_template.scope == PolicyScopes.APPLICATION.value:
                     new_policy_object = policy_template.clone()
                     new_policy_object.load_module()
-                    new_policy_object.initialize()
-                    logger.debug(f"-----------------> {self.active_policies[PolicyScopes.APPLICATION.value]}")
+                    new_policy_object.initialize(self.agent)
                     if not self.active_policies[PolicyScopes.APPLICATION.value].get(application_id):
                         self.active_policies[PolicyScopes.APPLICATION.value][application_id] = {}
 
@@ -137,6 +138,9 @@ class PolicyController:
 
         # Check if the application has any active policies
         if application_id in self.active_policies[PolicyScopes.APPLICATION.value]:
+            # update possible telemetry changes
+            for policyname in self.active_policies[PolicyScopes.APPLICATION.value][application_id].keys():
+                await self.agent.telemetry_controller.remove_interval(policyname)
             # Remove the application-specific policies
             del self.active_policies[PolicyScopes.APPLICATION.value][application_id]
             logger.info(f"Deleted Application Policies for application_id: {application_id}")
@@ -145,7 +149,7 @@ class PolicyController:
             logger.warning(f"No Application Policies found for application_id: {application_id}")
             return False
 
-    def load_policy_modules(self):
+    async def load_policy_modules(self):
         """
         Lists all .py files in the given directory with prefix 'policy-', extracts the
         string between '-' and '.py', loads the Python module, and verifies
@@ -173,7 +177,7 @@ class PolicyController:
                     policy_object = Policy(policy_name, file_path)
                     policy_object.load_module()
                     policy_object.validate()
-                    policy_object.initialize()
+                    policy_object.initialize(self.agent)
 
                     # Add the policy in the module
                     self.state.add_policy(policy_object) # add the global policies as templates
@@ -181,6 +185,47 @@ class PolicyController:
                     logger.info(f"Loaded module {policy_name} from {file_path}")
         except Exception as e:
             logger.error(f"Failed to load policy modules: {e}")
+
+    async def load_core_policy_modules(self):
+        """
+        Lists all .py files in the core policy directory with prefix 'policy-',
+        extracts the continuum level and the policy name from the name, loads the Python module, and verifies
+        the presence of expected methods (initialize, initial_plan, analyze, re_plan).
+
+        Args:
+            directory (str): Path to the directory containing the .py files.
+
+        Returns:
+            dict: A dictionary where keys are the extracted strings (policy names)
+                  and values are the loaded modules.
+        """
+        try:
+            directory = os.path.join(os.path.dirname(mlsysops.__file__), "policies")
+            # List all files in the directory
+            for filename in os.listdir(directory):
+                # Check for files matching the pattern 'policy-*.py'
+                if filename.startswith("policy-") and filename.endswith(".py"):
+                    # Extract the policy name (string between '-' and '.py')
+                    policy_name = filename.split('-')[2].rsplit('.py', 1)[0]
+                    continuum_level = filename.split('-')[1].rsplit('.py', 1)[0]
+
+                    if self.state.configuration.continuum_layer != continuum_level:
+                        continue # skip the policy not intended for this layer
+
+                    # Construct the full file path
+                    file_path = os.path.join(directory, filename)
+
+                    policy_object = Policy(policy_name, file_path)
+                    policy_object.load_module()
+                    policy_object.validate()
+                    policy_object.initialize(self.agent)
+
+                    # Add the policy in the module
+                    self.state.add_policy(policy_object) # add the global policies as templates
+
+                    logger.info(f"Loaded core policy module {policy_name} from {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to load core policy modules: {e}")
 
     def handle_policy_change(self,file_path):
         filename = os.path.basename(file_path)
@@ -197,7 +242,7 @@ class PolicyController:
                             if policy_object.name == policy_name:
                                 policy_object.load_module()
                                 policy_object.validate()
-                                policy_object.initialize()
+                                policy_object.initialize(self.agent)
                                 logger.info(f"Reloaded module application {policy_name}")
             except Exception as e:
                 logger.error(f"Error while reloading policy modules: {e}")

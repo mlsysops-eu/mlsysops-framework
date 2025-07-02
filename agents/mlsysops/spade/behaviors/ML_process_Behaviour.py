@@ -66,10 +66,10 @@ class ML_process_Behaviour(CyclicBehaviour):
           A behavior that processes tasks from a Redis queue in a cyclic manner.
     """
 
-    def __init__(self, redis_manager):
+    def __init__(self, redis_manager,message_queue):
         super().__init__()
         self.r = redis_manager
-
+        self.message_queue=message_queue
 
     async def run(self):
         """Continuously process tasks from the Redis queue."""
@@ -131,6 +131,11 @@ class ML_process_Behaviour(CyclicBehaviour):
                         name="ml-app-" + model_id
                     )
                     logger.debug(f"Custom Resource '{name}' deleted successfully.")
+                    await self.message_queue.put({
+                            "event": "application_removed",
+                            "payload": data_dict
+                        }
+                    )
                     self.r.update_dict_value("endpoint_hash", model_id, "Removed")
                     self.r.remove_key("endpoint_hash", model_id)
                 except ApiException as e:
@@ -153,6 +158,13 @@ class ML_process_Behaviour(CyclicBehaviour):
                     yaml_handler = yaml.safe_load(file_content)
                     cr_spec = yaml_handler
 
+                    await self.message_queue.put(
+                        {
+                            "event": "application_submitted",
+                            "payload": file_content
+                        }
+                    )
+                    
                     logger.debug(f"Creating or updating Custom Resource: {name}")
                     try:
                         current_resource = await custom_api.get_namespaced_custom_object(

@@ -14,13 +14,10 @@
 #
 
 import asyncio
-from typing import List, Dict, Any
-
+from typing import Dict
 from ..logger_util import logger
 from ..application import MLSApplication
 from ..data.state import MLSState
-from ..tasks.monitor import MonitorTask
-
 from ..tasks.analyze import AnalyzeTask
 
 
@@ -30,15 +27,25 @@ class ApplicationController:
     communicates with the monitor task, and manages application data.
     """
 
-    def __init__(self, monitor_task: MonitorTask, state: MLSState = None):
+    def __init__(self, agent):
         """
         Initialize the ApplicationController.
 
         :param monitor_task: Instance of the MonitorTask class.
         """
-        self.monitor_task = monitor_task
-        self.state = state
+        self.agent = agent
         self.application_tasks_running = {}
+
+    def  __del__(self):
+        """
+        Cancels and clears all running application tasks upon deletion.
+
+        Returns:
+            None
+        """
+        for app_id, task in self.application_tasks_running.items():
+            task.cancel()
+        self.application_tasks_running.clear()
 
     async def on_application_received(self, application_data: Dict):
         """
@@ -52,22 +59,24 @@ class ApplicationController:
             KeyError: If the required keys are missing in the application_data.
 
         """
-        logger.debug(f"Received application: {application_data}")
-
         # Create and store a new MLSApplication instance
         new_application = MLSApplication(
-            application_id=application_data["name"], # We use the CR name as id - unique in K8S
-            component_spec=application_data["spec"]["components"],
-            app_desc=application_data
+            application_id=application_data["name"],
+            application_description=application_data
         )
-        self.state.add_application(new_application.application_id, new_application)
+        
+        self.agent.state.add_application(new_application.application_id, new_application)
 
-        # # Update the monitoring list for the application's metrics TODO
-        # for metric_name in application_data["component_spec"]["metrics"]:
-        #     await self.monitor_task.add_metric(metric_name)
+        # Update the monitoring list for the application's metrics
+        for component in application_data.get("spec", {}).get("components", []):
+            qos_metrics = component.get("qos_metrics", [])
+            for qos_metric in qos_metrics:
+                metric_name = qos_metric.get("application_metric_id")
+                if metric_name:  # Ensure the metric name exists
+                    await self.agent.monitor_task.add_metric(metric_name)
 
         # Start an analyze task for this application
-        analyze_object = AnalyzeTask(new_application.application_id,self.state, "application")
+        analyze_object = AnalyzeTask(new_application.application_id,self.agent.state, "application")
         analyze_task = asyncio.create_task(analyze_object.run())
 
         self.application_tasks_running[new_application.application_id] = analyze_task
@@ -89,14 +98,24 @@ class ApplicationController:
             # NOTE: Does this only cancel analyze tasks?
             self.application_tasks_running[application_id].cancel()
             del self.application_tasks_running[application_id]
-            self.state.remove_application(application_id)
+            self.agent.state.remove_application(application_id)
 
     async def on_application_updated(self, data):
-        #logger.info('App %s updated %s', data['name'], )
+        """
+        Handles updates for a specific application by checking if it is currently running
+        and updates its state accordingly.
+
+        Args:
+            data (dict): A dictionary containing information about the updated application, including its name.
+
+        Raises:
+            None
+        """
         if data['name'] in self.application_tasks_running:
-            self.state.update_application(data['name'],data)
-        # else:
-        #     logger.error('No app name specified. Will not update app desc.')
+            self.agent.state.update_application(data['name'],data)
+        else:
+            logger.error(f'No application {data["name"]} found.')
+
     async def run(self):
         """
         Continuously checks the state for new applications and handles them.

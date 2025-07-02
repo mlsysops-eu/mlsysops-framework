@@ -6,6 +6,14 @@ spec:
   resourceSelectors:
     - apiVersion: mlsysops.eu/v1
       kind: MLSysOpsApp
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      namespace: mlsysops-framework
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      namespace: default
   conflictResolution: Overwrite
   placement:
     clusterAffinity:

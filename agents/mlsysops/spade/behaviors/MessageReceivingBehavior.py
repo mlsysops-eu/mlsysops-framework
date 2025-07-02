@@ -94,7 +94,7 @@ class MessageReceivingBehavior(CyclicBehaviour):
                         "payload": json.loads(msg.body)
                     }
                     await self.message_queue.put(payload)
-                case ("request", MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMIT.value):
+                case ("request", MessageEvents.NODE_SYSTEM_DESCRIPTION_SUBMITTED.value):
                     logger.debug(f"Received node sys desc update from {sender}")
                     payload = {
                         "event": event,
@@ -103,6 +103,13 @@ class MessageReceivingBehavior(CyclicBehaviour):
                     await self.message_queue.put(payload)
                 case ("request", MessageEvents.MESSAGE_TO_FLUIDITY.value):
                     logger.debug(f"Received {event} from {sender}")
+                    payload = {
+                        "event": event,
+                        "payload": json.loads(msg.body)
+                    }
+                    await self.message_queue.put(payload)
+                case _:
+                    logger.debug(f"Received unknown event {event} from {sender} - forwarding to MLSAgent")
                     payload = {
                         "event": event,
                         "payload": json.loads(msg.body)

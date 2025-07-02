@@ -15,6 +15,8 @@
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
+
+import pandas
 import pandas as pd
 import asyncio
 import time
@@ -68,6 +70,12 @@ class MonitorData:
             # Clean up old data outside the `max_age`
             self.data_store = self.data_store[self.data_store["timestamp"] > current_time - self.max_age]
 
+    async def get_data(self) -> pd.DataFrame:
+        df = None
+        async with self._lock:
+            df = pandas.DataFrame(self.data_store)
+
+        return df
 
     async def query_data(self, start_time: float = None, end_time: float = None, latest: bool = False) -> pd.DataFrame:
         """

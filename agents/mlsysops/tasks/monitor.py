@@ -15,13 +15,13 @@
 
 import asyncio
 import time
+from datetime import datetime
 from typing import Any, Optional, Dict, List
 from mlstelemetry import MLSTelemetry
-import pandas as pd
 from mlsysops.data.monitor import MonitorData
 
 from mlsysops.logger_util import logger
-
+from mlsysops.controllers.telemetry import parse_interval_string
 
 class MonitorTask:
     """
@@ -40,17 +40,28 @@ class MonitorTask:
         metrics_list: A thread-safe list holding the names of monitored metrics.
         mlsTelemetryClient: An MLSTelemetry instance used for fetching metrics telemetry data.
     """
-    def __init__(self, state, queue, monitor_data: MonitorData, period = 1):
+    def __init__(self, state, queue, period = "5s"):
         self.__lock = asyncio.Lock()  # Lock to ensure thread-safe access
         self.state = state
         self.queue = queue
-        self.__data = monitor_data
-        self.period = period
+        self.__data: MonitorData = state.monitor_data
+        self.period = parse_interval_string(period)
 
         # A list of metrics that this monitor
         self.metrics_list = []
 
         self.mlsTelemetryClient = MLSTelemetry("monitor_task","-")
+
+    async def set_monitor_interval(self, new_period):
+        """
+        Changes the monitoring interval.
+        This function is asynchronous and modifies the interval in a non-blocking
+        manner.
+
+        Args:
+            new_period (int): The new period to set for the monitoring interval.
+        """
+        self.period = new_period
 
     async def add_metric(self, metric: Any) -> None:
         """
@@ -59,8 +70,11 @@ class MonitorTask:
         :param metric: The metric to add.
         """
         async with self.__lock:
-            self.metrics_list.append(metric)
-            logger.debug(f"Metric added: {metric}")
+            if metric not in self.metrics_list:
+                self.metrics_list.append(metric)
+                logger.debug(f"Metric added: {metric}")
+            else:
+                logger.debug(f"Metric already exists: {metric}")
 
     async def remove_metric(self, metric: Any) -> bool:
         """
@@ -113,14 +127,19 @@ class MonitorTask:
                             )
                             # Add metric value to __data in the format {metric_name: value}
                             # Metric name will be the column, and its value will be the specific recorded data
-                            entry = {metric_name: metric_status[0]['value'], "timestamp": current_time} # TODO handle multiple values and timestamp
+                            entry = {
+                                metric_name: metric_status[0]['value'],
+                                "timestamp": current_time,
+                                "human_timestamp": datetime.fromtimestamp(int(current_time)).strftime('%Y-%m-%d %H:%M:%S')
+                            } # TODO handle multiple values and timestamp
+                            logger.debug(f"Telemetry for metric '{metric_name}': {entry}")
                             await self.__data.add_entry(entry)
 
                         except Exception as e:
-                            logger.error(f"Error fetching telemetry for metric '{metric_name}': {str(e)}")
-
+                            #logger.error(f"Error fetching telemetry for metric '{metric_name}': {str(e)}")
+                            pass
                     # Fetch mechanisms state
-                    for mechanism_key, mechanism_object in self.state.assets.items():
+                    for mechanism_key, mechanism_object in self.state.active_mechanisms.items():
                         mechanism_object['state'] = mechanism_object['module'].get_state()
 
         except asyncio.CancelledError:

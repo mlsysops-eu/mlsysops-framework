@@ -1,3 +1,4 @@
 MLSysOpsCluster:
-  clusterID: UTH-PROD
+  name: uth-prod-cluster
+  cluster_id: uth-prod-cluster
   nodes: ["csl-rpi5-1", "csl-jetson1", "csl-vader"]

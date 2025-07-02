@@ -15,31 +15,56 @@
 
 import asyncio
 import os
+import time
+import traceback
+from glob import glob
+
+import kubernetes.client.rest
 
 from mlsysops.agent import MLSAgent
 from mlsysops.events import MessageEvents
 from mlsysops.logger_util import logger
 
-from ruamel.yaml import YAML
 from kubernetes_asyncio.client.rest import ApiException
 import kubernetes_asyncio
+from kubernetes_asyncio import config, client
+from kubernetes import client, config
+
 from jinja2 import Environment, FileSystemLoader  # Add Jinja2 import for template rendering
 from ruamel.yaml import YAML  # YAML parser for handling PropagationPolicy definitions
 
+import os
+import traceback
+from glob import glob
+from jinja2 import Environment, FileSystemLoader
+from kubernetes import client, config
+from ruamel.yaml import YAML
+from mlsysops.logger_util import logger
+
+from kubernetes_library import KubernetesLibrary
 
 class MLSContinuumAgent(MLSAgent):
 
     def __init__(self):
+        # Deploy essential services
+        self.apply_deployments("./templates/essential_deployments",os.getenv("HOST_IP"))
+
+        logger.debug("Starting MLSContinuumAgent process...")
+
+        # Wait for other services to start
+        time.sleep(1) # TODO change this to dynamic discover?
+
         # Initialize base MLS agent class
         super().__init__()
 
         # Application
         self.active_components = {}  # Dictionary to track active application MLSComponent
         self.clusters = {}
+        self.directory = "descriptions"
         # Kubeconfigs - the default communicates with the Karmada host cluster, and second is the Karmada API
         # need to have the karmada api as a file
-        self.karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "kubeconfigs/karmada-api.kubeconfig")
-
+        self.karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "/etc/mlsysops/kubeconfigs/karmada-api.kubeconfig")
+        self.yaml_parser = YAML(typ='safe')
 
     async def run(self):
         """
@@ -73,26 +98,38 @@ class MLSContinuumAgent(MLSAgent):
         """
         Task to listen for messages from the message queue and act upon them.
         """
-        logger.info("Starting Message Queue Listener...")
+        logger.info("CONT_MLS_AGENT::::Starting Message Queue Listener...")
         while True:
             try:
                 # Wait for a message from the queue
                 message = await self.message_queue.get()
-                print(f"Received message: {message}")
+                logger.debug(f"MLS AGENT ::::: Received message: {message}")
 
                 # Extract event type and application details from the message
                 event = message.get("event")  # Expected event field
-                data = message.get("payload")  # Additional application-specific data
+                raw = message.get("payload")  # Additional application-specific data
+                data = raw["MLSysOpsApp"]
+
                 # Act upon the event type
                 if event == MessageEvents.APP_SUBMIT.value:
+                    logger.debug(f"Sending to controller that app is submitted: {data}")
                     await self.application_controller.on_application_received(data)
+                    await self.policy_controller.start_application_policies(data['name'])
                 if event == MessageEvents.APP_REMOVED.value:
-                    await self.application_controller.on_application_removed(data)
+                    logger.debug(f"Sending to controller that app is removed: {data}")
+                    await self.application_controller.on_application_terminated(data['name'])
+                    await self.policy_controller.delete_application_policies(data['name'])
+
+                    await self.state.active_mechanisms["clusterPlacement"]['module'].send_message({
+                        "event": MessageEvents.APP_REMOVED,
+                        "payload": {"name": data['name']},
+                    })
                 else:
                     print(f"Unhandled event type: {event}")
 
             except Exception as e:
                 print(f"Error processing message: {e}")
+                logger.error(traceback.format_exc())
 
     async def apply_propagation_policies(self):
         """
@@ -143,7 +180,7 @@ class MLSContinuumAgent(MLSAgent):
                     policy_body=simple_policy_body,
                     plural="propagationpolicies",
                     namespaced=True,
-                    namespace="default"
+                    namespace="mlsysops"
                 )
 
             except Exception as e:
@@ -151,8 +188,6 @@ class MLSContinuumAgent(MLSAgent):
 
         except Exception as e:
             logger.error(f"Error applying PropagationPolicies: {e}")
-
-            logger.error(f"Error applying PropagationPolicy: {e}")
 
     async def _apply_policy(self, policy_name: str, policy_body: dict, plural: str, namespaced: bool = False, namespace: str = None):
         """
@@ -263,7 +298,6 @@ class MLSContinuumAgent(MLSAgent):
         Checks if the MLSysOps-related resource definitions are registered and
         registers any missing.
         """
-
 
         #: the REST API group name
         API_GROUP = 'mlsysops.eu'

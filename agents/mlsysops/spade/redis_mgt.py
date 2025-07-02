@@ -19,7 +19,7 @@ import redis
 from ..logger_util import logger
 
 # Fetching environment variables with default values if not set
-redis_host = os.getenv('REDIS_HOST', '127.0.0.1')  # Default to '10.96.12.155'
+redis_host = os.getenv('REDIS_HOST', '172.25.27.72')  # Default to '10.96.12.155'
 redis_port = int(os.getenv('REDIS_PORT', 6379))  # Default to 6379
 redis_db_number = int(os.getenv('REDIS_DB_NUMBER', 0))  # Default to 0
 redis_password = os.getenv('REDIS_PASSWORD', 'secret')  # Uncomment if password is needed
@@ -73,7 +73,8 @@ class RedisManager:
         if self.redis_conn:
             value = self.redis_conn.lpop(q_name)
             if value:
-                print(f"'{value.decode()}' removed from the queue '{q_name}'.")
+                #print(f"'{value.decode()}' removed from the queue '{q_name}'.")
+                logger.debug(f" Info removed from '{q_name}'.")
                 return value.decode()
             print(f"The queue '{q_name}' is empty.")
         else:

@@ -24,16 +24,15 @@ import logging
 import os
 # import sys
 
-from kubernetes import client, config #, watch
+from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from ruamel.yaml import YAML
 
-from crds_config import CRDS_INFO_LIST
-# from fluidity_config import API_GROUP, CRDS_NAMESPACE
+from cluster_config import CRDS_INFO_LIST
 from objects_util import get_crd_info
 
 
-logger = logging.getLogger(__name__)
+from mlsysops.logger_util import logger
 
 
 class FluidityCrdsApiException(Exception):
@@ -134,26 +133,3 @@ def register_all_fluidity_crd():
                 logger.exception('%s update failed: %s', crd_info['kind'], exc)
                 print('%s update failed: %s' % (crd_info['kind'], exc))
                 raise FluidityCrdsApiException from exc
-
-        # update existing CRD
-        # if crd_info['singular'] in current_crds_names:
-        #     logger.info('Updating Fluidity CRD: %s', crd_info['kind'])
-        #     crd = ext_api.read_custom_resource_definition(crd_info['crd_name'])
-        #     crd_dict = crd.to_dict()
-        #     # crd['spec']
-        #     # v1 = crd.spec.versions[0]
-        #       v1.schema
-        #     try:
-        #         yaml = YAML(typ='safe')
-        #         with open(crd_info['crd_file'], 'r') as data:
-        #             body = yaml.load(data)
-        #         crd_dict['spec'] = body['spec']
-        #         crd.spec = body['spec']
-        #         ext_api.replace_custom_resource_definition(
-        #             crd_info['crd_name'],
-        #             crd)
-        #             # crd_dict)
-        #     except IOError:
-        #         logger.error('Resource %s definition not in dir %s.',
-        #             crd_info['kind'], crd_info['crd_file'])
-        #         continue

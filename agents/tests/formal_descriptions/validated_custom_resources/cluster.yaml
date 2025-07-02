@@ -3,4 +3,5 @@ kind: MLSysOpsCluster
 metadata:
   name: uth-prod-cluster
 cluster_id: uth-prod-cluster
+datacenter_id: jmndfe1421
 nodes: ["node-1", "csl-rpi5-1", "csl-jetson1", "csl-vader"]

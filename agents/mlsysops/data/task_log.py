@@ -37,10 +37,10 @@ class TaskLogEntry:
     task_name: str
     start_time: float
     end_time: float
-    asset: Optional[Dict[str, str]]
+    mechanism: Optional[Dict[str, str]]
     arguments: Optional[Dict[str, Any]] = None
     status: Optional[Status] = None  # e.g., "Success", "Failed"
-    result: Optional[Any] = None  # Optional field for task result
+    result: Optional[Any] = None  # Used in analysis tasks
     plan: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:

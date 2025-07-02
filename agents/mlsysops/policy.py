@@ -19,6 +19,8 @@ import sys
 import time
 import ast
 
+import asyncio
+
 from .logger_util import logger
 
 class Policy:
@@ -27,16 +29,29 @@ class Policy:
         self.module_path = module_path
         self.module = None
         self.context = {}
-        self.current_plan = None
         self.scope = None
         self.core = False
         self.last_analyze_run = time.time()
 
-    def initialize(self):
+    def initialize(self, agent):
         # Check if it was initialized
         try:
             policy_initial_context = self.module.initialize().copy()
             self.context.update(policy_initial_context)
+
+            # Add telemetry metrics
+            telemetry = policy_initial_context.get("telemetry", {})
+            telemetry_metrics = telemetry.get("metrics", [])
+
+            for metric_name in telemetry_metrics:
+                if metric_name:
+                    agent.current_loop.create_task(agent.monitor_task.add_metric(metric_name))
+
+            # Configure telemetry with the scrape interval
+            scrape_interval = telemetry.get("system_scrape_interval")
+            if scrape_interval:
+                agent.current_loop.create_task(agent.telemetry_controller.add_new_interval(self.name,scrape_interval))
+
             logger.debug(f"Policy {self.name} initialized {self.context}")
             self.scope = self.context['scope']
             self.core = self.context['core']
@@ -49,10 +64,10 @@ class Policy:
     def get_analyze_period_from_context(self):
         return self.context['configuration']['analyze_interval']
 
-    def analyze(self,application_description, system_description, current_plan, telemetry, ml_connector):
+    async def analyze(self,application_description, system_description, mechanisms, telemetry, ml_connector):
         # Inject context before calling module method
         try:
-            analyze_result,updated_context = self.module.analyze(self.context,application_description, system_description, current_plan, telemetry, ml_connector)
+            analyze_result,updated_context = await self.module.analyze(self.context,application_description, system_description, mechanisms, telemetry, ml_connector)
         except Exception as e:
             logger.error(f"Error in policy analyze {self.name}: {e}")
             return False
@@ -60,21 +75,19 @@ class Policy:
         self.last_analyze_run = time.time()
         return analyze_result
 
-    def plan(self,application_description, system_description, current_plan, telemetry, ml_connector,available_assets):
+    async def plan(self,application_description, system_description, mechanisms, telemetry, ml_connector):
         # Inject context before calling module method
         try:
-            new_plan, updated_context = self.module.plan(self.context,application_description, system_description, self.current_plan, telemetry, ml_connector,available_assets)
+            new_plan, updated_context = await self.module.plan(self.context,application_description, system_description, mechanisms, telemetry, ml_connector)
         except Exception as e:
             logger.error(f"Error in policy plan {self.name}: {e}")
             return {}
         self.update_context(updated_context)
-        self.current_plan = new_plan
         return new_plan
 
     def load_module(self):
         # Dynamically import the policy module
         try:
-            # Step 1: Parse the module for context['packages']
             packages = self.parse_module_for_context_data()
             if packages and isinstance(packages, list):
                 for pkg in packages:
@@ -119,7 +132,6 @@ class Policy:
         Create a deep independent copy of the Policy instance and return it.
         """
         try:
-            print(f"Cloning {self.name} {self.module}")
             return copy.deepcopy(self)
         except Exception as e:
             logger.error(f"Failed to clone policy {self.name}: {e}")

@@ -30,7 +30,7 @@ initial_list = None
 node_list_dict = None
 node_counter = 0
 configmap_list = None
-namespace = 'mls-telemetry'
+namespace = 'mlsysops-framework'
 base_pod_name = 'opentelemetry-collector'
 base_configmap_name = 'otel-collector-configmap'
 # node_lock = []
@@ -93,13 +93,13 @@ def set_node_dict(v1: client.CoreV1Api) -> None:
         task_list = [None] * node_counter
     except client.exceptions.ApiException as e:
         if e.status == 404:
-            print("Nodes not found (404).")
+            logger.error("Nodes not found (404).")
         elif e.status == 401:
-            print("Unauthorized (401). Check your credentials.")
+            logger.error("Unauthorized (401). Check your credentials.")
         else:
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
     except Exception as ex:
-        print(f"Unexpected error: {ex}")
+        logger.error(f"Unexpected error: {ex}")
     return None
 
 
@@ -152,6 +152,7 @@ async def create_pod(v1: client.CoreV1Api, pod_name: str, node_name: str, config
             logger.error(traceback.format_exc())
         else:
             logger.error(f"Error creating Pod: {ex.reason} (code: {ex.status})")
+            logger.error(traceback.format_exc())
     except Exception as e:
         logger.error(str(e))
     return None
@@ -218,14 +219,14 @@ def delete_pod(v1:client.CoreV1Api , pod_name:str) -> None:
 
     try:
         http_response = v1.delete_namespaced_pod(name = pod_name, namespace= namespace,body = client.V1DeleteOptions(grace_period_seconds = 0))
-        print(f'Pod with name {pod_name} from {namespace} namespace has been deleted')
+        logger.debug(f'Pod with name {pod_name} from {namespace} namespace has been deleted')
 
     except client.exceptions.ApiException as e:
         logger.error(traceback.format_exc())
         if e.status == 404:
-            print(f'Pod {pod_name} did not deleted. Error 404')
+            logger.error(f'Pod {pod_name} did not deleted. Error 404')
         else:
-            print(e)
+            logger.error(e)
     return None
 
 
@@ -240,16 +241,16 @@ async def create_configmap(v1: client.CoreV1Api, configmap_name: str, otel_specs
         # Run the synchronous API call in a separate thread
         created_configmap = v1.create_namespaced_config_map(namespace, configmap)
 
-        print(f"ConfigMap '{configmap_name}' created in namespace '{namespace}'.")
+        logger.debug(f"ConfigMap '{configmap_name}' created in namespace '{namespace}'.")
         return created_configmap
 
     except client.exceptions.ApiException as e:
         if e.status == 409:
-            print(f"ConfigMap '{configmap_name}' already exists in namespace '{namespace}'.")
+            logger.error(f"ConfigMap '{configmap_name}' already exists in namespace '{namespace}'.")
         elif e.status == 400:
-            print(f"Bad request in creating ConfigMap '{configmap_name}' in namespace '{namespace}'.")
+            logger.error(f"Bad request in creating ConfigMap '{configmap_name}' in namespace '{namespace}'.")
         else:
-            print(f"Error creating ConfigMap: {e.reason}")
+            logger.error(f"Error creating ConfigMap: {e.reason}")
         return None
 
 
@@ -290,24 +291,8 @@ async def read_configmap(v1: client.CoreV1Api , configmap_name: str) -> client.V
         configmap_obj =  v1.read_namespaced_config_map( name=configmap_name, namespace=namespace)
         return(configmap_obj)
     except Exception as ex:
-        print(ex)
+        logger.error(ex)
         return None
-
-# def monitor_pods(v1:client.CoreV1Api) -> None:
-#     w = watch.Watch()
-#     try:
-
-#         for event in w.stream(v1.list_namespaced_pod, namespace="default"):
-#             event_type = event["type"]
-#             pod_name = event["object"].metadata.name
-#             print(f"Pod Event: {event_type} - Node Name: {pod_name}")
-
-#     except Exception as ex:
-#         print(ex)
-#     finally:
-#         w.stop()
-#     return None
-
 
 async def redeploy_configmap(v1:client.CoreV1Api, otel_specs: str,configmap: client.V1ConfigMap) -> None:
     try :
@@ -326,25 +311,10 @@ async def redeploy_configmap(v1:client.CoreV1Api, otel_specs: str,configmap: cli
 
 
     except client.exceptions.ApiException as ex:
-        print(f'Could not redeploy configmap :{configmap_name} in namespace:{namespace} , reason: {ex.reason}')
+        logger.error(f'Could not redeploy configmap :{configmap_name} in namespace:{namespace} , reason: {ex.reason}')
     except Exception as e:
-        print(e)
+        logger.error(e)
     return None
-
-
-async def task_monitor(v1: client.CoreV1Api , node_list : list,otel:string) -> None:
-    global task_list
-    i = 0
-    print('Task monitoring starts ...')
-    while True :
-        if task_is_active(task_list[i]) :
-            await asyncio.sleep(1)
-        else:
-            task_list[i] = asyncio.create_task(restart_telemetry_pod(v1,node_list[i],i,otel,update_method = update_method))
-        i = (i + 1) % node_counter
-        await asyncio.sleep(60) # 3.2 minutes , so the i th pod will be restarted after 10 minutes
-    return None
-# Gather , check : is_running ,
 
 async def deploy_node_exporter_pod(node_name: str, flags: str,port: int) -> bool :
 
@@ -353,7 +323,7 @@ async def deploy_node_exporter_pod(node_name: str, flags: str,port: int) -> bool
     logger.debug(f'Node exporter Pod with name:{node_name} is been created')
     final_pod_name = f"node-exporter-{node_name}"
     try:
-        await create_node_exporter_pod(v1, final_pod_name, node_name, flags, port)
+        await create_node_exporter_pod_with_restart(v1, final_pod_name, node_name, flags, port)
     except Exception as e:
         logger.error(f'Error creating pod for node {node_name} : {e}')
         logger.error(traceback.format_exc())
@@ -361,7 +331,7 @@ async def deploy_node_exporter_pod(node_name: str, flags: str,port: int) -> bool
 
     return final_pod_name
 
-async def create_otel_pod(node_name: str , otel_yaml:string) -> bool :
+async def create_otel_pod(node_name: str , otel_yaml) -> bool :
     """
         Creates an OpenTelemetry (OTEL) pod and its associated ConfigMap on the provided node.
 
@@ -437,45 +407,6 @@ def delete_node_exporter_pod(node_name: str) -> bool:
 
     return True
 
-async def restart_telemetry_pod(v1: client.CoreV1Api , node : dict , node_id : int  , otel:string ,update_method = None) -> None :
-    global node_list_dict
-
-
-
-    node_values_list = list(node.values())[0]
-    config_name = node_values_list[1]
-    pod_name    = node_values_list[0]
-    node_status = node_values_list[2]
-
-
-    node_name = next(iter(node)) # Get the nodes name )
-
-    if node_status == STATUS.NOT_DEPLOYED:
-        print(f'Node with id:{node_id} is been created')
-        await create_configmap(v1,config_name,otel)
-        await  create_pod(v1,pod_name,node_name,config_name)
-        node_list_dict[node_id][node_name][2] = STATUS.DEPLOYED
-
-        await asyncio.sleep(5)
-        print(f'Node with id:{node_id} done')
-        return None
-
-    else:
-        print(f'Restart Node with id:{node_id} ')
-        configmap = await read_configmap(v1,config_name) # Get V1ConfigMap object
-        data = configmap.data # dict(str:str)
-        otel_specs = "\n".join(data.values()) # opentelemetry configuration
-        otel_specs = update_method(otel_specs)
-
-            # Impelemnt an update method and redeploy configmap
-        await redeploy_configmap(v1,otel_specs,configmap)
-        await delete_pod(v1,pod_name)
-        await create_pod(v1,pod_name,node_name,config_name)
-        # await asyncio.sleep(1)
-        print(f'Node with id{node_id} has finished restarting')
-
-    return None
-
 
 def create_svc_manifest(name_prefix=None):
     """Create manifest for service-providing component using Jinja template.
@@ -527,7 +458,7 @@ async def create_svc(name_prefix=None,svc_manifest=None):
         logger.info('Trying to read service if already exists')
         resp = core_api.read_namespaced_service(
             name=svc_manifest['metadata']['name'],
-            namespace='mls-telemetry')
+            namespace=namespace)
         #print(resp)
     except ApiException as exc:
         if exc.status != 404:
@@ -538,15 +469,116 @@ async def create_svc(name_prefix=None,svc_manifest=None):
             logger.info('Trying to delete service if already exists')
             resp = core_api.delete_namespaced_service(
                 name=svc_manifest['metadata']['name'],
-                namespace='mls-telemetry')
+                namespace=namespace)
             #print(resp)
         except ApiException as exc:
             logger.error('Failed to delete service: %s', exc)
     try:
         svc_obj = core_api.create_namespaced_service(body=svc_manifest,
-                                                     namespace='mls-telemetry')
+                                                     namespace=namespace)
         #print(svc_obj)
         return svc_obj
     except ApiException as exc:
         logger.error('Failed to create service: %s', exc)
         return None
+
+async def create_node_exporter_pod_with_restart(v1: client.CoreV1Api, pod_name: str, node_name: str, flags: str, port: int) -> None:
+    """
+    Checks if a pod already exists. If it exists, deletes the pod and recreates it.
+    
+    Args:
+        v1: Kubernetes CoreV1Api client.
+        pod_name: Name of the pod to create or restart.
+        node_name: Name of the node where the pod should be created.
+        flags: Node exporter flags.
+        port: Port for the Node Exporter pod.
+
+    Returns:
+        None
+    """
+    try:
+        # Check if the pod already exists
+        existing_pod = None
+        try:
+            existing_pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+            logger.info(f"Pod {pod_name} already exists in namespace {namespace}. It will be redeployed.")
+        except client.exceptions.ApiException as ex:
+            if ex.status == 404:
+                logger.info(f"Pod {pod_name} does not exist in namespace {namespace}. Creating a new pod.")
+            else:
+                logger.error(f"Error while checking pod existence: {ex.reason} (code: {ex.status})")
+                logger.error(traceback.format_exc())
+                return  # Stop if there are unknown errors during the pod existence check
+
+        # If the pod exists, delete it
+        if existing_pod:
+            try:
+                delete_node_exporter_pod(node_name)
+                logger.info(f"Pod {pod_name} deleted successfully.")
+            except Exception as e:
+                logger.error(f"Error while deleting existing pod {pod_name}: {e}")
+                logger.error(traceback.format_exc())
+                return  # Stop on delete error
+
+        # Create the node exporter pod
+        await create_node_exporter_pod(v1, pod_name, node_name, flags, port)
+
+    except Exception as e:
+        logger.error(f"Unexpected error in restarting pod {pod_name} on node {node_name}: {e}")
+        logger.error(traceback.format_exc())
+    return None
+
+async def create_otel_pod_with_restart(node_name: str, otel_yaml: dict):
+    """
+    Checks if an OpenTelemetry (OTEL) pod exists. If it does not exist, deletes the associated
+    ConfigMap and pod and recreates them.
+
+    Args:
+        node_name (str): The name of the node for the OTEL pod.
+        otel_yaml (str): The YAML configuration for the OTEL client.
+
+    Returns:
+        bool: True if the operation is successful, False otherwise.
+    """
+    v1 = get_api_handler()
+
+    final_config_name = f"{base_configmap_name}-{node_name}"
+    final_pod_name = f"{base_pod_name}-{node_name}"
+
+    try:
+        # Check if the OTEL pod already exists
+        existing_pod = None
+        try:
+            existing_pod = v1.read_namespaced_pod(name=final_pod_name, namespace=namespace)
+            logger.info(f"OTEL Pod {final_pod_name} already exists in namespace {namespace}. It will be redeployed.")
+        except client.exceptions.ApiException as ex:
+            if ex.status == 404:
+                logger.info(f"OTEL Pod {final_pod_name} does not exist in namespace {namespace}. Creating a new pod.")
+            else:
+                logger.error(f"Error while checking OTEL pod existence: {ex.reason} (code: {ex.status})")
+                logger.error(traceback.format_exc())
+                return final_pod_name, final_config_name  # Stop if there are unknown errors during the pod existence check
+
+        # If the pod exists, delete it and its associated ConfigMap
+        if existing_pod:
+            try:
+                logger.info(f"Deleting existing OTEL Pod {final_pod_name} and ConfigMap {final_config_name}.")
+                delete_otel_pod(node_name)
+                logger.info(f"Deleted OTEL Pod {final_pod_name} and ConfigMap {final_config_name} successfully.")
+            except Exception as e:
+                logger.error(f"Error while deleting existing OTEL pod {final_pod_name} or ConfigMap {final_config_name}: {e}")
+                logger.error(traceback.format_exc())
+                return final_pod_name, final_config_name  # Stop on delete error
+
+        # Create the ConfigMap and OTEL pod
+        logger.info(f"Creating new OTEL ConfigMap {final_config_name} and Pod {final_pod_name}.")
+        await create_configmap(v1, final_config_name, otel_yaml)
+        await create_pod(v1, final_pod_name, node_name, final_config_name)
+        logger.info(f"Successfully created OTEL ConfigMap {final_config_name} and Pod {final_pod_name}.")
+
+    except Exception as e:
+        logger.error(f"Unexpected error while redeploying OTEL pod {final_pod_name} on node {node_name}: {e}")
+        logger.error(traceback.format_exc())
+        return final_pod_name, final_config_name
+
+    return final_pod_name, final_config_name

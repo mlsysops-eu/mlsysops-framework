@@ -13,25 +13,11 @@
 #  limitations under the License.
 #
 
-import asyncio
-
-# from mlsysops.tasks.analyze import AnalyzeTask
-
-
 class MLSApplication:
-    def __init__(self, application_id, app_desc, component_spec=None, pod_spec=None,policies=None): # TODO What should we include in the general one
+    def __init__(self, application_id, application_description,policies=None):
         self.application_id = application_id
-        self.component_spec = component_spec
-        self.pod_spec = pod_spec
         self.policies = policies
-        self.app_desc = app_desc
-        # self.active_policy = component_spec.get("policy")
-
-        # Parse component spec into MLSComponent instances
-        self.components = [
-            # MLSComponent(component['name'], component['spec'])
-            # for component in component_spec
-        ]
+        self.application_description = application_description
 
     def get_component_by_name(self, component_name):
         """
@@ -55,10 +41,8 @@ class MLSApplication:
         self.policies = new_policy
         self.active_policy = new_policy.get("policy", None)
 
-
-
-class MLSComponent:
-
-    def __init__(self, name, spec):
-        self.name = name
-        self.spec = spec
+    def to_message(self):
+        return {
+            "application_id": self.application_id,
+            "application_description": self.application_description,
+        }

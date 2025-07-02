@@ -36,6 +36,7 @@ class AgentConfig:
 
     # Telemetry
     node_exporter_scrape_interval: str = "5s"
+    monitoring_interval: str = "5s"
 
     node_exporter_enabled: bool = True
     otel_deploy_enabled: bool = True

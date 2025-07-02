@@ -16,6 +16,7 @@
 import asyncio
 import json
 import time
+import traceback
 
 from .tasks import ExecuteTask
 from .logger_util import logger
@@ -25,7 +26,7 @@ from .data.task_log import Status
 class PlanScheduler:
     def __init__(self, state):
         self.state = state
-        self.period = 5
+        self.period = 1
         self.pending_plans = []
 
     async def update_pending_plans(self):
@@ -35,79 +36,82 @@ class PlanScheduler:
                 self.pending_plans.remove(pending_plan) # remove it
 
     async def run(self):
-        logger.debug("PlanScheduler started")
+        logger.debug("Plan Scheduler started")
         while True:
-            await asyncio.sleep(self.period)  # Wait for 1 second
-            current_plan_list: list[Plan] = []
+            try:
+                await asyncio.sleep(self.period)
+                current_plan_list: list[Plan] = []
 
-            logger.debug("--------------Scheduler Loop------")
+                logger.info("--------------Scheduler Loop------")
 
-            # check for previous plans
-            await self.update_pending_plans()
+                # check for previous plans
+                await self.update_pending_plans()
 
-            # Empty the queue
-            while not self.state.plans.empty():
-                # Get plans from queue
-                item = await self.state.plans.get()
-                current_plan_list.append(item)
-                self.state.plans.task_done()  # Mark task as done
+                # Empty the queue
+                while not self.state.plans.empty():
+                    # Get plans from the queue
+                    item = await self.state.plans.get()
+                    current_plan_list.append(item)
+                    self.state.plans.task_done()  # Mark the task as done
 
-            # initialize auxiliary dicts
-            assets_touched = {}
-            logger.debug(f"Current plan list: {len(current_plan_list)}")
-            if len(current_plan_list) > 0:
+                # initialize auxiliary dicts
+                mechanisms_touched = {}
+                logger.debug(f"Current plan list: {len(current_plan_list)}")
+                if len(current_plan_list) > 0:
 
-                for plan in current_plan_list:
-                    logger.debug(f"Processing {str(plan.uuid)} plan")
+                    for plan in current_plan_list:
 
-                    # Use FIFO logic - execute the first plan, and save the mechanisms touched.
-                    # TODO declare mechanisms as singletons or multi-instanced.
-                    # Singletons (e.g. CPU Freq): Can be configured once per Planning/Execution cycle, as they have
-                    # global effect
-                    # Multi-instance (e.g. component placement): Configure different parts of the system, that do not
-                    # affect anything else
+                        # Use FIFO logic - execute the first plan, and save the mechanisms touched.
+                        # TODO declare mechanisms as singletons or multi-instanced.
+                        # Singletons (e.g. CPU Freq): Can be configured once per Planning/Execution cycle, as they have
+                        # global effect
+                        # Multi-instance (e.g. component placement): Configure different parts of the system, that do not
+                        # affect anything else
 
-                    # Iterating over key-value pairs
-                    for asset, command in plan.asset_new_plan.items():
-                        print(f"asset: {asset}")
-                        print(f"command: {command}")
-                        should_discard = False
+                        # Iterating over key-value pairs
+                        for asset, command in plan.asset_new_plan.items():
+                            logger.info(f"Processing {str(plan.uuid)} plan for asset {asset} for application {plan.application_id}")
 
-                        # if was executed a plan earlier, then discard it.
-                        if asset in assets_touched:
-                            should_discard = True
+                            should_discard = False
 
-                        task_log = self.state.get_task_log(plan.uuid)
-
-                        # Check if there is a pending task log from previous runs
-                        if task_log:
-                            if (task_log['status'] == Status.PENDING.value
-                                    and task_log['asset'][asset] == Status.PENDING.value):
+                            # if was executed a plan earlier, then discard it.
+                            if asset in mechanisms_touched:
                                 should_discard = True
 
-                        # check if the application has been removed for this application scoped plan
-                        if plan.application_id not in self.state.applications:
-                            should_discard = True
+                            task_log = self.state.get_task_log(plan.uuid)
 
-                        # TODO: check for fluidity debug
-                        # Check if it is core, should override the discard mechanism
-                        logger.debug(f"_-------------------> {plan}")
-                        if not plan.core and should_discard:
-                            logger.debug(f"Discarding plan {str(plan.uuid)}")
-                            self.state.update_task_log(plan.uuid,updates={"status": "Discarded"})
-                            continue
+                            # Check if there is a pending task log from previous runs
+                            if task_log:
+                                if (task_log['status'] == Status.PENDING.value
+                                        and task_log['mechanism'][asset] == Status.PENDING.value):
+                                    should_discard = True
+
+                            # check if the application has been removed for this application scoped plan
+                            if (plan.application_id not in self.state.applications and
+                                plan.application_id not in self.state.active_mechanisms): # TODO easy way to do for now. different mechanism scope
+                                should_discard = True
+
+                            # TODO: check for fluidity debug
+                            # Check if it is core, should override the discard mechanism
+                            if not plan.core and should_discard:
+                                logger.test(f"|1| Plan planuid:{str(plan.uuid)} status:Discarded")
+                                self.state.update_task_log(plan.uuid,updates={"status": "Discarded"})
+                                continue
 
 
-                        self.state.update_task_log(plan.uuid,updates={"status": "Scheduled"})
+                            self.state.update_task_log(plan.uuid,updates={"status": "Scheduled"})
+                            logger.test(f"|1| Plan with planuid:{plan.uuid} scheduled for execution status:Scheduled")
+                            # mark mechanism touched only for non-core
+                            if not plan.core:
+                                mechanisms_touched[asset] = {
+                                    "timestamp": time.time(),
+                                    "plan_uid": plan.uuid,
+                                    "plan": command
+                                }
 
-                        # mark asset touched only for non-core
-                        if not plan.core:
-                            assets_touched[asset] = {
-                                "timestamp": time.time(),
-                                "plan_uuid": plan.uuid,
-                                "plan": command
-                            }
-
-                        # start execution task
-                        plan_task = ExecuteTask(asset,command, self.state, plan.uuid)
-                        asyncio.create_task(plan_task.run())
+                            # start execution task
+                            plan_task = ExecuteTask(asset,command, self.state, plan.uuid)
+                            asyncio.create_task(plan_task.run())
+            except Exception as e:
+                logger.error(f"Scheduler tick error: {traceback.format_exc()}")
+                continue

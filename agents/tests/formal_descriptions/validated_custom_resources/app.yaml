@@ -2,44 +2,20 @@ apiVersion: mlsysops.eu/v1
 kind: MLSysOpsApp
 metadata:
   name: test-application
+  namespace: mlsysops
 cluster_placement:
   cluster_id:
-    - "uth-prod-cluster"
+    - "mls-ubiw-1"
 components:
   - metadata:
       name: server-app
-      uid: a9jwduj9028uje
+      uid: server-app-v1
     node_placement:
-      continuum_layer:
-        - edge
-      mobility: True
-    sensors:
-      - camera:
-          model: d455
-          camera_type: rgb
-          minimum_framerate: 20
-          resolution: 1024x768
-        endpoint_variable: "CAMERA_ENDPOINT"
-        instances: 1
-    restart_policy: on_failure
+      node: mls-ubiw-2
+    restart_policy: OnFailure
     containers:
-      - image: registry.mlsysops.eu/agent/agents/test_app:0.0.0
-        platform_requirements:
-          cpu: 
-            requests: "250m"
-            limits: "500m"
-            architecture:
-              - amd64
-            frequency: 1.4
-          memory:
-            requests: "64Mi"
-            limits: "128Mi"
-          disk: "120"
-          performance_indicator: 30 # BogoMIPS
-          node_type: virtualized
-          os: ubuntu
-          container_runtime: containerd
-        image_pull_policy: if_not_present
+      - image: harbor.nbfc.io/mlsysops/test-app:latest
+        image_pull_policy: IfNotPresent
         command: ["python", "TcpServer.py"]
         env:
           - name: OTEL_RESOURCE_ATTRIBUTES
@@ -50,60 +26,26 @@ components:
             value_from:
               field_ref:
                 field_path: status.hostIP
-          - name: TELEMETRY_ENDPOINT
+          - name: TELEMETRY_ENDPOINT # Add code for this to be done dynamically
             value: "$(NODE_IP):43170"
+          - name: TCP_SERVER_IP
+            value: "0.0.0.0"
         ports:
           - container_port: 10000
-            protocol: tcp
+            protocol: TCP
     qos_metrics:
-      - application_metric_id: metric-1
+      - application_metric_id: test_received_success_counter_total
         target: 20
         relation: lower_or_equal
         system_metrics_hints:
           - cpu_frequency
-    host_network: False
   - metadata:
       name: client-app
-      uid: jdaddwewed235uje
-    node_placement:
-      mobility: False
-      continuum_layer:
-        - edge
-      labels:
-        - "node-type:rpi"
-    sensors:
-      - temperature:
-          model: sdc30
-          measurement_min: 13
-          measurement_max: 45
-          measurement_unit: celsius
-          accuracy: 0.4
-          sampling_frequency: 10
-        endpoint_variable: "TEMPERATURE_ENDPOINT"
-        instances: 1
-    restart_policy: on_failure
+      uid: client-app-v1
+    restart_policy: OnFailure
     containers:
-      - image: registry.mlsysops.eu/agent/agents/test_app:0.0.0
-        platform_requirements:
-          cpu: #change to cpu and merge with resources above.
-            requests: "250m"
-            limits: "500m"
-            architecture:
-              - arm64
-            frequency: 1.4
-          memory:
-            requests: "64Mi"
-            limits: "128Mi"
-          disk: "100"
-          gpu:
-            model: k80
-            memory: "2"
-            utilization_request: "10"
-          performance_indicator: 320 # BogoMIPS
-          node_type: native
-          os: zephyr
-          container_runtime: docker
-        image_pull_policy: if_not_present
+      - image: harbor.nbfc.io/mlsysops/test-app:latest
+        image_pull_policy: IfNotPresent
         command: ["python", "TcpClient.py"]
         env:
           - name: OTEL_RESOURCE_ATTRIBUTES
@@ -118,11 +60,8 @@ components:
             value: "$(NODE_IP):43170"
           - name: TCP_SERVER_IP
             value: "server-app"
-        ports:
-          - container_port: 10000
-            protocol: tcp
     qos_metrics:
-      - application_metric_id: metric-2
+      - application_metric_id: test_sent_success_counter_total
         target: 30
         relation: equal  
 component_interactions:
@@ -141,7 +80,7 @@ global_satisfaction:
   threshold: 0.7
   relation: greater_than
   achievement_weights:
-    - metric_id: metric-1
+    - metric_id: test_received_success_counter
       weight: 0.5
-    - metric_id: metric-2
+    - metric_id: test_sent_success_counter
       weight: 0.5

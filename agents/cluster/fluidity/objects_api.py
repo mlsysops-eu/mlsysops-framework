@@ -22,20 +22,19 @@ from __future__ import print_function
 import logging
 import os
 
-from kubernetes import client, config #, watch
+from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-
-from crds_config import API_GROUP, CRDS_NAMESPACE
+import cluster_config
+from cluster_config import API_GROUP
 from objects_util import get_crd_info
 
 
-logger = logging.getLogger(__name__)
+from mlsysops.logger_util import logger
 
 
 class FluidityApiException(Exception):
     """Kubernetes API related errors"""
     # pass
-
 
 class FluidityObjectsApi():
     """Fluidity-provided CRDs CRUD operations."""
@@ -47,26 +46,25 @@ class FluidityObjectsApi():
                 config.load_incluster_config()
             else:
                 config.load_kube_config()
-        # self.cr_api = client.CustomObjectsApi(api_client)
+
         self.cr_api = client.CustomObjectsApi() #: custom resources API client
 
     def list_fluidity_object(self, plural, field_select=None, label_select=None):
         """List custom fluidity resource objects"""
         _, crd_info = get_crd_info(plural)
-        # cr_api = client.CustomObjectsApi()
         try:
             if label_select is None and field_select is None:
                 crs = self.cr_api.list_namespaced_custom_object(
                     API_GROUP,
                     crd_info['version'],
-                    CRDS_NAMESPACE,
+                    cluster_config.NAMESPACE,
                     plural)
                 return crs
             elif label_select != None:
                 crs = self.cr_api.list_namespaced_custom_object(
                     API_GROUP,
                     crd_info['version'],
-                    CRDS_NAMESPACE,
+                    cluster_config.NAMESPACE,
                     plural,
                     label_selector=label_select,
                     pretty='true')
@@ -78,12 +76,12 @@ class FluidityObjectsApi():
     def create_fluidity_object(self, plural, cr_body):
         """Create custom fluidity resource object"""
         _, crd_info = get_crd_info(plural)
-        # cr_api = client.CustomObjectsApi()
+        version = crd_info['version']
         try:
             self.cr_api.create_namespaced_custom_object(
                 API_GROUP,
-                crd_info['version'],
-                CRDS_NAMESPACE,
+                version,
+                cluster_config.NAMESPACE,
                 plural,
                 cr_body)
         except ApiException as exc:
@@ -93,12 +91,13 @@ class FluidityObjectsApi():
     def get_fluidity_object(self, plural, name):
         """Retrieve custom fluidity resource object"""
         _, crd_info = get_crd_info(plural)
-        # cr_api = client.CustomObjectsApi()
+        version = crd_info['version']
+        
         try:
             cri = self.cr_api.get_namespaced_custom_object(
                 API_GROUP,
                 crd_info['version'],
-                CRDS_NAMESPACE,
+                cluster_config.NAMESPACE,
                 plural,
                 name)
             return cri
@@ -109,31 +108,27 @@ class FluidityObjectsApi():
     def update_fluidity_object(self, plural, name, cr_body):
         """Update custom fluidity resource object"""
         _, crd_info = get_crd_info(plural)
-        # cr_api = client.CustomObjectsApi()
         try:
             cri = self.cr_api.replace_namespaced_custom_object(
                 API_GROUP,
                 crd_info['version'],
-                CRDS_NAMESPACE,
+                cluster_config.NAMESPACE,
                 plural,
                 name,
                 cr_body)
             return cri
         except ApiException as exc:
-            # message = jsonify('{} update failed: {}'.format(crd_info['kind'], exc))
-            # raise FluidityApiException(message)
             logger.exception('%s update failed: %s', crd_info['kind'], exc)
             raise FluidityApiException from exc
 
     def delete_fluidity_object(self, plural, name):
         """Delete custom fluidity resource object"""
         _, crd_info = get_crd_info(plural)
-        # cr_api = client.CustomObjectsApi()
         try:
             self.cr_api.delete_namespaced_custom_object(
                 API_GROUP,
                 crd_info['version'],
-                CRDS_NAMESPACE,
+                cluster_config.NAMESPACE,
                 plural,
                 name)
         except ApiException as exc:

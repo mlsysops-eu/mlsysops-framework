@@ -26,6 +26,7 @@ from kubernetes_asyncio.client.api import CustomObjectsApi
 from kubernetes_asyncio.client import ApiException
 from ruamel.yaml import YAML
 
+
 def transform_description(input_dict):
     # Extract the name and other fields under "MLSysOpsApplication"
     ml_sys_ops_data = input_dict.pop("MLSysOpsApplication", {})
@@ -33,11 +34,7 @@ def transform_description(input_dict):
 
     # Create a new dictionary with the desired structure
     updated_dict = {
-        "apiVersion": "mlsysops.eu/v1",
-        "kind": "MLSysOpsApp",
-        "metadata": {
-            "name": app_name
-        }
+        "name": app_name
     }
 
     # Merge the remaining fields from MLSysOpsApplication into the updated dictionary
@@ -46,7 +43,7 @@ def transform_description(input_dict):
     # Convert the updated dictionary to a YAML-formatted string
     yaml_output = yaml.dump(updated_dict, default_flow_style=False)
 
-    return yaml_output
+    return updated_dict
 
 
 class ProcessBehaviour(CyclicBehaviour):
@@ -54,112 +51,77 @@ class ProcessBehaviour(CyclicBehaviour):
           A behavior that processes tasks from a Redis queue in a cyclic manner.
     """
 
-    def __init__(self, redis_manager):
+    def __init__(self, redis_manager, message_queue):
         super().__init__()
         self.r = redis_manager
+        self.message_queue = message_queue
 
     async def run(self):
         """Continuously process tasks from the Redis queue."""
         logger.info("MLs Agent is processing for Application ...")
 
-        karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "kubeconfigs/karmada-api.kubeconfig")
-
-        try:
-            await kubernetes_asyncio.config.load_kube_config(config_file=karmada_api_kubeconfig)
-        except kubernetes_asyncio.config.ConfigException:
-            logger.info("Running out-of-cluster configuration.")
+        if self.r.is_empty(self.r.q_name):
+            logger.debug(self.r.q_name + " queue is empty, waiting for next iteration...")
+            await asyncio.sleep(10)
             return
 
-        # Initialize Kubernetes API client
-        async with kubernetes_asyncio.client.ApiClient() as api_client:
-            custom_api = CustomObjectsApi(api_client)
+        q_info = self.r.pop(self.r.q_name)
+        data_dict = json.loads(q_info)
+        logger.debug(f"data_dict {data_dict}")
+        app_id = data_dict['MLSysOpsApp']['name']
+        logger.debug(f"name {app_id}")
+        logger.debug(f"payload XXXXXXXXXXXXXXXXXXXXXX {data_dict}")
+        logger.debug(self.r.get_dict_value("system_app_hash", app_id))
 
-            if self.r.is_empty(self.r.q_name):
-                logger.debug(self.r.q_name + " queue is empty, waiting for next iteration...")
-                await asyncio.sleep(10)
-                return
+        group = "mlsysops.eu"
+        version = "v1"
+        plural = "mlsysopsapps"
+        namespace = "default"
+        name = app_id
 
-            q_info = self.r.pop(self.r.q_name)
-            data_dict = json.loads(q_info)
-            app_id = data_dict['MLSysOpsApplication']['name']
-            logger.debug(f"name {app_id} {type(app_id)}")
-            logger.debug(self.r.get_dict_value("system_app_hash", app_id))
+        if self.r.get_dict_value("system_app_hash", app_id) == "To_be_removed":
+            try:
+                # Delete the existing custom resource
+                logger.info(f"Deleting Custom Resource: {name}")
+                # SEND MESSAGE TO THE QUEUE
+                await self.message_queue.put({
+                    "event": "application_removed",
+                    "payload": data_dict
+                }
+                )
 
-            group = "mlsysops.eu"
-            version = "v1"
-            plural = "mlsysopsapps"
-            namespace = "default"
-            name = app_id
+                logger.info(f"Custom Resource '{name}' deleted successfully.")
+                self.r.update_dict_value("system_app_hash", app_id, "Removed")
+                self.r.remove_key("system_app_hash", app_id)
 
-            if self.r.get_dict_value("system_app_hash", app_id) == "To_be_removed":
-                try:
-                    # Delete the existing custom resource
-                    logger.info(f"Deleting Custom Resource: {name}")
-                    await custom_api.delete_namespaced_custom_object(
-                        group=group,
-                        version=version,
-                        namespace=namespace,
-                        plural=plural,
-                        name=name
-                    )
-                    logger.info(f"Custom Resource '{name}' deleted successfully.")
-                    self.r.update_dict_value("system_app_hash", app_id, "Removed")
-                    self.r.remove_key("system_app_hash", app_id)
-                except ApiException as e:
-                    if e.status == 404:
-                        logger.warning(f"Custom Resource '{name}' not found. Skipping deletion.")
-                    else:
-                        logger.error(f"Error deleting Custom Resource '{name}': {e}")
-                        raise
-            else:
-                try:
-                    self.r.update_dict_value("system_app_hash", app_id, "Under_deployment")
-                    # Transform and parse the description
-                    file_content = transform_description(data_dict)
-                    yaml = YAML(typ="safe")
-                    cr_spec = yaml.load(file_content)
+            except ApiException as e:
+                if e.status == 404:
+                    logger.warning(f"Custom Resource '{name}' not found. Skipping deletion.")
+                else:
+                    logger.error(f"Error deleting Custom Resource '{name}': {e}")
+                    raise
+        else:
 
-                    # Create or update the custom resource
-                    logger.info(f"Creating or updating Custom Resource: {name}")
-                    try:
-                        current_resource = await custom_api.get_namespaced_custom_object(
-                            group=group,
-                            version=version,
-                            namespace=namespace,
-                            plural=plural,
-                            name=name
-                        )
-                        # Add resourceVersion for updating
-                        cr_spec["metadata"]["resourceVersion"] = current_resource["metadata"]["resourceVersion"]
-                        await custom_api.replace_namespaced_custom_object(
-                            group=group,
-                            version=version,
-                            namespace=namespace,
-                            plural=plural,
-                            name=name,
-                            body=cr_spec
-                        )
-                        logger.info(f"Custom Resource '{name}' updated successfully.")
-                    except ApiException as e:
-                        if e.status == 404:
-                            # Resource does not exist; create it
-                            await custom_api.create_namespaced_custom_object(
-                                group=group,
-                                version=version,
-                                namespace=namespace,
-                                plural=plural,
-                                body=cr_spec
-                            )
-                            logger.info(f"Custom Resource '{name}' created successfully.")
-                        else:
-                            logger.error(f"Error processing Custom Resource: {e}")
-                            raise
+            try:
 
-                    self.r.update_dict_value("system_app_hash", app_id, "Deployed")
-                    await asyncio.sleep(2)
-                except Exception as e:
-                    logger.error(f"Error during deployment of '{name}': {e}")
-                    self.r.update_dict_value("system_app_hash", app_id, "Deployment_Failed")
+                # SEND MESSAGE TO THE QUEUE
+
+                self.r.update_dict_value("system_app_hash", app_id, "Under_deployment")
+                # Transform and parse the description
+
+                logger.warning(f"Data get from nbapi'{data_dict}' .")
+
+                await self.message_queue.put(
+                    {
+                        "event": "application_submitted",
+                        "payload": data_dict
+                    }
+                )
+
+                self.r.update_dict_value("system_app_hash", app_id, "Deployed")
+                await asyncio.sleep(2)
+            except Exception as e:
+                logger.error(f"Error during deployment of '{name}': {e}")
+                self.r.update_dict_value("system_app_hash", app_id, "Deployment_Failed")
 
         await asyncio.sleep(2)
-
