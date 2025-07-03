@@ -1,0 +1,5 @@
+[build]
+  command = """
+  pip3 install mkdocs mkdocs-material mkdocs-section-index mkdocs-literate-nav && python3 -m mkdocs build
+  """
+  publish = "site"
