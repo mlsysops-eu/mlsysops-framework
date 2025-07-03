@@ -20,7 +20,7 @@ iterative development process characterized by continuous testing and feedback l
 mechanisms developed are not only effective in their current context but are also scalable and adaptable to future
 technological advancements and operational needs.
 
-<img src="../assets/img/arch.png" width="600"/>
+<img src="../../assets/img/arch.png" width="600"/>
 
 The following figure depicts a comprehensive illustration of the MLSysOps hierarchical agent system's placement
 and its interactions with two other fundamental subsystems: container orchestration and telemetry. This agent hierarchy
@@ -30,7 +30,7 @@ designated interfaces at each tier. Moreover, the agent system engages with the 
 integrates plug-in configuration policies that can use ML models at all levels. At every level, agents utilize mechanism
 plugins to implement commands for adjusting available configuration and execution mode options.
 
-<img src="../assets/img/high_level_arch.png" width="600"/>
+<img src="../../assets/img/high_level_arch.png" width="600"/>
 
 Node-level agents’ interface with local telemetry systems and expose configuration knobs. Cluster-level agents
 coordinate resource allocation decisions across groups of nodes. At the top level, the continuum agent handles global
