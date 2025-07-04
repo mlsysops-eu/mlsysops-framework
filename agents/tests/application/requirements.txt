@@ -1,0 +1,7 @@
+mlstelemetry
+opentelemetry-exporter-otlp
+opentelemetry-api
+opentelemetry-sdk
+prometheus_client
+cachetools
+grpcio
