@@ -22,7 +22,7 @@ spec:
           type: object
           description: MLSysOps continuum formal specification.
           properties:
-            continuum_id:
+            continuumID:
               type: string
               description: The unique continuum identifier.
             clusters:
@@ -31,5 +31,5 @@ spec:
                 type: string
               description: The set of registered clusters.
           required:
-          - continuum_id
+          - continuumID
           - clusters

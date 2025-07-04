@@ -6,13 +6,13 @@ metadata:
 spec:
   # group name to use for REST API: /apis/<group>/<version>
   group: mlsysops.eu
-  scope: Namespaced #Cluster
+  scope:  Namespaced #Cluster
   names:
     plural: mlsysopsnodes
     singular: mlsysopsnode
     kind: MLSysOpsNode
     shortNames:
-      - mlsnode
+    - mlsnode
   versions:
     - name: v1
       served: true
@@ -29,44 +29,46 @@ spec:
               items:
                 type: string
               description: The required labels for filtering.
-            continuum_layer:
+            continuumLayer:
               type: string
               enum:
-                - cloud
-                - edge_infrastructure
-                - edge
-                - far_edge
-            cluster_id:
+                - Cloud
+                - EdgeInfrastructure
+                - Edge
+                - FarEdge
+            clusterID:
               type: string
               description: The unique cluster identifier that the node resides.
-            datacenter_id:
+            datacenterID:
               type: string
-              description:
-                The unique datacenter identifier that the node belongs to (if any).
-                If no datacenterID is provided, the node is considered as standalone and will be characterized
-                using its location (geocoordinates).
+              description: The unique datacenter identifier that the node belongs to (if any).
+                          If no datacenterID is provided, the node is considered as standalone and will be characterized
+                          using its location (geocoordinates).
             availability:
               type: string
               enum:
                 - transient
                 - stable
-              description:
-                Depicts the level of a node's availability. It is not related to addition/removal to/from a cluster.
-                However, it relates to possible status transitions, for example due to energy outage (e.g. a node using a battery).
-            mobile:
+              description: Depicts the level of a node's availability. It is not related to addition/removal to/from a cluster.
+                           However, it relates to possible status transitions, for example due to energy outage (e.g. a node using a battery).
+            mobility:
               type: boolean
               description: Specify if the node is mobile or stationary.
             location:
               type: array
-              description:
-                This is used for fixed nodes. We assume that mobile node's
-                location is telemetry data which is not captured via these descriptions.
-                We can also assume that for mobile nodes this refers to base station's coordinates (lon, lat).
+              description: This is used for fixed nodes. We assume that mobile node's 
+                          location is telemetry data which is not captured via these descriptions. 
+                          We can also assume that for mobile nodes this refers to base station's coordinates (lon, lat).
               items:
                 type: number
             sensors:
               type: array
-              description: Available sensors on a node are presented as services provided by MLSysOps.
+              description: Available sensors on a node are presented as services provided by MLSysOps. 
+                          Thus, each sensor has several methods that can be transparently accessed by  
+                          application components without requiring extra effort from the developer to
+                          directly communicate with the device from within the container and enabling 
+                          easy component relocation while abstracting out the node peculiarities following
+                          a FaaS approach.
               items:
                 type: object
                 properties:
@@ -76,274 +78,323 @@ spec:
                       instances:
                         type: integer
                         description: Define the number of identical models (for multi-camera nodes).
+                      methods:
+                        type: array
+                        items:
+                          type: object
+                          description: The list of camera service methods.
+                          properties:
+                            methodName:
+                              type: string
+                              enum:
+                                - CaptureImage
+                                - CaptureImagePeriodic
+                                - CaptureVideo
+                                - ListImages
+                                - GetImageInfo
+                                - RetrieveImage
+                                - GetCameraInfo
                       model:
                         type: string
                         enum:
-                          - imx415
-                          - imx219
-                          - d455
-                          - imx477
+                          - IMX415
+                          - IMX219
+                          - D455
+                          - IMX477
                           - picamera-v2
                         description: The model name of the camera sensor.
-                      camera_type:
+                      cameraType:
                         type: string
                         description: The camera sensor type.
-                      framerate:
+                      framerate: 
                         type: integer
-                      supported_resolutions:
-                        type: array
-                        items:
-                          type: string
-                          enum:
-                            - 1024x768
-                            - 4056x3040
+                      resolution:
+                        type: string
+                        enum:
+                          - "1024x768"
+                          - "4056x3040"
                   temperature:
                     type: object
                     properties:
                       instances:
                         type: integer
                         description: Define the number of identical models.
+                      methods:
+                        type: array
+                        items:
+                          type: object
+                          description: The list of temperature service methods.
+                          properties:
+                            methodName:
+                              type: string
+                              enum:
+                                - GetTemperature
                       model:
                         type: string
                         enum:
-                          - sdc30
-                          - ds18b20
+                          - SDC30
+                          - DS18B20
                         description: The model name of the temperature sensor
-                      measurement_min:
+                      measurementMin:
                         type: number
-                      measurement_max:
+                      measurementMax:
                         type: number
-                      measurement_unit:
+                      measurementUnit:
                         type: string
                         enum:
-                          - celsius
-                          - fahrenheit
+                          - "Celsius"
+                          - "Fahrenheit"
                       accuracy:
                         type: number
-                      sampling_frequency:
+                      samplingFrequency:
                         type: number
+                    required:
+                      - methods
                   accelerometer:
                     type: object
                     properties:
+                      methods:
+                        type: array
+                        items:
+                          type: object
+                          description: The list of accelerometer service methods.
+                          properties:
+                            methodName:
+                              type: string
+                              enum:
+                                - GetAcceleration
                       model:
                         type: string
                         enum:
-                          - 3038-smt
-                      measurement_min:
+                          - 3038-SMT
+                      measurementMin:
                         type: number
-                      measurement_max:
+                      measurementMax:
                         type: number
-                      measurement_unit:
+                      measurementUnit:
                         type: string
                         enum:
-                          - m/s^2
+                          - "m/s^2"
                       accuracy:
                         type: number
-                      sampling_frequency:
+                      samplingFrequency:
                         type: number
-                  humidity: # Relative humidity.
-                    type: object
-                    properties:
-                      model:
-                        type: string
-                      measurement_min:
-                        type: number
-                      measurement_max:
-                        type: number
-                      measurement_unit:
-                        type: string
-                      accuracy:
-                        type: number
-                      sampling_frequency:
-                        type: object
-                        properties:
-                          min:
+                    required:
+                      - methods
+                  humidity: # Relative humidity. 
+                    type: object 
+                    properties: 
+                      methods: 
+                        type: array # The list of humidity sensor service methods. 
+                        items: 
+                          type: object 
+                          properties: 
+                            methodName: 
+                              type: string 
+                      model: 
+                        type: string 
+                      measurementMin: 
+                        type: number 
+                      measurementMax: 
+                        type: number 
+                      measurementUnit: 
+                        type: string 
+                      accuracy: 
+                        type: number 
+                      samplingFrequency: 
+                        type: object 
+                        properties: 
+                          min: 
+                            type: number 
+                          max: 
                             type: number
-                          max:
-                            type: number
-                  sound:
-                    type: object
-                    properties:
-                      model:
+                  sound: 
+                    type: object 
+                    properties: 
+                      methods: 
+                        type: array # The list of sound sensor service methods. 
+                        items: 
+                          type: object  
+                          properties: 
+                            methodName:   
+                              type: string   
+                      model: 
                         type: string # The model name of the sound sensor.
-                      measurement_min:
-                        type: number
-                      measurement_max:
-                        type: number
-                      measurement_unit:
-                        type: string
-                      accuracy:
-                        type: number
-                      sampling_frequency:
-                        type: object
-                        properties:
-                          min:
+                      measurementMin: 
+                        type: number 
+                      measurementMax: 
+                        type: number 
+                      measurementUnit: 
+                        type: string 
+                      accuracy: 
+                        type: number 
+                      samplingFrequency: 
+                        type: object 
+                        properties: 
+                          min: 
+                            type: number 
+                          max: 
                             type: number
-                          max:
-                            type: number
-                  co2:
-                    type: object
-                    properties:
-                      model:
+                  CO2: 
+                    type: object 
+                    properties: 
+                      methods: 
+                        type: array # The list of CO2 sensor service methods. 
+                        items: 
+                          type: object  
+                          properties: 
+                            methodName: 
+                              type: string 
+                      model: 
                         type: string # The model name of the CO2 sensor.
-                      measurement_min:
-                        type: number
-                      measurement_max:
-                        type: number
-                      measurement_unit:
-                        type: string
-                      accuracy:
-                        type: number
-                      sampling_frequency:
-                        type: object
-                        properties:
-                          min:
-                            type: number
-                          max:
+                      measurementMin: 
+                        type: number 
+                      measurementMax: 
+                        type: number 
+                      measurementUnit: 
+                        type: string 
+                      accuracy: 
+                        type: number 
+                      samplingFrequency: 
+                        type: object 
+                        properties: 
+                          min: 
+                            type: number 
+                          max: 
                             type: number
                   barometer:
                     type: object
                     properties:
+                      methods:
+                        type: array
+                        items:
+                          type: object
+                          description: The list of barometer service methods.
+                          properties:
+                            methodName:
+                              type: string
+                              enum:
+                                - GetAtmosphericPressure
                       model:
                         type: string
                         enum:
-                          - sb-100
-                      measurement_min:
+                          - SB-100
+                      measurementMin:
                         type: number
-                      measurement_max:
+                      measurementMax:
                         type: number
-                      measurement_unit:
+                      measurementUnit:
                         type: string
                         enum:
-                          - pa # Pascal
+                          - "Pa" # Pascal
                       accuracy:
                         type: number
-                      sampling_frequency:
+                      samplingFrequency:
                         type: number
-                  air_quality:
+                    required:
+                      - methods
+                  airQuality:
                     type: object
                     properties:
+                      methods:
+                        type: array
+                        items:
+                          type: object
+                          description: The list of airQuality service methods.
+                          properties:
+                            methodName:
+                              type: string
+                              enum:
+                                - DetectAirContaminants
                       model:
                         type: string
                         enum:
-                          - mq-135
-                      measurement_min:
+                          - MQ-135
+                      measurementMin:
                         type: number
-                      measurement_max:
+                      measurementMax:
                         type: number
-                      measurement_unit:
+                      measurementUnit:
                         type: string
                         enum:
-                          - ug/m^3 # micrograms per cubic meter
+                          - "μg/m^3" # micrograms per cubic meter
                       accuracy:
                         type: number
-                      sampling_frequency:
+                      samplingFrequency:
                         type: number
-                  instances:
-                    type: number
-                    description: Number of instances
-                  protocol:
-                    type: string
-                    enum:
-                      - MQTT
-                      - RTSP
-                    description: The protocol of the sensor service.
-                  endpoint:
-                    type: string
-                    description:
-                      The endpoint to retrieve data from. We assume that
-                      the application developer will read an env variable
-                      inside the container in order to get this endpoint.
-            permitted_actions:
-              type: array
-              items:
-                type: string
-                enum:
-                  - set_power_cap
-                  - traffic_redirection
-                  - acceleration
-                  - cpu_frequency
-                  - gpu_frequency
-                  - change_container_cpu_set
-                  - change_container_image
-                  - "*"
-              description: List of desired actions that can be performed by
-                the MLSysOps agents. For traffic redirection, it must
-                be enabled in the respective node description in order
-                for MLSysOps to apply it. If a node can initiate container
-                image change, it will notify the cluster to do it.
-            distributed_storage_service:
+                    required:
+                      - methods        
+            distributedStorageService: 
               type: object
               properties:
                 member:
                   type: boolean
-                available_space:
+                availableSpace:
                   type: number
                   description: Available space to be used by the storage service in GB.
-              description:
-                This property specifies whether the node is part of the distributed
-                storage service or not.
+              description: This property specifies whether the node is part of the distributed 
+                          storage service or not.
             environment:
               type: object
               properties:
-                node_type:
+                nodeType:
                   type: string
                   enum:
-                    - virtualized # In the form of a Virtual Machine
-                    - native # Non-virtualized, including OS
-                    - bare_metal # Non-virtualized, without OS
-                os:
+                    - Virtualized # In the form of a Virtual Machine
+                    - Native # Non-virtualized, including OS
+                    - BareMetal # Non-virtualized, without OS
+                OS:
                   type: string
                   enum:
-                    - ubuntu
-                    - kali
-                    - zephyr
-                container_runtime:
+                    - Ubuntu
+                    - Kali
+                    - Zephyr
+                container-runtime:
                   type: array
                   items:
                     type: string
                     enum:
                       - containerd
-                      - docker
-                      - emb_serve
-            acceleration_api: # Each node must expose the supported API calls, frameworks, platforms etc.
+                      - Docker
+                      - embServe
+            accelerationAPI: # Each node must expose the supported API calls, frameworks, platforms etc.
               type: array
               items:
                 type: object
                 properties:
-                  call_name:
+                  callName:
                     type: string
                     enum:
-                      - calc_optical_flow
-                      - image_inference
+                      - CalcOpticalFlow
+                      - ImageInference
                     description: The (unique) API call name.
-                  supported_platforms:
+                  supportedPlatforms:
                     type: array
-                    items:
+                    items: 
                       type: object
                       properties:
                         name:
                           type: string
                           enum:
-                            - cpu
-                            - gpu
-                            - fpga
-                            - tpu
-                        suported_frameworks:
+                            - CPU
+                            - GPU
+                            - FPGA
+                            - TPU
+                        suportedFrameworks:
                           type: array
                           items:
                             type: string
                             enum:
-                              - pytorch
-                              - tensorflow
-                              - opencl
+                              - PyTorch
+                              - TensorFlow
+                              - OpenCL
                 required:
-                  - call_name
-                  - supported_platforms
+                  - callName
+                  - supportedPlatforms
             hardware:
               type: object
               properties:
-                cpu:
+                CPU:
                   type: object
                   properties:
                     model:
@@ -352,117 +403,112 @@ spec:
                     architecture:
                       type: string
                       enum:
-                        - amd64
+                        - x86
                         - arm64
                     cores:
                       type: integer
                     frequency:
                       type: array
-                      description: All the possible CPU frequency values in Hz.
+                      description: All the possible CPU frequency values.
                       items:
                         type: number
-                    performance_indicator:
+                    performanceIndicator:
                       type: number
                       description: Quantifies the processing capabilities of the platform.
-                mcu:
+                MCU:
                   type: object
                   properties:
                     architecture:
                       type: string
                       enum:
                         - arm-M4
-                    flash:
+                    Flash:
                       type: string
                       description: Flash memory size (related to far edge devices)
                     cores:
                       type: integer
                     frequency:
                       type: number
-                    performance_indicator:
+                    performanceIndicator:
                       type: number
                       description: Quantifies the processing capabilities of the platform.
-                memory:
-                  type: integer
-                  description: Memory size (in GB).
-                disk:
+                RAM:
                   type: string
-                  description: Disk space in GB (local storage).
-                gpu:
+                  description: RAM size (in GB).
+                Disk:
+                  type: string
+                  description: Disk space in GB (local storage). 
+                GPU:
                   type: object
                   properties:
                     model:
                       type: string
                       enum:
-                        - k80
-                        - k40
+                        - K80
+                        - K40
                     memory:
-                      type: integer
+                      type: string
                     instances:
                       type: number
-                    performance_indicator:
+                    performanceIndicator:
                       type: number
                       description: Quantifies the processing capabilities of the platform.
-                fpga:
+                FPGA:
                   type: object
                   properties:
                     model:
                       type: string
                       enum:
-                        - zcu102
+                        - ZCU102
                     memory:
-                      type: integer
-                    performance_indicator:
+                      type: string
+                    performanceIndicator:
                       type: number
                       description: Quantifies the processing capabilities of the platform.
-            network_resources:
+            networkResources:
               type: object
               properties:
-                basic_interface:
+                BasicInterface:
                   type: object
                   properties:
                     name:
                       type: string
                       enum:
-                        - 4g
-                        - 5g
-                        - wifi
-                        - bluetooth
-                        - lora
-                        - zigbee
-                        - ethernet
-                      description:
-                        It is the (only) interface used for control traffic.
-                        Also, it is the default interface for application-level traffic.
+                        - 4G
+                        - 5G
+                        - WiFi
+                        - Bluetooth
+                        - LoRa
+                        - ZigBee
+                        - Ethernet
+                      description: It is the (only) interface used for control traffic. 
+                                  Also, it is the default interface for application-level traffic.
                     range:
                       type: number
                       description: The communication range if the given interface is wireless.
-                    interface_name:
+                    interfaceName:
                       type: string
-                    application_traffic_permission:
-                      type: boolean
-                      description: This flag indicates if the main interface can be used for application traffic
-                                   (besides control messages).
-                redirection_interface:
+                redirectionInterface:
                   type: array
                   description: The redirection only refers to application traffic.
                   items:
                     type: object
                     properties:
-                      connection_type:
+                      connectionType:
                         type: string
                         enum:
-                          - 4g
-                          - 5g
-                          - wifi
-                          - bluetooth
-                          - lora
-                          - zigbee
-                          - ethernet
+                          - 4G
+                          - 5G
+                          - WiFi
+                          - Bluetooth
+                          - LoRa
+                          - ZigBee
+                          - Ethernet
                         description: The networking interface technology
                       range:
                         type: number
                         description: The communication range if the given interface is wireless.
-                      interface_name:
+                      interfaceName:
                         type: string
                       mode:
                         type: string
@@ -470,99 +516,24 @@ spec:
                           - infrastructure
                           - adhoc
                         description: The connectivity.
-                      hardware_address:
+                      hardwareAddress:
                         type: string
-                      pairing_info:
+                      pairingInfo:
                         type: object
                         properties:
-                          ip_address:
+                          ipAddress:
                             type: string
-                          network_ssid:
+                          networkSSID:
                             type: string
                             description: The network id (SSID or PAN ID)
-                          net_key:
+                          netKey:
                             type: string
                             description: The network connection password
                     required:
-                      - connection_type
-            power:
+                      - connectionType
+            powerSources:
               type: object
               properties:
-                target:
-                  type: object
-                  properties:
-                    consumption:
-                      type: object
-                      properties:
-                        value:
-                          type: number
-                        relation:
-                          type: string
-                          enum:
-                            - lower_or_qqual
-                            - greater_or_equal
-                            - equal
-                            - lower_than
-                            - greater_than
-                        measurement_unit:
-                          type: string
-                          enum:
-                            - wh
-                            - kwh
-                            - Mwh
-                    cost:
-                      type: object
-                      properties:
-                        value:
-                          type: number
-                          description: Cost value per measurement_unit. No currency assumed.
-                        measurement_unit:
-                          type: string
-                          enum:
-                            - wh
-                            - kwh
-                            - Mwh
-                        relation:
-                          type: string
-                          enum:
-                            - lower_or_qqual
-                            - greater_or_equal
-                            - equal
-                            - lower_than
-                            - greater_than
-                    co2_emission:
-                      type: object
-                      properties:
-                        value:
-                          type: number
-                        measurement_unit:
-                          type: string
-                          enum:
-                            - kt/wh
-                            - kt/kwh
-                            - kt/Mwh
-                        relation:
-                          type: string
-                          enum:
-                            - lower_or_qqual
-                            - greater_or_equal
-                            - equal
-                            - lower_than
-                            - greater_than
-                      description: CO2 emissions per power unit.
-                  description: The target set by the node owner.
-                max_consumption:
-                  type: object
-                  properties:
-                    value:
-                      type: number
-                    measurement_unit:
-                      type: string
-                      enum:
-                        - w
-                        - kw
-                        - Mw
-                  description: The power info of node.
                 grid:
                   type: boolean
                 renewable:
@@ -573,33 +544,27 @@ spec:
                       name:
                         type: string
                         enum:
-                          - solar_panel
-                        production:
+                          - solarPanel
+                        Production:
                           type: object
                           properties:
-                            levels:
-                              type: array
-                              items:
-                                type: number
-                            measurement_unit:
+                            value:
+                              type: number
+                            measurementUnit:
                               type: string
                               enum:
-                                - wh
+                                - mAh
+                                - Wh
                 battery:
                   type: object
                   properties:
                     capacity:
                       type: object
                       properties:
-                        levels:
-                          type: array
-                          items:
-                            type: number
-                        measurement_unit:
+                        value:
+                          type: number
+                        measurementUnit:
                           type: string
                           enum:
-                            - wh
-          required:
-            - continuum_layer
-            - environment
-            - hardware
+                            - mAh
+                            - Wh

@@ -1,0 +1,93 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:43170"
+      http:
+        cors:
+          allowed_origins:
+            - "https://*"
+            - "http://*"
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: '${env:NODE_HOSTNAME}_node_exporter'
+          scrape_interval: {{ scrape_interval }}
+          scrape_timeout: {{ scrape_timeout }}
+          static_configs:
+            - targets: ['${env:NODE_IP}:9200'] {% if k8s_cluster_receiver is not none %}
+  k8s_events:
+    namespaces: [ default, mlsysops ]
+  k8s_cluster:
+    collection_interval: {{ scrape_interval }}
+    node_conditions_to_report: [ "Ready", "MemoryPressure" ]
+    allocatable_types_to_report: [ "cpu","memory" ]
+    metadata_collection_interval: {{ scrape_interval }}
+    metrics:
+      k8s.cronjob.active_jobs:
+        enabled: false
+      k8s.hpa.current_replicas:
+        enabled: false
+      k8s.hpa.desired_replicas:
+        enabled: false
+      k8s.hpa.max_replicas:
+        enabled: false
+      k8s.hpa.min_replicas:
+        enabled: false
+  {% endif %}
+
+exporters: {% if otlp_export_endpoint is not none %}
+  otlp:
+    endpoint: {{ otlp_export_endpoint }}
+    tls:
+      insecure: true {% endif %} {% if mimir_export_endpoint is not none %}
+  prometheusremotewrite:
+    endpoint: {{ mimir_export_endpoint }}
+    target_info:
+      enabled: true
+    resource_to_telemetry_conversion:
+      enabled: true
+    tls:
+      insecure: true {% endif %} {% if loki_export_endpoint is not none %}
+  loki:
+    endpoint: {{ loki_export_endpoint }} {% endif %} {% if tempo_export_endpoint is not none %}
+  tempo:
+    endpoint: {{ tempo_export_endpoint }} {% endif %}
+
+  prometheus:
+    endpoint: {{ prometheus_export_endpoint }}
+    send_timestamps: true
+    metric_expiration: {{ local_endpoint_metrics_expiration }}
+    enable_open_metrics: false
+    add_metric_suffixes: true
+    resource_to_telemetry_conversion:
+      enabled: true
+
+processors:
+  attributes/add_labels:
+    actions:
+      - key: node_name
+        action: insert
+        value: '${env:NODE_HOSTNAME}'
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp,prometheus
+        {%- if k8s_cluster_receiver is not none -%} ,k8s_cluster{%- endif -%}
+      ]
+      processors: [attributes/add_labels]
+      exporters: [ prometheus,
+          {%- if otlp_export_endpoint is not none -%}otlp{%- if mimir_export_endpoint is not none or tempo_export_endpoint is not none -%}, {%- endif -%}{%- endif -%}
+          {%- if mimir_export_endpoint is not none -%}prometheusremotewrite{%- if tempo_export_endpoint is not none -%}, {%- endif -%}{%- endif -%}
+          {%- if tempo_export_endpoint is not none -%}tempo{%- endif -%}
+      ] {% if loki_export_endpoint is not none %}
+    logs:
+      receivers: [ otlp
+        {%- if k8s_cluster_receiver is not none -%} ,k8s_cluster, k8s_events{%- endif -%}
+      ]
+      processors: [ ]
+      exporters: [ loki,otlp ]
+    {%- endif -%}
+
+

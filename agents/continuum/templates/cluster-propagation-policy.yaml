@@ -1,0 +1,28 @@
+apiVersion: policy.karmada.io/v1alpha1
+kind: ClusterPropagationPolicy
+metadata:
+  name: {{ name }}
+spec:
+  resourceSelectors:
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: mlsysopsapps.mlsysops.eu
+    - apiVersion: apiextensions.k8s.io/v1
+      kind: CustomResourceDefinition
+      name: mlsysopsnodes.mlsysops.eu
+    - apiVersion: v1
+      kind: ServiceAccount
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      namespace: mlsysops-framework
+  placement:
+    clusterAffinity:
+      clusterNames:
+        {% for cluster in cluster_names %}
+        - {{ cluster }}
+        {% endfor %}
+

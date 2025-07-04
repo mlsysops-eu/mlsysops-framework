@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-stack-deployment
+  namespace: mlsysops-framework # Ensure the namespace exists
+  labels:
+    app: redis-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-stack
+  template:
+    metadata:
+      labels:
+        app: redis-stack
+    spec:
+      containers:
+        - name: redis-stack
+          image: redis/redis-stack:latest
+          ports:
+            - containerPort: 6379
+              name: redis-port
+          env:
+            - name: REDIS_HOST
+              value: {{ hostIP }}
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DB_NUMBER
+              value: "0"
+            - name: REDIS_PASSWORD
+              value: "secret"
+            - name: REDIS_QUEUE_NAME
+              value: "parsed_descriptions"
+            - name: REDIS_CHANNEL_NAME
+              value: "my_channel"
+            - name: REDIS_DICT_NAME
+              value: "my_dictionary"
+          command: ["redis-stack-server", "--requirepass", "secret", "--timeout", "300"]
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      restartPolicy: Always
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: mlsysops-framework
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi # Define the storage size (adjust as needed)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-stack-service
+  namespace: mlsysops-framework
+spec:
+  selector:
+    app: redis-stack
+  ports:
+    - protocol: TCP
+      port: 6379 # Service port
+      targetPort: 6379 # Container port
+  type: ClusterIP # Change to `NodePort` or `LoadBalancer` if external access is required

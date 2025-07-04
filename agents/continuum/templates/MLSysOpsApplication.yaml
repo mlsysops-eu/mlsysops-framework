@@ -1,0 +1,751 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: mlsysopsapps.mlsysops.eu
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: mlsysops.eu
+  scope:  Namespaced #Cluster
+  names:
+    plural: mlsysopsapps
+    singular: mlsysopsapp
+    kind: MLSysOpsApp
+    shortNames:
+    - mlsapp
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            name:
+              type: string
+            cluster_placement:
+              type: object
+              properties:
+                cluster_id:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of clusters that can host the application.
+                instances:
+                  type: integer
+                  description: The desired number of replicas (e.g. deploy 2 instances of a given app).
+                location:
+                  type: object
+                  properties:
+                    continent:
+                      type: array
+                      items:
+                        type: string
+                        enum:
+                          - Europe
+                          - Asia
+                        description: The required continent (optional)
+                    country: # See reference list
+                      type: array
+                      items:
+                        type: string
+                        enum:
+                          - el # Greece
+                          - it # Italy
+                          - fr # France
+                          - nl # Netherlands
+                          - ie # Ireland
+                          - pt # Portugal
+                          - dk # Denmark
+                          - il # Israel
+                      description: The required country (optional)
+                    city:
+                      type: array
+                      items:
+                        type: string
+                        enum:
+                          - volos
+                          - athens
+                          - rende
+                          - milan
+                          - lille
+                          - delft
+                          - dublin
+                          - aveiro
+                          - porto
+                          - aarhus
+                          - jerusalem
+                        description: The required city (optional)
+                cloud_provider:
+                  type: string
+                  enum:
+                    - private
+                    - aws
+                    - microsoft_azure
+                    - gcp
+                accelerators:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - gpu
+                      - fpga
+                      - tpu
+                  description: The candidate clusters should have nodes containing at least one instance of the specified accelerators.
+                node_types:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - cloud
+                      - far_edge
+                      - edge_infrastructure
+                      - edge
+                    description: The required
+                  description: The candidate clusters should contain at least one node of each specified type.
+            single_node:
+              type: array
+              items:
+                type: object
+                description: The application deployment should occur within a single node with the required characteristics.
+                             If the involved components have multiple instances, the framework will do the same for all the replicas.
+                             This field will override nodePlacement information (if specified) for any of the components.
+                properties:
+                  components:
+                    type: array
+                    items:
+                      type: string
+                    description: The array of components to be deployed on the same Node.
+                  continuum_layer:
+                    type: array
+                    items:
+                      type: string
+                      enum:
+                        - cloud
+                        - far_edge
+                        - edge_infrastructure
+                        - edge
+                        - "*"
+                      description: The required component placement on the continuum. "*" symbol means "anywhere on the continuum".
+                  scaling:
+                    type: object
+                    properties:
+                      scaling_mode:
+                        type: string
+                        enum:
+                          - manual
+                          - auto
+                      instances:
+                        type: integer
+                        description: In case of manual scaling of the component, specify the number of instances.
+                      scaling_criteria:
+                        type: string
+                        enum:
+                          - min_cpu_utilization
+                          - max_cpu_utilization
+                          - min_memory_percent
+                          - max_memory_percent
+                          - min_requests_per_sec
+                          - max_request_per_sec
+                          - min_number_of_instances
+                          - max_number_of_instances
+                        description: Scaling criteria for the component, related to the "auto" scaling type.
+                    description: The component scaling information.
+                  mobile:
+                    type: boolean
+                    description: Specify if the component must be deployed on a mobile node (optional)
+                  labels:
+                    type: array
+                    items:
+                      type: string
+                    description: The required labels for filtering.
+                  node:
+                    type: string
+                    description: The required node name to be the host of the component (optional).
+            components:
+              type: array
+              items:
+                type: object
+                properties:
+                  metadata:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        description: The unique name of the component
+                      uid:
+                        type: string
+                        description: The unique identifier of the component (not given by app provider).
+                  node_placement:
+                    type: object
+                    properties:
+                      continuum_layer:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            - cloud
+                            - far_edge
+                            - edge_infrastructure
+                            - edge
+                            - "*"
+                          description: The required component placement on the continuum. "*" symbol means "anywhere on the continuum".
+                      scaling:
+                        type: object
+                        properties:
+                          scaling_mode:
+                            type: string
+                            enum:
+                              - manual
+                              - auto
+                          instances:
+                            type: integer
+                            description: In case of manual scaling of the component, specify the number of instances.
+                          scaling_criteria:
+                            type: string
+                            enum:
+                              - min_cpu_utilization
+                              - max_cpu_utilization
+                              - min_memory_percent
+                              - max_memory_percent
+                              - min_requests_per_sec
+                              - max_request_per_sec
+                              - min_number_of_instances
+                              - max_number_of_instances
+                            description: Scaling criteria for the component, related to the "auto" scaling type.
+                        description: The component scaling information.
+                      mobile:
+                        type: boolean
+                        description: Specify if the component needs to be deployed on a mobile node (optional)
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                        description: The required labels for filtering.
+                      node:
+                        type: string
+                        description: The required node name to be the host of the component (optional).
+                  depends_on:
+                    type: array
+                    items:
+                      type: string
+                      description: The name of the related components.
+                    description: The given component should be deployed after all the components
+                                 specified in the Components list have already started running.
+                  runtime_configuration:
+                    type: object
+                    description: Enables runtime (node-level) configuration for app components.
+                    properties:
+                      config_specification_file:
+                        type: string
+                        description: The actual specification file describing the available runtime
+                                     configuration knobs (expected in json format).
+                                     This file is provided by the app developer.
+                      config_file_path:
+                        type: string
+                        description: The absolute path inside the container where the application code
+                                     expects to find the configSpecificationFile.
+                  sensors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        camera:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - d455
+                                - imx477
+                                - picamera-v2
+                              description: The model name of the camera sensor
+                            camera_type:
+                              type: string
+                              enum:
+                                - rgb
+                                - nir
+                                - thermal
+                                - monocular
+                              description: The camera sensor type.
+                            minimum_framerate:
+                              type: integer
+                            resolution:
+                              type: string
+                              enum:
+                                - 1024x768
+                                - 4056x3040
+                        temperature:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - sdc30
+                                - ds18b20
+                              description: The model name of the temperature sensor
+                            measurement_min:
+                              type: number
+                            measurement_max:
+                              type: number
+                            measurement_unit:
+                              type: string
+                              enum:
+                                - celsius
+                                - fahrenheit
+                            accuracy:
+                              type: number
+                            sampling_frequency:
+                              type: number
+                        accelerometer:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - 3038-smt
+                            measurement_min:
+                              type: number
+                            measurement_max:
+                              type: number
+                            measurement_unit:
+                              type: string
+                              enum:
+                                - m/s^2
+                            accuracy:
+                              type: number
+                            sampling_frequency:
+                              type: number
+                        barometer:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - sb-100
+                            measurement_min:
+                              type: number
+                            measurement_max:
+                              type: number
+                            measurement_unit:
+                              type: string
+                              enum:
+                                - pa # Pascal
+                            accuracy:
+                              type: number
+                            sampling_frequency:
+                              type: number
+                        air_quality:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - mq-135
+                            measurement_min:
+                              type: number
+                            measurement_max:
+                              type: number
+                            measurement_unit:
+                              type: string
+                              enum:
+                                - ug/m^3 # micrograms per cubic meter
+                            accuracy:
+                              type: number
+                            sampling_frequency:
+                              type: number
+                        endpoint_variable:
+                          type: string
+                          description: The env variable that the app will retrieve the endpoint
+                                       to get the sensor measurements.
+                        protocol:
+                          type: string
+                          enum:
+                            - MQTT
+                            - RTSP
+                          description: The protocol of the sensor service.
+                        instances:
+                          type: number
+                          description: The number of required sensor instances.
+                  qos_metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        application_metric_id:
+                          type: string
+                          description: This is an indicative list of metrics. It can be extended as needed.
+                        target:
+                          type: number
+                        relation:
+                          type: string
+                          enum:
+                            - lower_or_equal
+                            - greater_or_equal
+                            - equal
+                            - lower_than
+                            - greater_than
+                        system_metrics_hints:
+                          type: array
+                          description: System-level metrics affecting the application metric.
+                          items:
+                            type: string
+                            enum:
+                              - cpu_frequency
+                  storage: # Refers to CC storage service.
+                    type: object
+                    properties:
+                      buckets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            bucket_id:
+                              type: string
+                              description: The bucket's unique identifier.
+                            policy_update_token:
+                              type: string
+                              description: The required token for the MLSysOps to update the bucket's policy at runtime.
+                            location_restrictions:
+                              type: object
+                              description: These restrictions are used to exclude storage locations that host data of the application.
+                              properties:
+                                gdpr:
+                                  type: boolean
+                                  description: For EU citizens only GDPR-compliant storage locations can legally be used.
+                            reduncancy:
+                              type: string
+                              enum:
+                                - high
+                                - one
+                                - none
+                            max_latency:
+                              type: number
+                            min_download_speed:
+                              type: number
+                            server_side_encryption:
+                              type: string
+                              enum:
+                                - on
+                                - off
+                          required:
+                            - bucket_id
+                  data_sensitivity:
+                    type: boolean
+                    description: The indication to specify whether a component has sensitive data or not (useful for the data storage).
+                  data_criticality:
+                    type: string
+                    enum:
+                      - low
+                      - medium
+                      - high
+                    description: Used to provide information referring to the trust aspect for a given component.
+                  external_component:
+                    type: boolean
+                    description: This property indicates whether the component can be managed by MLSysOps or not. 
+                     If not the MLSysOps platform merely deploys the component(s), based on the provided instances,
+                     and subsequently deletes it whenever the application needs to be removed.
+                  external_access:
+                    type: boolean
+                    description: This property indicates whether the component can be accessed outside of its cluster.
+                  host_network:
+                    type: boolean
+                    description: Host networking requested for this component. 
+                      Use the host's network namespace. If this option is set,
+                      the ports that will be used must be specified. Default to false.
+                  runtime_class_name:
+                    type: string
+                    enum:
+                      - nvidia
+                  restart_policy:
+                    type: string
+                    enum:
+                      - always
+                      - on_failure
+                      - never
+                    description: Restart policy for the container. Default to Always.
+                  os:
+                    type: string
+                    enum:
+                      - ubuntu
+                      - kali
+                      - zephyr
+                  node_type:
+                    type: string
+                    enum:
+                      - virtualized # In the form of a Virtual Machine
+                      - native # Non-virtualized, including OS
+                      - bare_metal # Non-virtualized, without OS
+                  container_runtime:
+                    type: string
+                    enum:
+                      - containerd
+                      - docker
+                      - emb_serve
+                  containers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        image:
+                          type: string
+                          description: The name of the container image.
+                        command:
+                          type: array
+                          items:
+                            type: string
+                        image_pull_policy:
+                          type: string
+                          enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                          description: Image pull policy. Defaults to Always if :latest tag is specified,
+                           or IfNotPresent otherwise.
+                        acceleration_api:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              call_name:
+                                type: string
+                                description: The (unique) API call name.
+                                enum:
+                                  - calc_optical_flow
+                                  - image_inference
+                              required_framework:
+                                type: string
+                                description: Asterisk means any of the available frameworks.
+                                enum:
+                                  - pytorch
+                                  - tensorflow
+                                  - opencl
+                                  - "*"
+                            required:
+                              - call_name
+                        platform_requirements:
+                          type: object
+                          description: The resource requirements of the container.
+                          properties:
+                            cpu:
+                              type: object
+                              properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
+                                architecture:
+                                  type: array
+                                  items:
+                                    type: string
+                                    enum:
+                                      - arm64
+                                      - amd64
+                                frequency:
+                                  type: number
+                                  description: required frequency in Hz.
+                            memory:
+                              type: object
+                              properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
+                            mcu:
+                              type: object
+                              properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
+                                architecture:
+                                  type: array
+                                  items:
+                                    type: string
+                                    enum:
+                                      - arm-m4
+                                flash:
+                                  type: string
+                                  description: Flash memory size (related to far edge devices)
+                                frequency:
+                                  type: number
+                                  description: required frequency in GHz.
+                            disk:
+                              type: string
+                              description: required Disk space (in GB).
+                            gpu:
+                              type: object
+                              properties:
+                                requests:
+                                  type: integer
+                                limits:
+                                  type: integer
+                                model:
+                                  type: string
+                                  enum:
+                                    - k80
+                                    - k40
+                                memory:
+                                  type: string
+                                utilization_request:
+                                  type: string
+                                  description: Percentage of expected utilization.
+                            fpga:
+                              type: object
+                              properties:
+                                model:
+                                  type: string
+                                  enum:
+                                    - zcu102
+                                memory:
+                                  type: string
+                                utilization_request:
+                                  type: string
+                                  description: Percentage of expected utilization.
+                            performance_indicator:
+                              type: number
+                              description: This field assists MLSysOps with an initial hint in order to
+                                          filter out nodes based on their performance capabilities.
+                        ports:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              container_port:
+                                type: integer
+                                description: Number of port to expose on the component's IP address.
+                                  This must be a valid port number, 0 < x < 65536.
+                              host_ip:
+                                type: string
+                                description: What host IP to bind the external port to.
+                              host_port:
+                                type: integer
+                                description: Number of port to expose on the host.
+                                  If specified, this must be a valid port number, 0 < x < 65536.
+                                  If HostNetwork is specified, this must match ContainerPort.
+                              name:
+                                type: string
+                                description: Each named port in a component must have a unique name.
+                                  Name for the port that can be referred to by services.
+                              protocol:
+                                type: string
+                                enum:
+                                  - UDP
+                                  - TCP
+                                  - SCTP
+                                description: Protocol for port. Defaults to "TCP".
+                          description: Environment variables for the container.
+                        env:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                description: Name of the environment variable.
+                              value_from:
+                                type: object
+                                properties:
+                                  field_ref:
+                                    type: object
+                                    properties:
+                                      field_path:
+                                        type: string
+                              value:
+                                type: string
+                                description: Value of the environment variable.
+                          description: Environment variables for the container.
+                required:
+                - containers
+                - metadata
+            component_interactions:
+              type: array
+              items:
+                type: object
+                properties:
+                  component_name1:
+                    type: string
+                    description: The "source" component.
+                  type:
+                    type: string
+                    enum:
+                      - ingress
+                      - egress
+                  component_name2:
+                    type: string
+                    description: The "destination" component.
+                  interaction_criticality:
+                    type: string
+                    enum:
+                      - low
+                      - medium
+                      - high
+                    description: Used to provide information referring to the trust aspect for a given interaction.
+                  interaction_metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        system_metric_id:
+                          type: string
+                          enum:
+                            - latency
+                            - bandwidth
+                            - end_to_end_invocation_delay
+                          description: The unique identifier of the system-level metric related to this interaction.
+                        target:
+                          type: number
+                        measurement_unit:
+                          type: string
+                          enum:
+                            - milliseconds # latency, E2E invocation delay
+                            - Mbps # Bandwidth
+                            - seconds # latency, E2E invocation delay
+                        relation:
+                          type: string
+                          enum:
+                            - lower_or_equal
+                            - greater_or_equal
+                            - equal
+                            - lower_than
+                            - greater_than
+            permitted_actions:
+              type: array
+              items:
+                type: string
+                enum:
+                  - component_relocation
+                  - traffic_redirection
+                  - change_container_image
+                  - change_container_runtime_class
+                  - change_container_cpu_set
+                  - change_container_resource_requirements
+                  - acceleration
+                  - "*"
+              description: List of desired actions that can be performed by
+                           the MLSysOps agents. For traffic redirection, it must 
+                           be enabled in the respective node description in order
+                           for MLSysOps to apply it.
+            global_satisfaction:
+              type: object
+              properties:
+                threshold:
+                  type: number
+                  description: Happiness minimum required value (range (0-1])
+                relation:
+                  type: string
+                  enum:
+                    - greater_or_equal
+                    - equal
+                    - greater_than
+                achievement_weights:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      metric_id:
+                        type: string
+                      weight:
+                        type: number       
+          required:
+            - components

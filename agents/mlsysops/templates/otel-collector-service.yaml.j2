@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ name }}"
+  namespace: "mlsysops-framework"
+spec:
+  type: "{{ type }}"
+  ports:
+    - name: "otlp-grpc"
+      port: {{ otlp_grpc_port }}
+      protocol: "TCP"
+      targetPort: {{ otlp_grpc_port }}
+    - name: "otlp-http"
+      port: {{ otlp_http_port }}
+      protocol: "TCP"
+      targetPort: {{ otlp_http_port }}
+    - name: "prom"
+      port: {{ otlp_prometheus_port }}
+      protocol: "TCP"
+      targetPort: {{ otlp_prometheus_port }}
+  selector:
+    mlsysops-framework/otel: "{{ selector }}"

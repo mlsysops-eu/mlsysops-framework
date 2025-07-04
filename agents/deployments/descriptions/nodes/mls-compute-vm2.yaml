@@ -1,0 +1,26 @@
+MLSysOpsNode:
+  name: mls-compute-vm2
+  cluster_id: mls-test-manage
+  continuum_layer: edge
+  permitted_actions:
+    - traffic_redirection
+    - acceleration
+    - cpu_frequency
+    - gpu_frequency
+    - change_container_cpu_set
+    - change_container_image
+  environment:
+    node_type: virtualized
+    os: ubuntu
+    container_runtime:
+      - containerd
+  hardware:
+    cpu:
+      cores: 2
+      architecture: amd64
+      frequency:
+        - 14000
+        - 17000
+      performance_indicator: 70 # BogoMIPS
+    memory: 4
+    disk: "120"

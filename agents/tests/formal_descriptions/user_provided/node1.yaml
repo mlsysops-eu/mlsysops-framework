@@ -1,0 +1,67 @@
+MLSysOpsNode:
+  name: node-1
+  continuum_layer: edge
+  cluster_id: uth-prod-cluster
+  mobility: True
+  sensors:
+  - camera:
+      model: d455
+      camera_type: rgb
+      framerate: 20
+      supported_resolutions:
+        - 1024x768
+        - 4056x3040
+    instances: 1
+  environment:
+    node_type: virtualized
+    os: ubuntu
+    container_runtime: 
+      - containerd
+  hardware:
+    cpu:
+      cores: 30
+      architecture: amd64
+      frequency:
+        - 14000
+        - 17000
+      performance_indicator: 70 # BogoMIPS
+    memory: 4
+    disk: "120"
+  network_resources:
+    basic_interface:
+      name: ethernet
+      interface_name: eth0
+  permitted_actions:
+    - traffic_redirection
+    - acceleration
+    - cpu_frequency
+    - gpu_frequency
+    - change_container_cpu_set
+    - change_container_image
+  power:
+    target:
+      consumption:
+        value: 20
+        relation: lower_than
+        measurement_unit: kwh
+    availability:
+      - mode: brown
+        value: 4
+        measurement_unit: wh
+        time_windows: ["00:00-23:59"]
+        cost:
+          value: 35    
+          measurement_unit: kwh
+        co2_emission:
+          value: 40
+          measurement_unit: kt/kwh
+      - mode: green
+        value: 2
+        measurement_unit: wh
+        time_windows: ["09:00-17:00", "21:00-22:00"]
+        cost:
+          value: 35    
+          measurement_unit: kwh
+        co2_emission:
+          value: 0
+          measurement_unit: kt/kwh

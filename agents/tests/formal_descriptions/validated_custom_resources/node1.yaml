@@ -1,0 +1,55 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsNode
+metadata:
+  name: node-1
+  namespace: mlsysops
+cluster_id: uth-prod-cluster
+mobile: True
+sensors:
+- camera:
+    model: picamera-v2
+    camera_type: rgb
+    framerate: 20
+    supported_resolutions:
+      - 1024x768
+      - 4056x3040
+  protocol: RTSP
+  endpoint: "12.13.14.156:8090"
+  instances: 1
+environment:
+  node_type: virtualized
+  os: ubuntu
+  container_runtime: 
+    - containerd
+hardware:
+  cpu:
+    cores: 30
+    architecture: amd64
+    frequency:
+      - 14000
+      - 17000
+    performance_indicator: 70 # BogoMIPS
+  memory: 4
+  disk: "120"
+network_resources:
+  basic_interface:
+    name: ethernet
+    interface_name: eth0
+    application_traffic_permission: True
+permitted_actions:
+  - traffic_redirection # Add info in the default channel for application data permission 
+  - acceleration
+  - cpu_frequency
+  - set_power_cap
+  - gpu_frequency
+  - change_container_cpu_set
+  - change_container_image
+power:
+  max_consumption: 
+    value: 20
+    measurement_unit: kw
+  target:
+    consumption:
+      value: 20
+      relation: lower_than
+      measurement_unit: kwh

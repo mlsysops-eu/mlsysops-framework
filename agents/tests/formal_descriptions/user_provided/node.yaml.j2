@@ -1,0 +1,22 @@
+MLSysOpsNode:
+  name: {{ node_name }}
+  cluster_id: {{ cluster_id }}
+  continuum_layer: {{ continuum_layer }}
+  permitted_actions:{% for action in permitted_actions %}
+    - {{ action -}}
+{% endfor %}
+  environment:
+    node_type: virtualized
+    os: ubuntu
+    container_runtime:
+      - containerd
+  hardware:
+    cpu:
+      cores: 1
+      architecture: amd64
+      frequency:
+        - 14000
+        - 17000
+      performance_indicator: 1 # BogoMIPS
+    memory: 100
+    disk: "1"
