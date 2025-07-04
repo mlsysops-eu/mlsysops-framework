@@ -23,8 +23,14 @@ jobs:
           echo "ARTIFACT_SHA=$(echo ${{github.event.pull_request.head.sha}})" >> $GITHUB_ENV
           echo "CI_COMMIT_TAG=0.0.0-${{ github.run_id }}" >> $GITHUB_ENV
         else
-          echo "ARTIFACT_SHA=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
-          echo "CI_COMMIT_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF##*/}"
+            echo "CI_COMMIT_TAG=$VERSION" >> $GITHUB_ENV
+          else
+            echo "CI_COMMIT_TAG=0.0.0+${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+            #echo "ARTIFACT_SHA=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
+            #echo "CI_COMMIT_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
         fi
 
     - name: Install python dependencies
