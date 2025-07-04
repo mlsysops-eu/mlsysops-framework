@@ -1,5 +1,5 @@
 # Use the official Python image
-FROM python:3.9-slim
+FROM harbord.nbfc.io/proxy_cache/library/python:3.9-slim
 
 # Set the working directory inside the container
 WORKDIR /app
