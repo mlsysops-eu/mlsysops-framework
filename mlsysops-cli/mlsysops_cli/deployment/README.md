@@ -30,12 +30,12 @@ A system description is a YAML file, implemented as Kubernetes CRDs.
 Examples can be found in `descriptions/` directory.
 The descriptions for each layer reside in the respectively named directory: continuum, clusters, nodes.
 Each file MUST have the name of the corresponding hostname, followed by the .yaml or .yml suffix.
-For example, a machine at the node level, with hostname `node-1`, should have a description file named `node-1.yaml` under
+For example, a machine at the node level, with hostname `worker1`, should have a description file named `worker1.yaml` under
 the directory `nodes/`.
 
 * **Continuum** level descriptions, require one single file, that declare the continuumID and the clusters that we allow MLSysOps to manage.
 * **Cluster** level descritptions, require a file for each cluster registered in Karmada. It contains the clusterID and a list of node hostnames, that MLSysOps is allowed to manage.
-* **Node** level descriptions, contain the detailed information about the node resources. Example [here](descriptions/nodes/node-1.yaml).
+* **Node** level descriptions, contain the detailed information about the node resources. Example [here](descriptions/nodes/worker1.yaml).
 
 # Automated Deployment
 
@@ -48,6 +48,16 @@ It needs the kubeconfigs of Karmada host cluster and Karmada API.
 
 And then execute the CLI command inside `deployments` directory, with `descriptions` directory files prepared:
 - `python3 deploy.py`
+
+
+#### Automatic system description generation
+There is a python script that uses the content from `inventory.yaml` used in testbed installation steps.
+
+- `python3 create_descriptions.py`
+
+It reads the `inventory.yaml` in the same directory, and creates the yaml descriptions in the same directory. 
+It also creates a test application description.
+
 
 # Manual Deployment
 

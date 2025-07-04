@@ -1,0 +1,3 @@
+MLSysOpsContinuum:
+  continuumID: continuum
+  clusters: ["cluster1"]

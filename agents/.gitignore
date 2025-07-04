@@ -1,0 +1,11 @@
+/.idea
+/*.egg-info
+/dist
+/build
+*.log
+**/__pycache__/
+*.csv
+/**/.env
+*.kubeconfig
+/.*ini
+*.json

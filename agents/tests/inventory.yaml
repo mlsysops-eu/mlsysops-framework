@@ -1,0 +1,55 @@
+all:
+  children:
+    management_cluster:
+      hosts:
+        mls-test-karmada:
+          ansible_host: 10.64.83.239
+          ansible_user: runner
+          ansible_ssh_private_key_file: /home/runner/.ssh/runner
+          ansible_python_interpreter: /usr/bin/python3
+          k3s_cluster_name: mls-test-karmada
+          pod_cidr: "10.10.0.0/16"
+          service_cidr: "10.11.0.0/16"
+          labels:
+            is_vm: true
+            mlsysops.eu/continuumLayer: continuum
+            vaccel: "false"
+
+    cluster1:
+      children:
+        master_nodes:
+          hosts:
+            mls-test-manage:
+              ansible_host: 10.64.83.230
+              ansible_user: runner
+              ansible_ssh_private_key_file:  /home/runner/.ssh/runner
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: mls-test-manage
+              pod_cidr: "10.12.0.0/16"
+              service_cidr: "10.13.0.0/16"
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: cluster
+                vaccel: "false"
+        worker_nodes:
+          hosts:
+            mls-test-vm1:
+              ansible_host: 10.64.83.151
+              ansible_user: runner
+              ansible_ssh_private_key_file: /home/runner/.ssh/runner
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: mls-test-manage
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: node
+                vaccel: "false"
+            mls-compute-vm2:
+              ansible_host: 10.64.83.170
+              ansible_user: runner
+              ansible_ssh_private_key_file: /home/runner/.ssh/runner
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: mls-test-manage
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: node
+                vaccel: "false"

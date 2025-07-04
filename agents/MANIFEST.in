@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+recursive-include mlsysops/templates *.j2
+recursive-include mlsysops/policies *.py
