@@ -102,6 +102,18 @@ mls framework deploy-node
 mls framework deploy-services
 ```
 
+**Optional path argument:** Use the `--path` flag to specify the system descriptions folder.
+  ```bash
+  mls framework deploy-all/cluster/continuum/node --path ./descriptions
+  ```
+  The `descriptions` folder should contain subfolders like `node`, `cluster`, or `continuum` for proper agent configuration.
+
+**Optional inventory argument:** Use the `--inventory` flag to specify the inventory YAML file used during the K3s installation.
+  ```bash
+  mls framework add-system-agents --inventory ./inventory.yaml
+  ```
+
+> **Note:** Only one of `--path` or `--inventory` can be specified at a time. If both options are provided, the command will throw an error.
 ---
 
 ## ⚡ Tab Completion (Bash)
