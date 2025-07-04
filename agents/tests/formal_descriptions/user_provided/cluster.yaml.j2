@@ -1,6 +1,0 @@
-MLSysOpsCluster:
-  name: {{ cluster_name }}
-  cluster_id: {{ cluster_name }}
-  nodes:{% for node in nodes %}
-    - {{ node -}}
-{% endfor %}
