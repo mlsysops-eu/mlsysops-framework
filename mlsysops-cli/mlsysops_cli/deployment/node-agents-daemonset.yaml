@@ -19,7 +19,7 @@ spec:
         mlsysops/continuumLayer: "node"
       containers:
         - name: node-agent
-          image: registry.mlsysops.eu/agent/agents/node:0.0.15
+          image: harbor.nbfc.io/mlsysops/node-agent
           imagePullPolicy: Always
           env:
             - name: NODE_NAME

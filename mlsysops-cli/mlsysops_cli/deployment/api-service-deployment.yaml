@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: nb-api-service
-          image: registry.mlsysops.eu/agent/northbound-api:0.0.0
+          image: harbor.nbfc.io/mlsysops/northbound-api
           ports:
             - containerPort: 8000
               name: http-port
