@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlsysops-cli"
-version = "1.0.1"
+version = "1.0.2"
 description = "CLI for MLSysOps orchestration framework"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -43,4 +43,5 @@ mlsysops_cli = [
     "deployment/configuration/continuum/*.yaml",
     "deployment/configuration/cluster/*.yaml",
     "deployment/configuration/node/*.yaml",
+    "templates/*",
 ]

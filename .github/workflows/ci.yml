@@ -35,6 +35,15 @@ jobs:
     uses: ./.github/workflows/build-mlsysops-pkg.yml
     secrets: inherit
 
+  build-cli-pkg:
+    #needs: [validate-files-and-commits, lint]
+    name: Build mlsysops CLI pkg
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-pkg')
+    uses: ./.github/workflows/build-cli-pkg.yml
+    secrets: inherit
+
   build-agent-containers:
     needs: [build-agent-pkg]
     name: Build containers
