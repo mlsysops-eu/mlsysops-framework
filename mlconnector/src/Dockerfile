@@ -1,5 +1,5 @@
 
-FROM python:3.11.5-slim-bookworm
+FROM harbor.nbfc.io/proxy_cache/library/python:3.11.5-slim-bookworm
 
 # Add curl for healthcheck
 RUN apt-get update && \

@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM harbor.nbfc.io/proxy_cache/library/python:3.10-slim
 
 WORKDIR /app
 

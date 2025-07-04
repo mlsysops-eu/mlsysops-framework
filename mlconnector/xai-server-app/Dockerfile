@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM harbor.nbfc.io/proxy_cache/library/python:3.10
 
 WORKDIR /appServer
 
