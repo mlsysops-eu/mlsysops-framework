@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import traceback
 
 import click
 import requests
@@ -12,6 +13,8 @@ from mlsysops_cli.deployment.deploy import (
     deploy_cluster_agents,
     deploy_node_agents,
 )
+
+from mlsysops_cli.deployment.descriptions_util import create_app_yaml
 
 # Configurable IP and PORT via environment variables
 IP = os.getenv("MLS_API_IP", "127.0.0.1")
@@ -313,9 +316,15 @@ def framework():
 
 
 @click.command(help="Deploy all components (core services, continuum, clusters, nodes)")
-def deploy_all():
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+def deploy_all(path, inventory):
+    # Ensure only one of the --path or --uri options is provided
+    if path and inventory:
+        click.secho('❌ Error: Provide only --path or --uri.')
+        return
     try:
-        run_deploy_all()
+        run_deploy_all(path, inventory)
     except Exception as e:
         click.secho(f"❌ Error during full deployment: {e}", fg='red')
 
@@ -329,35 +338,62 @@ def deploy_services():
 
 
 @click.command(help="Deploy the continuum agent")
-def deploy_continuum():
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+def deploy_continuum(path, inventory):
+    # Ensure only one of the --path or --uri options is provided
+    if path and inventory:
+        click.secho('❌ Error: Provide only --path or --uri.')
+        return
     try:
-        deploy_continuum_agents()
+        deploy_continuum_agents(path, inventory)
     except Exception as e:
         click.secho(f"❌ Error during continuum agent deployment: {e}", fg='red')
 
 
 @click.command(help="Deploy the cluster agents")
-def deploy_cluster():
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+def deploy_cluster(path, inventory):
+    # Ensure only one of the --path or --uri options is provided
+    if path and inventory:
+        click.secho('❌ Error: Provide only --path or --uri.')
+        return
     try:
-        deploy_cluster_agents()
+        deploy_cluster_agents(path, inventory)
     except Exception as e:
         click.secho(f"❌ Error during cluster agents deployment: {e}", fg='red')
 
 
 @click.command(help="Deploy the node agents")
-def deploy_node():
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+def deploy_node(path, inventory):
+    # Ensure only one of the --path or --uri options is provided
+    if path and inventory:
+        click.secho('❌ Error: Provide only --path or --uri.')
+        return
+
     try:
-        deploy_node_agents()
+        deploy_node_agents(path, inventory)
     except Exception as e:
         click.secho(f"❌ Error during node agents deployment: {e}", fg='red')
 
+@click.command(help="Create a test application description using an inventory YAML.")
+@click.option('--inventory', type=click.Path(exists=True), required=True, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+def create_test_app_description(inventory):
+    try:
+        create_app_yaml(inventory)
+    except Exception as e:
+        click.secho(f"❌ Error during test application descriptions creation: {e}", fg='red')
 
-# Agrega los comandos al grupo 'framework'
+# Add commands to the 'framework' group
 framework.add_command(deploy_all)
 framework.add_command(deploy_services)
 framework.add_command(deploy_continuum)
 framework.add_command(deploy_cluster)
 framework.add_command(deploy_node)
+framework.add_command(create_test_app_description)
 
 cli.add_command(framework)
 

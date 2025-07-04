@@ -1,6 +1,7 @@
 from pathlib import Path
 from importlib.resources import files
 import kubernetes.client.rest
+import yaml
 from jinja2 import Environment, FileSystemLoader
 from kubernetes import client, config
 from kubernetes.client import ApiException
@@ -9,6 +10,7 @@ import os
 from jinja2 import Template
 import subprocess
 from mlsysops_cli import deployment
+from mlsysops_cli.deployment.descriptions_util import create_cluster_yaml, create_worker_node_yaml,create_continuum_yaml
 
 
 def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list | None:
@@ -264,10 +266,10 @@ class KubernetesLibrary:
         Create a ConfigMap from all YAML files inside a given folder inside the package.
         """
         files_data_object = {}
-
+        directory = Path(descriptions_directory)
         try:
             for suffix in suffixes:
-                for file in descriptions_directory.glob(suffix):
+                for file in directory.glob(suffix):
                     print(f"Reading file: {file.name}")
                     file_data = file.read_text()
                     files_data_object[file.name] = file_data
@@ -485,13 +487,13 @@ def _check_required_env_vars(*required_vars):
     if missing:
         raise EnvironmentError(f"Missing required environment variables: {', '.join(missing)}")
 
-def run_deploy_all():
+def run_deploy_all(path, inventory_path):
     try:
         print("🚀 Deploying all MLSysOps components...")
         deploy_core_services()
-        deploy_continuum_agents()
-        deploy_cluster_agents()
-        deploy_node_agents()
+        deploy_continuum_agents(path, inventory_path)
+        deploy_cluster_agents(path, inventory_path)
+        deploy_node_agents(path, inventory_path)
         print("✅ All components deployed successfully.")
     except Exception as e:
         print(f"❌ Error in deploy_all: {e}")
@@ -518,15 +520,30 @@ def deploy_core_services():
     for r in parse_yaml_from_file(redis_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
         client_k8s.create_or_update(r)
 
-def deploy_continuum_agents():
+def deploy_continuum_agents(path, inventory_path):
     print("🧠 Deploying Continuum Agent...")
     _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_HOST_KUBECONFIG")
     client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_HOST_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
     _apply_namespace_and_rbac(client_k8s)
 
+    descriptions_path = os.getenv("CONTINUUM_SYSTEM_DESCRIPTIONS_PATH", "descriptions")
+    if path:
+        descriptions_path = path
+
+    if inventory_path:
+        # build the system descriptions
+        parent_dir = "descriptions"
+        descriptions_path = os.path.join(parent_dir, "continuum")
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+        if not os.path.exists(descriptions_path):
+            os.makedirs(descriptions_path)
+
+
+        create_continuum_yaml(inventory_path, descriptions_path)
+
     # ConfigMap descriptions
-    desc_path = files(deployment).joinpath("descriptions/continuum")
-    client_k8s.create_configmap_from_file(desc_path, "mlsysops-framework", "continuum-system-description")
+    client_k8s.create_configmap_from_file(descriptions_path, "mlsysops-framework", "continuum-system-description")
 
     kubeconfig_path = files(deployment).joinpath("descriptions/continuum")
     client_k8s.create_configmap_from_file(kubeconfig_path, "mlsysops-framework", "continuum-karmadapi-config", suffixes=["*.kubeconfig"])
@@ -536,36 +553,81 @@ def deploy_continuum_agents():
     for r in parse_yaml_from_file(daemonset_path):
         client_k8s.create_or_update(r)
 
-def deploy_cluster_agents():
+def deploy_cluster_agents(path, inventory_path):
     print("🏢 Deploying Cluster Agents...")
     _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_API_KUBECONFIG")
     client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_API_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
     _apply_namespace_and_rbac(client_karmada)
     client_karmada.apply_mlsysops_propagation_policies()
 
+    descriptions_path = os.getenv("CLUSTER_SYSTEM_DESCRIPTIONS_PATH", "descriptions")
+    if path:
+        descriptions_path = path
+
+    if inventory_path:
+        # build the system descriptions
+        parent_dir = "descriptions"
+        descriptions_path = os.path.join(parent_dir, "cluster")
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+        if not os.path.exists(descriptions_path):
+            os.makedirs(descriptions_path)
+
+        with open(inventory_path, 'r') as file:
+            inventory = yaml.safe_load(file)
+
+        for cluster_name in inventory['all']['children']:
+            try:
+                print(f"Processing cluster: {cluster_name}")
+                create_cluster_yaml(inventory_path, cluster_name, descriptions_path)
+            except ValueError as e:
+                print(f"Skipping cluster '{cluster_name}': {e}")
+
     # ConfigMap
-    desc_path = files(deployment).joinpath("descriptions/cluster")
-    client_karmada.create_configmap_from_file(desc_path, "mlsysops-framework", "cluster-system-description")
+    client_karmada.create_configmap_from_file(descriptions_path, "mlsysops-framework", "cluster-system-description")
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("cluster-agents-daemonset.yaml")
     for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
         client_karmada.create_or_update(r)
 
-def deploy_node_agents():
+def deploy_node_agents(path, inventory_path):
     print("🧱 Deploying Node Agents...")
     _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_API_KUBECONFIG")
     client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_API_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
 
+    descriptions_path = os.getenv("NODE_SYSTEM_DESCRIPTIONS_PATH","descriptions")
+    if path:
+      descriptions_path = path
+
+    if inventory_path:
+        # build the system descriptions
+        parent_dir = "descriptions"
+        descriptions_path = os.path.join(parent_dir,"nodes")
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+        if not os.path.exists(descriptions_path):
+            os.makedirs(descriptions_path)
+
+        with open(inventory_path, 'r') as file:
+            inventory = yaml.safe_load(file)
+
+        for cluster_name in inventory['all']['children']:
+            try:
+                print(f"Processing cluster: {cluster_name}")
+                create_worker_node_yaml(inventory_path, cluster_name,descriptions_path)
+            except ValueError as e:
+                print(f"Skipping cluster '{cluster_name}': {e}")
+
     # ConfigMap
-    desc_path = files(deployment).joinpath("descriptions/node")
-    print(desc_path)
-    client_karmada.create_configmap_from_file(desc_path, "mlsysops-framework", "node-system-descriptions")
+    print(f"Using node systems decriptions from {descriptions_path}")
+    client_karmada.create_configmap_from_file(descriptions_path, "mlsysops-framework", "node-system-descriptions")
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("node-agents-daemonset.yaml")
     for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
         client_karmada.create_or_update(r)
+
 def _apply_namespace_and_rbac(client_instance):
     # Carga de namespace.yaml
     ns_path = files(deployment).joinpath("namespace.yaml")

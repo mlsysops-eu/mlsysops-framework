@@ -1,3 +1,0 @@
-MLSysOpsCluster:
-  clusterID: mls02
-  nodes: ["mls03", "mls04"]

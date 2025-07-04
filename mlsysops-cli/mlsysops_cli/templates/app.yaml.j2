@@ -1,0 +1,85 @@
+MLSysOpsApp:
+  name: test-application
+  cluster_placement:
+    cluster_id:
+      - {{ cluster_id }}
+  components:
+    - metadata:
+        name: server-app
+        uid: server-app-v1
+      node_placement:
+        node: {{ server_placement_node }}
+      restart_policy: OnFailure
+      containers:
+        - image: harbor.nbfc.io/mlsysops/test-app:latest
+          image_pull_policy: IfNotPresent
+          command: ["python", "TcpServer.py"]
+          env:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=server-app, service.version=0.0.0"
+            - name: OTEL_SERVICE_NAME
+              value: "server-app"
+            - name: NODE_IP
+              value_from:
+                field_ref:
+                  field_path: status.hostIP
+            - name: TELEMETRY_ENDPOINT
+              value: "$(NODE_IP):43170"
+            - name: TCP_SERVER_IP
+              value: "0.0.0.0"
+          ports:
+            - container_port: 10000
+              protocol: TCP
+      qos_metrics:
+        - application_metric_id: test_received_success_counter_total
+          target: 20
+          relation: lower_or_equal
+    - metadata:
+        name: client-app
+        uid: client-app-v1
+      restart_policy: on_failure
+      containers:
+        - image: harbor.nbfc.io/mlsysops/test-app:latest
+          image_pull_policy: IfNotPresent
+          command: ["python", "TcpClient.py"]
+          env:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=client-app, service.version=0.0.0"
+            - name: OTEL_SERVICE_NAME
+              value: "client-app"
+            - name: NODE_IP
+              value_from:
+                field_ref:
+                  field_path: status.hostIP
+            - name: TELEMETRY_ENDPOINT
+              value: "$(NODE_IP):43170"
+            - name: TCP_SERVER_IP
+              value: "server-app"
+          ports:
+            - container_port: 10000
+              protocol: TCP
+      qos_metrics:
+        - application_metric_id: metric-2
+          target: 30
+          relation: equal
+  component_interactions:
+    - component_name1: client-app
+      type: egress
+      component_name2: server-app
+  permitted_actions:
+    - component_relocation
+    - traffic_redirection
+    - change_container_image
+    - change_container_runtime_class
+    - change_container_cpu_set
+    - change_container_resource_requirements
+    - acceleration
+  global_satisfaction:
+    threshold: 0.7
+    relation: greater_than
+    achievement_weights:
+      - metric_id: test_received_success_counter
+        weight: 0.5
+      - metric_id: test_sent_success_counter
+        weight: 0.5
+
