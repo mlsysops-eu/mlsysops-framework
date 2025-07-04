@@ -1,0 +1,55 @@
+apiVersion: mlsysops.eu/v1
+cluster_placement:
+  cluster_id: [uth-prod-cluster]
+component_interactions:
+- {component_name1: client-app, component_name2: server-app, type: egress}
+components:
+- containers:
+  - command: [python, TcpServer.py]
+    env:
+    - {name: OTEL_RESOURCE_ATTRIBUTES, value: 'service.name=server-app, service.version=0.0.0'}
+    - {name: OTEL_SERVICE_NAME, value: server-app}
+    - name: NODE_IP
+      value_from:
+        field_ref: {field_path: status.hostIP}
+    - {name: TELEMETRY_ENDPOINT, value: $(NODE_IP):43170}
+    - {name: TCP_SERVER_IP, value: 0.0.0.0}
+    image: harbor.nbfc.io/mlsysops/test-app:latest
+    image_pull_policy: IfNotPresent
+    ports:
+    - {container_port: 10000, protocol: TCP}
+  metadata: {name: server-app, uid: server-app-v1}
+  node_placement: {node: mls-ubiw-2}
+  qos_metrics:
+  - {application_metric_id: test_received_success_counter_total, relation: lower_or_equal,
+    target: 20.0}
+  restart_policy: OnFailure
+- containers:
+  - command: [python, TcpClient.py]
+    env:
+    - {name: OTEL_RESOURCE_ATTRIBUTES, value: 'service.name=client-app, service.version=0.0.0'}
+    - {name: OTEL_SERVICE_NAME, value: client-app}
+    - name: NODE_IP
+      value_from:
+        field_ref: {field_path: status.hostIP}
+    - {name: TELEMETRY_ENDPOINT, value: $(NODE_IP):43170}
+    - {name: TCP_SERVER_IP, value: server-app}
+    image: harbor.nbfc.io/mlsysops/test-app:latest
+    image_pull_policy: IfNotPresent
+    ports:
+    - {container_port: 10000, protocol: TCP}
+  metadata: {name: client-app, uid: client-app-v1}
+  qos_metrics:
+  - {application_metric_id: metric-2, relation: equal, target: 30.0}
+  restart_policy: OnFailure
+global_satisfaction:
+  achievement_weights:
+  - {metric_id: test_received_success_counter, weight: 0.5}
+  - {metric_id: test_sent_success_counter, weight: 0.5}
+  relation: greater_than
+  threshold: 0.7
+kind: MLSysOpsApp
+metadata: {name: test-application}
+permitted_actions: [component_relocation, traffic_redirection, change_container_image,
+  change_container_runtime_class, change_container_cpu_set, change_container_resource_requirements,
+  acceleration]

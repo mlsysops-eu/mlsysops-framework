@@ -45,7 +45,7 @@ spec:
                           - Europe
                           - Asia
                         description: The required continent (optional)
-                    country: # See reference list
+                    country: # See reference list  
                       type: array
                       items:
                         type: string
@@ -101,7 +101,7 @@ spec:
                       - far_edge
                       - edge_infrastructure
                       - edge
-                    description: The required
+                    description: The required 
                   description: The candidate clusters should contain at least one node of each specified type.
             single_node:
               type: array
@@ -173,7 +173,7 @@ spec:
                       name:
                         type: string
                         description: The unique name of the component
-                      uid:
+                      uid: 
                         type: string
                         description: The unique identifier of the component (not given by app provider).
                   node_placement:
@@ -231,11 +231,11 @@ spec:
                       type: string
                       description: The name of the related components.
                     description: The given component should be deployed after all the components
-                                 specified in the Components list have already started running.
+                                 specified in the Components list have already started running. 
                   runtime_configuration:
                     type: object
                     description: Enables runtime (node-level) configuration for app components.
-                    properties:
+                    properties: 
                       config_specification_file:
                         type: string
                         description: The actual specification file describing the available runtime
@@ -268,7 +268,7 @@ spec:
                                 - thermal
                                 - monocular
                               description: The camera sensor type.
-                            minimum_framerate:
+                            minimum_framerate: 
                               type: integer
                             resolution:
                               type: string
@@ -403,7 +403,7 @@ spec:
                             bucket_id:
                               type: string
                               description: The bucket's unique identifier.
-                            policy_update_token:
+                            policy_update_token: 
                               type: string
                               description: The required token for the MLSysOps to update the bucket's policy at runtime.
                             location_restrictions:
@@ -412,7 +412,7 @@ spec:
                               properties:
                                 gdpr:
                                   type: boolean
-                                  description: For EU citizens only GDPR-compliant storage locations can legally be used.
+                                  description: For EU citizens only GDPR-compliant storage locations can legally be used.   
                             reduncancy:
                               type: string
                               enum:
@@ -449,7 +449,7 @@ spec:
                     type: boolean
                     description: This property indicates whether the component can be accessed outside of its cluster.
                   host_network:
-                    type: boolean
+                    type: boolean 
                     description: Host networking requested for this component. 
                       Use the host's network namespace. If this option is set,
                       the ports that will be used must be specified. Default to false.
@@ -457,12 +457,22 @@ spec:
                     type: string
                     enum:
                       - nvidia
+                      - default
+                      - kata-fc
+                      - kata-dragon
+                      - urunc
+                      - crun
+                      - lunatic
+                      - nvidia-experimental
+                      - spin
+                      - wasmedge
+                      - slight
                   restart_policy:
                     type: string
                     enum:
-                      - always
-                      - on_failure
-                      - never
+                      - Always
+                      - OnFailure
+                      - Never
                     description: Restart policy for the container. Default to Always.
                   os:
                     type: string
@@ -544,6 +554,10 @@ spec:
                                 frequency:
                                   type: number
                                   description: required frequency in Hz.
+                                performance_indicator:
+                                  type: number
+                                  description: This field assists MLSysOps with an initial hint in order to
+                                              filter out nodes based on their performance capabilities.
                             memory:
                               type: object
                               properties:
@@ -570,6 +584,10 @@ spec:
                                 frequency:
                                   type: number
                                   description: required frequency in GHz.
+                                performance_indicator:
+                                  type: number
+                                  description: This field assists MLSysOps with an initial hint in order to
+                                              filter out nodes based on their performance capabilities.
                             disk:
                               type: string
                               description: required Disk space (in GB).
@@ -586,10 +604,14 @@ spec:
                                     - k80
                                     - k40
                                 memory:
-                                  type: string
+                                  type: integer
                                 utilization_request:
                                   type: string
                                   description: Percentage of expected utilization.
+                                performance_indicator:
+                                  type: number
+                                  description: This field assists MLSysOps with an initial hint in order to
+                                              filter out nodes based on their performance capabilities.
                             fpga:
                               type: object
                               properties:
@@ -598,14 +620,14 @@ spec:
                                   enum:
                                     - zcu102
                                 memory:
-                                  type: string
+                                  type: integer
                                 utilization_request:
                                   type: string
                                   description: Percentage of expected utilization.
-                            performance_indicator:
-                              type: number
-                              description: This field assists MLSysOps with an initial hint in order to
-                                          filter out nodes based on their performance capabilities.
+                                performance_indicator:
+                                  type: number
+                                  description: This field assists MLSysOps with an initial hint in order to
+                                              filter out nodes based on their performance capabilities.
                         ports:
                           type: array
                           items:
@@ -649,7 +671,7 @@ spec:
                                   field_ref:
                                     type: object
                                     properties:
-                                      field_path:
+                                      field_path: 
                                         type: string
                               value:
                                 type: string

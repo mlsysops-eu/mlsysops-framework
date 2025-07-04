@@ -1,8 +1,5 @@
-import os
-
 import yaml
-from jinja2 import Template, Environment, PackageLoader, select_autoescape
-
+from jinja2 import Template
 
 def render_template(template_file, context):
     """
@@ -12,8 +9,7 @@ def render_template(template_file, context):
         template = Template(file.read())
     return template.render(context)
 
-
-def create_cluster_yaml(input_file, cluster_name, descriptions_path=""):
+def create_cluster_yaml(input_file, cluster_name):
     """
     Generates the cluster-level YAML based on a template.
     """
@@ -31,7 +27,7 @@ def create_cluster_yaml(input_file, cluster_name, descriptions_path=""):
         raise ValueError(f"No master hostname found for cluster: {cluster_name}")
 
     # Update corrected cluster filename logic here
-    cluster_yaml_filename = os.path.join(descriptions_path, f"{master_hostnames[0]}.yaml")
+    cluster_yaml_filename = f"{master_hostnames[0]}.yaml"  # Updated to use cluster_name
 
     # Create context for the cluster template
     cluster_context = {
@@ -39,23 +35,14 @@ def create_cluster_yaml(input_file, cluster_name, descriptions_path=""):
         "nodes": list(worker_nodes.keys())
     }
 
-    loader = PackageLoader("mlsysops_cli", "templates")
-    env = Environment(
-        loader=loader,
-        autoescape=select_autoescape(enabled_extensions=("j2"))
-    )
-
-    # Load the template
-    template = env.get_template("cluster.yaml.j2")
-
     # Render and write the cluster YAML
-    cluster_yaml = template.render(cluster_context)
+    cluster_yaml = render_template("formal_descriptions/user_provided/cluster.yaml.j2", cluster_context)
     with open(cluster_yaml_filename, 'w') as output_file:
         output_file.write(cluster_yaml)
     print(f"Cluster YAML written to {cluster_yaml_filename}")
 
 
-def create_worker_node_yaml(input_file, cluster_name, descriptions_path=""):
+def create_worker_node_yaml(input_file, cluster_name):
     """
     Generates YAML files for each worker node based on a template.
     """
@@ -91,17 +78,8 @@ def create_worker_node_yaml(input_file, cluster_name, descriptions_path=""):
             "continuum_layer": worker_object['labels']['mlsysops.eu/continuumLayer'],
             "permitted_actions": permitted_actions
         }
-
-        loader = PackageLoader("mlsysops_cli", "templates")
-        env = Environment(
-            loader=loader,
-            autoescape=select_autoescape(enabled_extensions=("j2"))
-        )
-
-        # Load the template
-        template = env.get_template("node.yaml.j2")
-        worker_yaml = template.render(worker_context)
-        worker_yaml_filename = os.path.join(descriptions_path, f"{worker_name}.yaml")
+        worker_yaml = render_template("formal_descriptions/user_provided/node.yaml.j2", worker_context)
+        worker_yaml_filename = f"{worker_name}.yaml"
         with open(worker_yaml_filename, 'w') as output_file:
             output_file.write(worker_yaml)
         print(f"Worker YAML written to {worker_yaml_filename}")
@@ -129,23 +107,14 @@ def create_app_yaml(input_file):
         "server_placement_node": server_placement_node
     }
 
-    loader = PackageLoader("mlsysops_cli", "templates")
-    env = Environment(
-        loader=loader,
-        autoescape=select_autoescape(enabled_extensions=("j2"))
-    )
-
-    # Load the template
-    template = env.get_template("app.yaml.j2")
-
-    app_yaml = template.render(app_context)
-    app_yaml_filename = "mlsysops-test-app-description.yaml"
+    app_yaml = render_template("formal_descriptions/user_provided/app.yaml.j2", app_context)
+    app_yaml_filename = "app-description.yaml"
     with open(app_yaml_filename, 'w') as output_file:
         output_file.write(app_yaml)
     print(f"Application YAML written to {app_yaml_filename}")
 
 
-def create_continuum_yaml(input_file, descriptions_path=""):
+def create_continuum_yaml(input_file):
     """
     Generates the continuum-level YAML with `continuum_id` from the first host in management_cluster
     and adds cluster names based on all master nodes in other clusters.
@@ -156,7 +125,7 @@ def create_continuum_yaml(input_file, descriptions_path=""):
     # Extract the continuum_id from the first host of management_cluster
     management_cluster = inventory['all']['children'].get('management_cluster', {})
     management_hosts = management_cluster.get('hosts', {})
-
+    
     if not management_hosts:
         raise ValueError("No hosts found in the management cluster")
 
@@ -176,18 +145,9 @@ def create_continuum_yaml(input_file, descriptions_path=""):
         "clusters": cluster_hostnames
     }
 
-    loader = PackageLoader("mlsysops_cli", "templates")
-    env = Environment(
-        loader=loader,
-        autoescape=select_autoescape(enabled_extensions=("j2"))
-    )
-
-    # Load the template
-    template = env.get_template("continuum.yaml.j2")
-
     # Render and write the continuum YAML
-    continuum_yaml_filename = os.path.join(descriptions_path, f"{continuum_id}.yaml")
-    continuum_yaml_content = template.render(continuum_context)
+    continuum_yaml_filename = f"{continuum_id}.yaml"
+    continuum_yaml_content = render_template("formal_descriptions/user_provided/continuum.yaml.j2", continuum_context)
     with open(continuum_yaml_filename, 'w') as output_file:
         output_file.write(continuum_yaml_content)
     print(f"Continuum YAML written to {continuum_yaml_filename}")

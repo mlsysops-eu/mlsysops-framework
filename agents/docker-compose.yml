@@ -1,0 +1,12 @@
+services:
+  continuum_agent:
+    image: harbor.nbfc.io/mlsysops/continuum
+    network_mode: host
+
+  cluster_agent:
+    image: harbor.nbfc.io/mlsysops/cluster
+    network_mode: host
+
+  node_agent:
+    image: harbor.nbfc.io/mlsysops/node
+    network_mode: host

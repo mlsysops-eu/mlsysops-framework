@@ -21,6 +21,7 @@ spec:
           ports:
             - containerPort: 6379
               name: redis-port
+              hostPort: 6379
           env:
             - name: REDIS_HOST
               value: {{ KARMADA_HOST_IP }}

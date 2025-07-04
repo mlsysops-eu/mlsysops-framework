@@ -23,11 +23,11 @@ spec:
           image: harbor.nbfc.io/mlsysops/continuum-agent
           env:
             - name: KARMADA_API_KUBECONFIG
-              value: /etc/kubeconfigs/mls-test-karmadaapi.kubeconfig
+              value: /etc/kubeconfigs/mls-test-karmada.kubeconfig
             - name: REDIS_HOST
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
+              value: 172.25.27.72
+            - name: REDIS_PORT
+              value: "6379"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
