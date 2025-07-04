@@ -13,7 +13,7 @@ Make sure you have **Python 3.7+** and `pip` installed.
 ### Option 1: Install via pip (recommended)
 
 ```bash
-pip install mlsysops-cli
+pip install -i https://test.pypi.org/simple/ mlsysops-cli
 ```
 
 After installation, you can use the `mls` command directly in your terminal.
