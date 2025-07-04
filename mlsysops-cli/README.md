@@ -5,16 +5,57 @@ with the MLSysOps framework. It allows users to manage applications,
 infrastructure resources, and orchestration agents across the 
 device-edge-cloud continuum.
 
+
 ## 📦 Installation
 
-Make sure you have Python 3.7+ and `pip` installed.
+Make sure you have **Python 3.7+** and `pip` installed.
+
+### Option 1: Install via pip (recommended)
 
 ```bash
 pip install mlsysops-cli
 ```
 
-This will expose the `mls` command in your terminal.
+After installation, you can use the `mls` command directly in your terminal.
 
+---
+
+### Option 2: Install from source (for development)
+
+If you want to work on the CLI or customize it:
+
+```bash
+# Clone the repository (make sure to use the CLI branch)
+git clone -b CLI https://github.com/mlsysops-eu/mlsysops-framework.git
+
+# Go into the CLI directory
+cd mlsysops-framework/mlsysops-cli
+
+# Install it in editable mode
+pip install -e .
+```
+
+This will also expose the `mls` command in your terminal, and any changes you make to the code will be reflected immediately.
+
+---
+
+## 🔧 Configuration
+
+Make sure you have your environment variables or `.env` file set up with:
+
+```bash
+# Configuration with the framework API
+export MLS_API_IP=<MLS API host ip>
+export MLS_API_PORT=8000
+
+# Deployment
+export KARMADA_HOST_KUBECONFIG=<path to karmada host kubeconfig>
+export KARMADA_API_KUBECONFIG=<path to karmada api kubeconfig>
+export KARMADA_HOST_IP=<karmada host ip>
+```
+
+
+---
 ## 🚀 Usage
 
 ```bash
@@ -63,21 +104,6 @@ mls framework deploy-services
 
 ---
 
-## 🔧 Configuration
-
-You can override the default API IP and PORT using environment variables:
-
-```bash
-export MLS_API_IP=<MLS API host ip>
-export MLS_API_PORT=8000
-
-export KARMADA_HOST_KUBECONFIG=<path to karmada host kubeconfig>
-export KARMADA_API_KUBECONFIG=<path to karmada api kubeconfig>
-export KARMADA_HOST_IP=<karmada host ip>
-```
-
----
-
 ## ⚡ Tab Completion (Bash)
 
 Enable tab-completion for the `mls` CLI in your terminal to quickly discover available commands and options:
@@ -97,31 +123,6 @@ Enjoy instant access to commands and flags 🎉
 
 ---
 
-## 🛠️ Development
-
-Clone the repo and install locally:
-
-```bash
-git clone https://github.com/mlsysops-eu/mlsysops-framework/tree/CLI
-cd mlsysops-cli
-pip install -e .
-```
-## 📜 Changelog
-
-## Version [1.0] - 2025-07-01
-First public version of the CLI.
-### Description:
-- Version tested with the testbed setup. 
-
-### Added
-- mls commands 
-
-### Fixed
-- .
-
-### Changed
-- .
-
 ## 📄 License
 
-License © 2025 [Marco Loaiza / MLSysOps]
+License © 2025 [MLSysOps]
