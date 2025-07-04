@@ -1,5 +1,6 @@
 # Use the official slim Python image as the base image
-FROM python:3.11-slim
+FROM harbor.nbfc.io/proxy_cache/library/python:3.10-slim
+
 
 # Set the working directory in the container
 WORKDIR /app
