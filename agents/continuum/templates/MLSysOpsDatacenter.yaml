@@ -18,24 +18,24 @@ spec:
       served: true
       storage: true
       schema:
-        openAPIV3Schema: # Add metadata for energy, etc. Is the reference top-down or bottom-up? Add list of cluster_ids in the datacenter description.
+        openAPIV3Schema:
           type: object
           description: MLSysOps datacenter formal specification.
           properties:
-            datacenter_id:
+            datacenterID:
               type: string
               description: The unique datacenter identifier.
-            cluster_id:
+            clusterID:
               type: string
               description: The clusterID that the given datacenter is a member.
             continuum:
               type:  string
               description: The continuum layer that the datacenter belongs to.
               enum:
-                - cloud
-                - edge_infrastructure
-                - edge
-                - far_edge
+                - Cloud
+                - EdgeInfrastructure
+                - Edge
+                - FarEdge
             nodes:
               type: array
               items:
@@ -44,56 +44,47 @@ spec:
             continent:
               type: string
               enum:
-                - europe
-                - asia
-                - africa
-                - australia
-                - north_america
-                - south_america
-                - antarctica
+                - Europe
+                - Asia
+                - Africa
+                - Australia
+                - North America
+                - South America
+                - Antarctica
               description: The desired continent (optional)
             country:
               type: string
               enum:
-                - el # Greece
-                - it # Italy
-                - fr # France
-                - nl # Netherlands
-                - ie # Ireland
-                - pt # Portugal
-                - dk # Denmark
-                - il # Israel
+                - GR
+                - IT
+                - FRA
+                - ENG
+                - POR
               description: The desired country (optional)
             city:
               type: string
               enum:
-                - volos
-                - athens
-                - rende
-                - milan
-                - lille
-                - delft
-                - dublin
-                - aveiro
-                - porto
-                - aarhus
-                - jerusalem
+                - Volos
+                - Milan
+                - Paris
+                - London
+                - Lisbon
               description: The desired city (optional)
             location:
               type: array
               description: The location of the datacenter.
               items:
                 type: number
-            cloud_provider:
+            cloudProvider:
               type: string
               enum:
                 - private
-                - aws
-                - microsoft_azure
-                - gcp
+                - AWS
+                - MicrosoftAzure
+                - GCP
               description: The name of the desired provider (optional)
           required:
-          - cluster_id
-          - datacenter_id
+          - clusterID
+          - datacenterID
           - continuum
           - nodes

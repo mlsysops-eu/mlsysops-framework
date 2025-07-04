@@ -1,5 +1,5 @@
 # Base image
-FROM harbor.nbfc.io/proxy_cache/library/python:3.10-slim
+FROM python:3.10-slim
 
 # Set up a working directory
 WORKDIR /workdir

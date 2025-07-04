@@ -1,0 +1,75 @@
+# DaemonSet for Cluster Agent
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mlsysops-cluster-agent
+  namespace: mlsysops-framework
+spec:
+  selector:
+    matchLabels:
+      app: cluster-agent
+  template:
+    metadata:
+      labels:
+        app: cluster-agent
+    spec:
+      serviceAccountName: mlsysops-agents-sa
+      nodeSelector:
+        mlsysops.eu/continuumLayer: "cluster"
+      containers:
+        - name: cluster-agent
+          image: registry.mlsysops.eu/agent/agents/cluster:0.0.25
+          imagePullPolicy: Always
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: REDIS_HOST
+              value: {{ KARMADA_HOST_IP }}
+            - name: CLUSTER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: EJABBERD_DOMAIN
+              value: {{ KARMADA_HOST_IP }}
+            - name: NODE_PASSWORD
+              value: "1234"
+            - name: PYTHONPATH
+              value: "/workdir/fluidity"
+            - name: DESCRIPTION_PATH
+              value: "/etc/mlsysops/descriptions"
+          volumeMounts:
+            - name: description-volume
+              mountPath: /etc/mlsysops/descriptions
+            - name: cluster-config-volume
+              mountPath: /etc/mlsysops/config
+            - name: policies-volume
+              mountPath: /etc/mlsysops/policies
+      volumes:
+        - name: cluster-config-volume
+          configMap:
+            name: cluster-agents-config
+        - name: description-volume
+          configMap:
+            name: cluster-system-description
+        - name: policies-volume
+          configMap:
+            name: cluster-agents-policies
+---
+# Empty ConfigMap for Cluster Policies
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-agents-policies
+  namespace: mlsysops-framework
+data: {}
+
+---
+# Empty ConfigMap for agent configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-agents-config
+  namespace: mlsysops-framework
+data: {}

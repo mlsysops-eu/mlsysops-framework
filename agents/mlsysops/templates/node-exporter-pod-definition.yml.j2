@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ pod_name }}"
+  namespace: "{{ namespace }}"
+  labels:
+    app: "node-exporter"
+spec:
+  containers:
+    - name: "node-exporter"
+      image: "quay.io/prometheus/node-exporter:latest"
+      args:
+         - "--web.listen-address=:{{ port }}"
+         - "--path.rootfs=/host"
+         - "--collector.disable-defaults"
+         {% for arg in node_exporter_flags %}
+         - "{{ arg }}"
+         {% endfor %}
+      securityContext:
+        privileged: true
+      ports:
+        - containerPort: {{ port }}
+          hostPort: {{ port }}
+          protocol: "TCP"
+      volumeMounts:
+        - name: "host-root"
+          mountPath: "/host"
+          mountPropagation: HostToContainer
+          readOnly: true
+  volumes:
+    - name: "host-root"
+      hostPath:
+        path: "/"
+  restartPolicy: "Always"
+  nodeSelector:
+    kubernetes.io/hostname: "{{ node_name }}"

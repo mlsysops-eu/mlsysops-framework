@@ -1,0 +1,99 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: mlsysopsdatacenters.mlsysops.eu
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: mlsysops.eu
+  scope:  Namespaced #Cluster
+  names:
+    plural: mlsysopsdatacenters
+    singular: mlsysopsdatacenter
+    kind: MLSysOpsDatacenter
+    shortNames:
+    - mlsdatacenter
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema: # Add metadata for energy, etc. Is the reference top-down or bottom-up? Add list of cluster_ids in the datacenter description.
+          type: object
+          description: MLSysOps datacenter formal specification.
+          properties:
+            datacenter_id:
+              type: string
+              description: The unique datacenter identifier.
+            cluster_id:
+              type: string
+              description: The clusterID that the given datacenter is a member.
+            continuum:
+              type:  string
+              description: The continuum layer that the datacenter belongs to.
+              enum:
+                - cloud
+                - edge_infrastructure
+                - edge
+                - far_edge
+            nodes:
+              type: array
+              items:
+                type: string
+              description: The set of registered nodes.
+            continent:
+              type: string
+              enum:
+                - europe
+                - asia
+                - africa
+                - australia
+                - north_america
+                - south_america
+                - antarctica
+              description: The desired continent (optional)
+            country:
+              type: string
+              enum:
+                - el # Greece
+                - it # Italy
+                - fr # France
+                - nl # Netherlands
+                - ie # Ireland
+                - pt # Portugal
+                - dk # Denmark
+                - il # Israel
+              description: The desired country (optional)
+            city:
+              type: string
+              enum:
+                - volos
+                - athens
+                - rende
+                - milan
+                - lille
+                - delft
+                - dublin
+                - aveiro
+                - porto
+                - aarhus
+                - jerusalem
+              description: The desired city (optional)
+            location:
+              type: array
+              description: The location of the datacenter.
+              items:
+                type: number
+            cloud_provider:
+              type: string
+              enum:
+                - private
+                - aws
+                - microsoft_azure
+                - gcp
+              description: The name of the desired provider (optional)
+          required:
+          - cluster_id
+          - datacenter_id
+          - continuum
+          - nodes

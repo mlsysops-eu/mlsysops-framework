@@ -1,0 +1,5 @@
+MLSysOpsContinuum:
+  continuum_id: {{ continuum_id }}
+  clusters:{% for cluster in clusters %}
+    - {{ cluster -}}
+  {% endfor %}

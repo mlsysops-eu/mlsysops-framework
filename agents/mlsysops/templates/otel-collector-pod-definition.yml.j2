@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ pod_name }}"
+  namespace: "mlsysops-framework"
+  labels:
+    mlsysops-framework/otel: "otel-collector"
+spec:
+  serviceAccountName: mlsysops-agents-sa
+  containers:
+    - name: "otel-collector"
+      image: "otel/opentelemetry-collector-contrib:0.113.0"
+      args:
+        - "--config=/etc/otel-collector-config/otel-collector-config.yaml"
+      ports:
+        - containerPort: {{ otlp_grpc_port }}
+          hostPort: {{ otlp_grpc_port }}
+          protocol: "TCP"
+        - containerPort: {{ otlp_http_port }}
+          hostPort: {{ otlp_http_port }}
+          protocol: "TCP"
+        - containerPort: {{ otlp_prometheus_port }}
+          hostPort: {{ otlp_prometheus_port }}
+          protocol: "TCP"
+      volumeMounts:
+        - name: "otel-config-volume"
+          mountPath: "/etc/otel-collector-config"
+          readOnly: true
+      env:
+        - name: "NODE_HOSTNAME"
+          valueFrom:
+            fieldRef:
+              apiVersion: "v1"
+              fieldPath: "spec.nodeName"
+        - name: "NODE_IP"
+          valueFrom:
+            fieldRef:
+              apiVersion: "v1"
+              fieldPath: "status.hostIP"
+  volumes:
+    - name: "otel-config-volume"
+      configMap:
+        name: "{{ configmap_name }}"
+  restartPolicy: "OnFailure"
+  nodeSelector:
+    kubernetes.io/hostname: "{{ node_name }}"

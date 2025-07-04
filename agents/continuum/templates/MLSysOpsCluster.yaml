@@ -22,17 +22,14 @@ spec:
           type: object
           description: MLSysOps cluster formal specification.
           properties:
-            cluster_id:
+            clusterID:
               type: string
               description: The unique cluster identifier.
-            datacenter_id:
-              type: string
-              description: The unique datacenter identifier.
             nodes:
               type: array
               items:
                 type: string
               description: The set of registered nodes.
           required:
-          - cluster_id
+          - clusterID
           - nodes

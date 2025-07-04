@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlsysops-agents-sa
+  namespace: mlsysops-framework
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlsysops-agents-sa
+  namespace: mlsysops
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mlsysops-framework-role
+rules:
+  - apiGroups:
+      - node.k8s.io
+    resources:
+      - runtimeclasses
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - daemonsets
+      - replicasets
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - mlsysops.eu
+    resources:
+      - mlsysopsnodes
+      - mlsysopsapps
+      - mlsysopscontinuums
+      - mlsysopsdatacenters
+      - mlsysopsclusters
+    verbs:
+      - '*'
+  - apiGroups:
+      - ""
+    resources:
+      - events
+      - namespaces/status
+      - nodes
+      - nodes/spec
+      - pods/status
+      - resourcequotas
+      - replicationcontrollers
+      - replicationcontrollers/status
+    verbs:
+      - 'get'
+      - 'watch'
+      - 'list'
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - pods
+      - namespaces
+      - configmaps
+    verbs:
+      - '*'
+  - apiGroups:
+      - extensions
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - get
+      - list
+      - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mlsysops-framework-crb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mlsysops-framework-role
+subjects:
+- kind: ServiceAccount
+  name: mlsysops-agents-sa
+  namespace: mlsysops-framework
+- kind: ServiceAccount
+  name: mlsysops-agents-sa
+  namespace: mlsysops
