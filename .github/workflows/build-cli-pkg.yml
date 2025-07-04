@@ -59,7 +59,7 @@ jobs:
       run: |
         . .venv/bin/activate
         .venv/bin/python3 -m pip install build
-        cd agents
+        cd mlsysops-cli
         ../.venv/bin/python3 -m build
         VERSION=$(python3 setup.py --version)
         PYVER=$(python3 --version | awk '{print $2}' | awk -F\. '{print $1 $2 }')
@@ -70,4 +70,4 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_TOKEN }}
-        packages-dir: agents/dist
+        packages-dir: mlsysops-cli/dist
