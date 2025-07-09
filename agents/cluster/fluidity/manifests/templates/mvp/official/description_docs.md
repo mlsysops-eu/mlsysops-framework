@@ -254,138 +254,17 @@ MLSysOpsApp:
 | `achievement_weights[].weight` | Weight of each metric (total weight sum must be 1). | No | - |
 
 
-# Cluster, Node, and Continuum Custom Resources Reference
+# Continuum, Cluster, and Node Custom Resources Reference
 
 This documentation provides full example YAMLs and hierarchical field reference tables for the following custom resource definitions:
 
+- `MLSysOpsContinuum`
 - `MLSysOpsCluster`
 - `MLSysOpsNode`
-- `MLSysOpsContinuum`
 
 Each section includes:
 - A sample YAML snippet.
 - A structured table of fields with descriptions, required/optional status, and allowed values (if defined).
-
----
-
-## MLSysOpsCluster
-
-### Example `cluster.yaml`
-
-```yaml
-MLSysOpsCluster:
-  name: uth-prod-cluster
-  cluster_id: uth-prod-cluster
-  nodes:
-    - node-1
-    - node-2
-    - node-3
-```
-
-### Field Reference Table
-
-| Field | Description | Required | Allowed Values |
-|-------|-------------|----------|----------------|
-| `name` | The name of the node. | No | - |
-| `labels` | The required labels for filtering. | No | - |
-| `continuum_layer` | Continuum placement level. | Yes | `cloud`, `edge_infrastructure`, `edge`, `far_edge` |
-| `cluster_id` | The unique cluster identifier that the node reports to. | No | - |
-| `mobile` | Specify if the node is mobile or stationary. | No | - |
-| `location` | Geolocation coordinates (lon, lat). | No | - |
-| `sensors[].camera.model` | The model name of the camera sensor. | No | `imx415`, `imx219`, `d455`, `imx477`, `picamera-v2` |
-| `sensors[].camera.camera_type` | The camera sensor type. | No | - |
-| `sensors[].camera.framerate` | Framerate. | No | - |
-| `sensors[].camera.supported_resolutions` | Supported camera resolutions. | No | `1024x768`, `4056x3040` |
-| `sensors[].temperature.model` | The model name of the temperature sensor. | No | `sdc30`, `ds18b20` |
-| `environment.node_type` | Node type. | Yes | `virtualized`, `native`, `bare_metal` |
-| `environment.os` | Operating system. | Yes | `ubuntu`, `kali`, `zephyr` |
-| `environment.container_runtime[]` | Supported runtimes. | Yes | `containerd`, `docker`, `emb_serve` |
-| `hardware.cpu.model` | CPU model name. | No | - |
-| `hardware.cpu.architecture` | CPU architecture. | No | `amd64`, `arm64` |
-| `hardware.cpu.frequency[]` | Possible CPU frequency values (Hz). | No | - |
-| `hardware.cpu.performance_indicator` | Quantifies processing capabilities. | No | - |
-| `hardware.memory` | Memory size (GB). | No | - |
-| `hardware.disk` | Disk space in GB. | No | - |
-| `hardware.gpu.model` | GPU model. | No | `k80`, `k40` |
-| `hardware.gpu.memory` | GPU memory size. | No | - |
-| `hardware.gpu.performance_indicator` | GPU performance score. | No | - |
--------|-------------|----------|----------------|
-| `name` | The name of the node. | No | - |
-| `labels` | The required labels for filtering. | No | - |
-| `continuum_layer` | - | Yes | `cloud`, `edge_infrastructure`, `edge`, `far_edge` |
-| `cluster_id` | The unique cluster identifier that the node resides. | No | - |
-| `mobile` | Specify if the node is mobile or stationary. | No | - |
-| `location` | Geolocation coordinates (lon, lat). | No | - |
-| `sensors[].camera.model` | The model name of the camera sensor. | No | `imx415`, `imx219`, `d455`, `imx477`, `picamera-v2` |
-| `sensors[].camera.camera_type` | The camera sensor type. | No | - |
-| `sensors[].camera.framerate` | Framerate. | No | - |
-| `sensors[].camera.supported_resolutions` | Supported camera resolutions. | No | `1024x768`, `4056x3040` |
-| `sensors[].temperature.model` | The model name of the temperature sensor. | No | `sdc30`, `ds18b20` |
-| `environment.node_type` | Node type. | Yes | `virtualized`, `native`, `bare_metal` |
-| `environment.os` | Operating system. | Yes | `ubuntu`, `kali`, `zephyr` |
-| `environment.container_runtime[]` | Supported runtimes. | Yes | `containerd`, `docker`, `emb_serve` |
-| `hardware.cpu.model` | CPU model name. | No | - |
-| `hardware.cpu.architecture` | CPU architecture. | No | `amd64`, `arm64` |
-| `hardware.cpu.frequency[]` | Possible CPU frequency values (Hz). | No | - |
-| `hardware.cpu.performance_indicator` | Quantifies processing capabilities. | No | - |
-| `hardware.memory` | Memory size (GB). | No | - |
-| `hardware.disk` | Disk space in GB. | No | - |
-| `hardware.gpu.model` | GPU model. | No | `k80`, `k40` |
-| `hardware.gpu.memory` | GPU memory size. | No | - |
-| `hardware.gpu.performance_indicator` | GPU performance score. | No | - |
----
-
-## MLSysOpsNode
-
-### Example `node.yaml`
-
-```yaml
-MLSysOpsNode:
-  name: node-1
-  labels:
-    - gpu
-    - edge-ready
-  continuum_layer: edge
-  cluster_id: uth-prod-cluster
-  mobile: False
-  location: [22.9576, 40.6401]  # longitude, latitude
-  sensors:
-    - camera:
-        model: d455
-        camera_type: rgb
-        framerate: 30
-        supported_resolutions: ["1024x768"]
-    - temperature:
-        model: sdc30
-  environment:
-    node_type: virtualized
-    os: ubuntu
-    container_runtime: ["containerd"]
-  hardware:
-    cpu:
-      model: Intel-i7
-      architecture: amd64
-      frequency: [2.4, 3.0]
-      performance_indicator: 75
-    memory: 16
-    disk: "256"
-    gpu:
-      model: k80
-      memory: "4"
-      performance_indicator: 100
-```
-
-### Field Reference Table
-
-| Field | Description | Required | Allowed Values |
-|-------|-------------|----------|----------------|
-| `name` | The name of the node. | No | - |
-| `labels` | The required labels for filtering. | No | - |
-| `continuum_layer` | - | Yes | `cloud`, `edge_infrastructure`, `edge`, `far_edge` |
-| `cluster_id` | The unique cluster identifier that the node reports to. | No | - |
-| `mobile` | Specify if the node is mobile or stationary. | No | - |
-
----
 
 ## MLSysOpsContinuum
 
@@ -406,4 +285,95 @@ MLSysOpsContinuum:
 | `name` | The continuum slice name. | Yes | - |
 | `continuum_id` | The unique continuum identifier. | Yes | - |
 | `clusters` | The set of registered clusters. | Yes | - |
+---
 
+## MLSysOpsCluster
+
+### Example `cluster.yaml`
+
+```yaml
+MLSysOpsCluster:
+  name: uth-prod-cluster
+  cluster_id: uth-prod-cluster
+  nodes:
+    - node-1
+    - node-2
+    - node-3
+```
+
+### Field Reference Table
+
+| Field | Description | Required | Allowed Values |
+|-------|-------------|----------|----------------|
+| `name` | The cluster name. | Yes | - |
+| `cluster_id` | The unique continuum identifier. | Yes | - |
+| `nodes` | The set of registered nodes. | Yes | - |
+---
+
+## MLSysOpsNode
+
+### Example `node.yaml`
+
+```yaml
+MLSysOpsNode:
+  name: node-1
+  labels:
+    - gpu
+    - edge-ready
+  continuum_layer: edge
+  cluster_id: uth-prod-cluster
+  mobile: False
+  location: [22.9576, 40.6401]  # [longitude, latitude] for stationary nodes
+  sensors:
+    - camera:
+        model: d455
+        camera_type: rgb
+        framerate: 30
+        supported_resolutions: ["1024x768"]
+    - temperature:
+        model: sdc30
+  environment:
+    node_type: virtualized
+    os: ubuntu
+    container_runtime: ["containerd"]
+  hardware:
+    cpu:
+      model: Intel-i7
+      architecture: amd64
+      frequency: [2400000000, 3000000000]
+      performance_indicator: 75 # BogoMIPS
+    memory: 16
+    disk: "256"
+    gpu:
+      model: k80
+      memory: "4"
+      performance_indicator: 100 
+```
+### Field Reference Table
+
+| Field | Description | Required | Allowed Values |
+|-------|-------------|----------|----------------|
+| `name` | The name of the node. | No | - |
+| `labels` | The required labels for filtering. | No | - |
+| `continuum_layer` | Continuum placement level. | Yes | `cloud`, `edge_infrastructure`, `edge`, `far_edge` |
+| `cluster_id` | The unique cluster identifier that the node reports to. | No | - |
+| `mobile` | Specify if the node is mobile or stationary. | No | - |
+| `location` | Geolocation coordinates (lon, lat). Valid only for stationary nodes. For mobile ones, the respective information is collected using telemetry. | No | - |
+| `sensors[].camera.model` | The model name of the camera sensor. | No | `imx415`, `imx219`, `d455`, `imx477`, `picamera-v2` |
+| `sensors[].camera.camera_type` | The camera sensor type. | No | - |
+| `sensors[].camera.framerate` | Framerate. | No | - |
+| `sensors[].camera.supported_resolutions` | Supported camera resolutions. | No | `1024x768`, `4056x3040` |
+| `sensors[].temperature.model` | The model name of the temperature sensor. | No | `sdc30`, `ds18b20` |
+| `environment.node_type` | Node type. | Yes | `virtualized`, `native`, `bare_metal` |
+| `environment.os` | Operating system. | Yes | `ubuntu`, `kali`, `zephyr` |
+| `environment.container_runtime[]` | Supported runtimes. | Yes | `containerd`, `docker`, `emb_serve` |
+| `hardware.cpu.model` | CPU model name. | No | - |
+| `hardware.cpu.architecture` | CPU architecture. | No | `amd64`, `arm64` |
+| `hardware.cpu.frequency[]` | Possible CPU frequency values (Hz). | No | - |
+| `hardware.cpu.performance_indicator` | Quantifies processing capabilities (BogoMIPS). | No | - |
+| `hardware.memory` | Memory size (GB). | No | - |
+| `hardware.disk` | Disk space (GB). | No | - |
+| `hardware.gpu.model` | GPU model. | No | `k80`, `k40` |
+| `hardware.gpu.memory` | GPU memory size. | No | - |
+| `hardware.gpu.performance_indicator` | GPU performance score. | No | - |
+---
