@@ -1,0 +1,322 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: mlsysopsapps.mlsysops.eu
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: mlsysops.eu
+  scope:  Namespaced
+  names:
+    plural: mlsysopsapps
+    singular: mlsysopsapp
+    kind: MLSysOpsApp
+    shortNames:
+    - mlsapp
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            name:
+              type: string
+              description: The application name.
+            cluster_placement:
+              type: object
+              properties:
+                cluster_id:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of clusters that can host the application.
+            components:
+              type: array
+              items:
+                type: object
+                properties:
+                  metadata:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        description: The unique name of the component
+                      uid: 
+                        type: string
+                        description: The unique identifier of the component (not given by app provider).
+                  node_placement:
+                    type: object
+                    properties:
+                      continuum_layer:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            - cloud
+                            - far_edge
+                            - edge_infrastructure
+                            - edge
+                            - "*"
+                          description: The required component placement on the continuum. "*" symbol means "anywhere on the continuum".
+                      mobile:
+                        type: boolean
+                        description: Specify if the component needs to be deployed on a mobile node (optional)
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                        description: The required labels for filtering.
+                      node:
+                        type: string
+                        description: The required node name to be the host of the component (optional).
+                  sensors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        camera:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - d455
+                                - imx477
+                                - picamera-v2
+                              description: The model name of the camera sensor
+                            camera_type:
+                              type: string
+                              enum:
+                                - rgb
+                                - nir
+                                - thermal
+                                - monocular
+                              description: The camera sensor type.
+                            minimum_framerate: 
+                              type: integer
+                            resolution:
+                              type: string
+                              enum:
+                                - 1024x768
+                                - 4056x3040
+                        temperature:
+                          type: object
+                          properties:
+                            model:
+                              type: string
+                              enum:
+                                - sdc30
+                                - ds18b20
+                              description: The model name of the temperature sensor
+                  qos_metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        application_metric_id:
+                          type: string
+                          description: App metric id.
+                        target:
+                          type: number
+                        relation:
+                          type: string
+                          enum:
+                            - lower_or_equal
+                            - greater_or_equal
+                            - equal
+                            - lower_than
+                            - greater_than
+                  host_network:
+                    type: boolean 
+                    description: Host networking requested for this component. 
+                      Use the host's network namespace. If this option is set,
+                      the ports that will be used must be specified. Default to false.
+                  runtime_class_name:
+                    type: string
+                    enum:
+                      - nvidia
+                      - default
+                      - kata-fc
+                      - kata-dragon
+                      - urunc
+                      - crun
+                      - lunatic
+                      - nvidia-experimental
+                      - spin
+                      - wasmedge
+                      - slight
+                  restart_policy:
+                    type: string
+                    enum:
+                      - Always
+                      - OnFailure
+                      - Never
+                    description: Restart policy for the container. Default to Always.
+                  os:
+                    type: string
+                    enum:
+                      - ubuntu
+                      - kali
+                      - zephyr
+                  node_type:
+                    type: string
+                    enum:
+                      - virtualized # In the form of a Virtual Machine
+                      - native # Non-virtualized, including OS
+                      - bare_metal # Non-virtualized, without OS
+                  container_runtime:
+                    type: string
+                    enum:
+                      - containerd
+                      - docker
+                      - emb_serve
+                  containers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        image:
+                          type: string
+                          description: The name of the container image.
+                        command:
+                          type: array
+                          items:
+                            type: string
+                        image_pull_policy:
+                          type: string
+                          enum:
+                            - Always
+                            - Never
+                            - IfNotPresent
+                          description: Image pull policy. Defaults to Always if :latest tag is specified,
+                           or IfNotPresent otherwise.
+                        platform_requirements:
+                          type: object
+                          description: The resource requirements of the container.
+                          properties:
+                            cpu:
+                              type: object
+                              properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
+                                architecture:
+                                  type: array
+                                  items:
+                                    type: string
+                                    enum:
+                                      - arm64
+                                      - amd64
+                                frequency:
+                                  type: number
+                                  description: required frequency in Hz.
+                                performance_indicator:
+                                  type: number
+                                  description: This field assists MLSysOps with an initial hint in order to
+                                              filter out nodes based on their performance capabilities.
+                            memory:
+                              type: object
+                              properties:
+                                requests:
+                                  type: string
+                                limits:
+                                  type: string
+                            disk:
+                              type: string
+                              description: required Disk space (in GB).
+                            gpu:
+                              type: object
+                              properties:
+                                model:
+                                  type: string
+                                  enum:
+                                    - k80
+                                    - k40
+                                memory:
+                                  type: string
+                                performance_indicator:
+                                  type: number
+                                  description: This field assists MLSysOps with an initial hint in order to
+                                              filter out nodes based on their performance capabilities.
+                        ports:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              container_port:
+                                type: integer
+                                description: Number of port to expose on the component's IP address.
+                                  This must be a valid port number, 0 < x < 65536.
+                              protocol:
+                                type: string
+                                enum:
+                                  - UDP
+                                  - TCP
+                                  - SCTP
+                                description: Protocol for port. Defaults to "TCP".
+                          description: Environment variables for the container.
+                        env:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                                description: Name of the environment variable.
+                              value_from:
+                                type: object
+                                properties:
+                                  field_ref:
+                                    type: object
+                                    properties:
+                                      field_path: 
+                                        type: string
+                              value:
+                                type: string
+                                description: Value of the environment variable.
+                          description: Environment variables for the container.
+                required:
+                - containers
+                - metadata
+            component_interactions:
+              type: array
+              items:
+                type: object
+                properties:
+                  component_name1:
+                    type: string
+                    description: The "source" component.
+                  type:
+                    type: string
+                    enum:
+                      - ingress
+                      - egress
+                  component_name2:
+                    type: string
+                    description: The "destination" component.
+            global_satisfaction:
+              type: object
+              properties:
+                threshold:
+                  type: number
+                  description: Happiness minimum required value (range (0-1])
+                relation:
+                  type: string
+                  enum:
+                    - greater_or_equal
+                    - equal
+                    - greater_than
+                achievement_weights:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      metric_id:
+                        type: string
+                      weight:
+                        type: number       
+          required:
+            - components

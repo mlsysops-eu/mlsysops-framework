@@ -1,0 +1,126 @@
+MLSysOpsApp:
+  name: test-application
+  cluster_placement:
+    cluster_id:
+      - "uth-prod-cluster"
+  components:
+    - metadata:
+        name: server-app
+        uid: a9jwduj9028uje
+      node_placement:
+        continuum_layer:
+          - edge
+        node: node-1 # Replace with proper hostname
+        mobile: True
+      runtime_class_name: nvidia
+      sensors:
+        - camera:
+            model: d455
+            camera_type: rgb
+            minimum_framerate: 20
+            resolution: 1024x768
+      restart_policy: OnFailure
+      node_type: virtualized
+      os: ubuntu
+      container_runtime: containerd
+      containers:
+        - image: harbor.nbfc.io/mlsysops/test-app:latest
+          platform_requirements:
+            cpu: 
+              requests: "250m"
+              limits: "500m"
+              architecture:
+                - amd64
+              frequency: 1.4
+              performance_indicator: 30 # BogoMIPS
+            memory:
+              requests: "64Mi"
+              limits: "128Mi"
+            disk: "120"
+          image_pull_policy: IfNotPresent
+          command: ["python", "TcpServer.py"]
+          env:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=server-app, service.version=0.0.0, service.experimentid=test"
+            - name: OTEL_SERVICE_NAME
+              value: "server-app"
+            - name: NODE_IP
+              value_from:
+                field_ref:
+                  field_path: status.hostIP
+            - name: TELEMETRY_ENDPOINT # Add code for this to be done dynamically
+              value: "$(NODE_IP):43170"
+            - name: TCP_SERVER_IP 
+              value: "0.0.0.0"
+          ports:
+            - container_port: 10000
+              protocol: TCP
+      qos_metrics:
+        - application_metric_id: test_received_success_counter
+          target: 20
+          relation: lower_or_equal
+          system_metrics_hints:
+            - cpu_frequency
+      host_network: False
+    - metadata:
+        name: client-app
+        uid: jdaddwewed235uje
+      node_placement:
+        mobile: False
+        continuum_layer:
+          - edge
+      sensors:
+        - temperature:
+            model: sdc30
+      restart_policy: OnFailure
+      node_type: native
+      os: ubuntu # Just for demonstration purposes.
+      container_runtime: containerd
+      containers:
+        - image: harbor.nbfc.io/mlsysops/test-app:latest
+          platform_requirements:
+            cpu: #change to cpu and merge with resources above.
+              requests: "250m"
+              limits: "500m"
+              architecture:
+                - arm64
+              frequency: 1.4
+            memory:
+              requests: "64Mi"
+              limits: "128Mi"
+            disk: "100"
+            gpu:
+              model: k80
+              memory: 2
+              performance_indicator: 320 # BogoMIPS
+          image_pull_policy: IfNotPresent
+          command: ["python", "TcpClient.py"]
+          env:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=server-app, service.version=0.0.0, service.experimentid=test"
+            - name: OTEL_SERVICE_NAME
+              value: "server-app"
+            - name: NODE_IP
+              value_from:
+                field_ref:
+                  field_path: status.hostIP
+            - name: TELEMETRY_ENDPOINT
+              value: "$(NODE_IP):43170"
+            - name: TCP_SERVER_IP
+              value: "server-app"
+      qos_metrics:
+        - application_metric_id: test_sent_success_counter
+          target: 30
+          relation: equal  
+  component_interactions:
+    - component_name1: client-app
+      type: egress
+      component_name2: server-app
+  global_satisfaction:
+    threshold: 0.7
+    relation: greater_than
+    achievement_weights:
+      - metric_id: test_received_success_counter
+        weight: 0.5
+      - metric_id: test_sent_success_counter
+        weight: 0.5

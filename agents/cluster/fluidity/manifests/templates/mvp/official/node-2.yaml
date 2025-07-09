@@ -1,0 +1,27 @@
+MLSysOpsNode:
+  name: node-2
+  continuum_layer: edge
+  cluster_id: uth-prod-cluster
+  mobile: False
+  location: [22.812791301, 29.82382932] # For fixed nodes
+  sensors:
+    - temperature:
+        model: sdc30
+  environment:
+    node_type: native
+    os: ubuntu
+    container_runtime: 
+      - containerd
+  hardware:
+    cpu: #change to cpu and merge with resources above.
+      architecture: arm64
+      frequency: # All the available values
+        - 1.4
+        - 1.7
+      performance_indicator: 700 # BogoMIPS
+    gpu:
+      model: k80
+      memory: 2 # GB
+      performance_indicator: 330 # BogoMIPS
+    memory: 4 # GB
+    disk: "100" # GB
