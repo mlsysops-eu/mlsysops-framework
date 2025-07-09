@@ -22,8 +22,7 @@ nav:
       - Agent Configuration: design/agent-configuration.md
       - ML Connector: design/ml-connector.md
   - User Guide:
-      - Application Description:
-      - System Description:
+      - Application and System Description: user-guide/description_docs.md
       - Policy Plugins:
       - Mechanism Plugins:
       - MLConnector:
