@@ -1,0 +1,36 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsNode
+metadata:
+  name: node-1
+  namespace: mlsysops
+cluster_id: uth-prod-cluster
+continuum_layer: edge
+mobile: True
+sensors:
+- temperature:
+    model: sdc30
+- camera:
+    model: picamera-v2
+    camera_type: rgb
+    framerate: 20
+    supported_resolutions:
+      - 1024x768
+      - 4056x3040
+environment:
+  node_type: native
+  os: ubuntu # Just for demonstration purposes.
+  container_runtime: 
+    - containerd
+hardware:
+  cpu:
+    architecture: arm64
+    frequency:
+      - 14000
+      - 17000
+    performance_indicator: 70 # BogoMIPS
+  gpu:
+    model: k80
+    memory: 3 # GB
+    performance_indicator: 330 # BogoMIPS
+  memory: 4
+  disk: "120"

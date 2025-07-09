@@ -1,0 +1,33 @@
+apiVersion: mlsysops.eu/v1
+kind: MLSysOpsNode
+metadata:
+  name: node-3
+  namespace: mlsysops
+cluster_id: uth-prod-cluster
+continuum_layer: edge
+mobile: True
+sensors:
+- camera:
+    model: d455
+    camera_type: rgb
+    framerate: 20
+    supported_resolutions:
+      - 1024x768
+      - 4056x3040
+environment:
+  node_type: virtualized
+  os: ubuntu
+  container_runtime: 
+    - containerd
+hardware:
+  cpu:
+    architecture: amd64
+    frequency:
+      - 14000
+      - 17000
+    performance_indicator: 70 # BogoMIPS
+  memory: 4
+  gpu:
+    memory: 8
+    performance_indicator: 320 # BogoMIPS
+  disk: "120"

@@ -1,0 +1,159 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: mlsysopsnodes.mlsysops.eu
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: mlsysops.eu
+  scope: Namespaced #Cluster
+  names:
+    plural: mlsysopsnodes
+    singular: mlsysopsnode
+    kind: MLSysOpsNode
+    shortNames:
+      - mlsnode
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            name:
+              type: string
+              description: The name of the node.
+            labels:
+              type: array
+              items:
+                type: string
+              description: The required labels for filtering.
+            continuum_layer:
+              type: string
+              enum:
+                - cloud
+                - edge_infrastructure
+                - edge
+                - far_edge
+            cluster_id:
+              type: string
+              description: The unique cluster identifier that the node resides.
+            mobile:
+              type: boolean
+              description: Specify if the node is mobile or stationary.
+            location:
+              type: array
+              description:
+                This is used for fixed nodes. We assume that mobile node's
+                location is telemetry data which is not captured via these descriptions.
+                We can also assume that for mobile nodes this refers to base station's coordinates (lon, lat).
+              items:
+                type: number
+            sensors:
+              type: array
+              description: Available sensors on a node are presented as services provided by MLSysOps.
+              items:
+                type: object
+                properties:
+                  camera:
+                    type: object
+                    properties:
+                      model:
+                        type: string
+                        enum:
+                          - imx415
+                          - imx219
+                          - d455
+                          - imx477
+                          - picamera-v2
+                        description: The model name of the camera sensor.
+                      camera_type:
+                        type: string
+                        description: The camera sensor type.
+                      framerate:
+                        type: integer
+                      supported_resolutions:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            - 1024x768
+                            - 4056x3040
+                  temperature:
+                    type: object
+                    properties:
+                      model:
+                        type: string
+                        enum:
+                          - sdc30
+                          - ds18b20
+                        description: The model name of the temperature sensor
+            environment:
+              type: object
+              properties:
+                node_type:
+                  type: string
+                  enum:
+                    - virtualized # In the form of a Virtual Machine
+                    - native # Non-virtualized, including OS
+                    - bare_metal # Non-virtualized, without OS
+                os:
+                  type: string
+                  enum:
+                    - ubuntu
+                    - kali
+                    - zephyr
+                container_runtime:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - containerd
+                      - docker
+                      - emb_serve
+            hardware:
+              type: object
+              properties:
+                cpu:
+                  type: object
+                  properties:
+                    model:
+                      type: string
+                      description: CPU model name.
+                    architecture:
+                      type: string
+                      enum:
+                        - amd64
+                        - arm64
+                    frequency:
+                      type: array
+                      description: All the possible CPU frequency values in Hz.
+                      items:
+                        type: number
+                    performance_indicator:
+                      type: number
+                      description: Quantifies the processing capabilities of the platform.
+                memory:
+                  type: integer
+                  description: Memory size (in GB).
+                disk:
+                  type: string
+                  description: Disk space in GB (local storage).
+                gpu:
+                  type: object
+                  properties:
+                    model:
+                      type: string
+                      enum:
+                        - k80
+                        - k40
+                    memory:
+                      type: string
+                    performance_indicator:
+                      type: number
+                      description: Quantifies the processing capabilities of the platform.
+          required:
+            - continuum_layer
+            - environment
+            - hardware

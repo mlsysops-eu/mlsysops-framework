@@ -1219,22 +1219,7 @@ class FluidityAppController():
 
 async def main(inbound_queue=None, outbound_queue=None, cluster_description=None):
     """Main Controller loop."""
-    # Configure logging
-    # USE MLSYSOPS LOGGER
-
-    # logger = logging.getLogger('')
-    # formatter = logging.Formatter('%(asctime)s %(levelname)s '
-    #                               '[%(filename)s] %(message)s ')
-    # f_hdlr = logging.FileHandler('/var/tmp/cluster_agent_fluidity_mlsysops.log')
-    # f_hdlr.setFormatter(formatter)
-    # f_hdlr.setLevel(logging.INFO)
-    # logger.addHandler(f_hdlr)
-    # s_hdlr = logging.StreamHandler(sys.stdout)
-    # s_hdlr.setFormatter(formatter)
-    # s_hdlr.setLevel(logging.INFO)
-    # logger.addHandler(s_hdlr)
-    # logger.setLevel(logging.INFO)
-
+    
     await kubernetes_asyncio.config.load_config()
 
     # Detect if controller is run within a Pod or outside
