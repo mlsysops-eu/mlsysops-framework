@@ -4,4 +4,7 @@ metadata:
   name: uth-prod-cluster
 name: uth-prod-cluster
 cluster_id: uth-prod-cluster
-nodes: ["node-1", "csl-rpi5-1", "csl-jetson1", "csl-vader"]
+nodes:
+  - node-1
+  - node-2
+  - node-3

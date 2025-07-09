@@ -135,7 +135,7 @@ spec:
                       type: number
                       description: Quantifies the processing capabilities of the platform.
                 memory:
-                  type: integer
+                  type: string
                   description: Memory size (in GB).
                 disk:
                   type: string

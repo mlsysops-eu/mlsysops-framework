@@ -23,8 +23,8 @@ MLSysOpsNode:
         - 14000
         - 17000
       performance_indicator: 70 # BogoMIPS
-    memory: 4
+    memory: "4"
     gpu:
-      memory: 8
+      memory: "8"
       performance_indicator: 320 # BogoMIPS
     disk: "120"

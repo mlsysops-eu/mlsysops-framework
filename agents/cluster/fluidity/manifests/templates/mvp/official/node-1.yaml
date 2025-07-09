@@ -27,7 +27,7 @@ MLSysOpsNode:
       performance_indicator: 70 # BogoMIPS
     gpu:
       model: k80
-      memory: 3 # GB
+      memory: "3" # GB
       performance_indicator: 330 # BogoMIPS
-    memory: 4
+    memory: "4"
     disk: "120"
