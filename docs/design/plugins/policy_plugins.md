@@ -3,23 +3,33 @@
 Policy plugins are the components responsible for determining if a new adaptation is required and generating new
 configuration plans. They follow the MAPE paradigm, specifically implementing the Analyze and Plan tasks. A policy
 plugin is implemented as a Python module, which may import and use any external libraries, and must define three
-specific methods: (i) initialize, (ii) analyze, and (iii) plan. Each method requires specific arguments and must return
+specific functions: (i) initialize, (ii) analyze (async), and (iii) plan (async). Each method requires specific arguments and must return
 defined outputs. Each method accepts a common argument, context, which can be used to maintain state between different
 method calls, as well as across consecutive invocations of the policy plugin. Policy plugins can be bound to a node or
 multiple applications; however, they need to decide on at least one mechanism.
+
+**Important notes:**
+* Each policy filename must start with the prefix `policy-`.
+
+* The role of `context` structure is to be used across different policy function executions
+and store useful data. It is up to the policy developer to configure this as needed. One 
+can also use `initialize()`. In the following examples we use a dictionary as context.
+* The `new_plan` dictionary must be comprised of the component names as keys,
+and as values the desired list of actions for this component.
+
 
 The methods are described as follows:
 
 **initialize**: This method contains the initialization configuration required by the agent. It is called during the
 plugin
-loading phase, and it must return the common context dictionary with specific values. An example is shown in Figure 35,
+loading phase, and it must return the context dictionary with specific values. An example is shown in Figure 35,
 where the policy declares the telemetry configuration it requires, the mechanisms it will analyze and manage, any custom
 Python packages needed by the script, and any additional agent configuration parameters. An important parameter is to
 declare if this policy will make use of machine learning - this enables the usage of the ML Connector interface and
 accordingly configures the mechanism that enables/disables machine learning usage in the framework.
 
 ```python
-def initialize(context):
+def initialize():
     context = {
         # The required values
         "telemetry": {
@@ -52,10 +62,11 @@ specified target. The analyze method can also make use of the ML Connector inter
 models deployed from that service.
 
 ```python
-def analyze(context, application_description, system_description, current_plan, telemetry, ml_connector):
-    # policy that checks if application target is achieved
+async def analyze(context, application_descriptions, system_description, mechanisms, telemetry, ml_connector):
+    application = application_descriptions[0]
 
-    if telemetry['data']['application_metric'] > application_description['targets']['application_metric']:
+    # policy that checks if application target is achieved
+    if telemetry['data']['application_metric'] > application['targets']['application_metric']:
         return True, context  # It did not achieve the target - a new plan is needed      
 
     return False, context
@@ -64,17 +75,18 @@ def analyze(context, application_description, system_description, current_plan, 
 **Figure X. Analyze method example**
 
 **plan**: This method decides if a new plan is needed, and if it is positive, generates a new configuration plan based
-on all available information in the system, including application and system descriptions, telemetry data, the current
-plan, and available assets. It may also leverage the ML Connector interface to invoke machine learning models. In the
+on all available information in the system, including application and system descriptions, telemetry data.
+It may also leverage either internal logic/libraries or the ML Connector interface to invoke machine learning models. In the
 example shown in Figure X, the plan method creates a new configuration for the CPU frequency of the node on which it
 runs. If the application target is not met, the method sets the CPU to the maximum available frequency; otherwise, it
 sets it to the minimum. The configuration values used in the plan are predefined and known to the policy developer,
 based on the specifications of the corresponding mechanism plugin (see Section 2.4.2 for examples).
 
 ```python
-def plan(context, application_description, system_description, current_plan, telemetry, ml_connector
-         , available_assets):
-    if telemetry['data']['application_metric'] > application_description['targets']['application_metric']:
+async def plan(context, application_descriptions, system_description, mechanisms, telemetry, ml_connector):
+    application = application_descriptions[0]
+
+    if telemetry['data']['application_metric'] > application['targets']['application_metric']:
         cpu_frequency_command = {
             "command": "set",
             "cpu": "all",
@@ -87,26 +99,23 @@ def plan(context, application_description, system_description, current_plan, tel
             "frequency": "min"
         }
 
-    if new_plan != current_plan:
-        new_plan = {
-            "CPUFrequency": cpu_frequency_command
-        }
-        return new_plan, context
+    new_plan = {
+        "CPUFrequency": cpu_frequency_command
+    }
 
-    return current_plan, context
+    return new_plan, context
 ```
 
 **Figure X. Plan method example**
 
-For both the `analyze` and `plan` methods, the arguments are as follows *(subject to change, and actual values are
-documented at the opensource documentation - see Section Y (os))*:
-
-- **application\_descriptions**: A dictionary or a list of dictionaries containing values from the submitted
+For both the `analyze` and `plan` methods, the arguments are as follows:
+- **context**: Custom user-defined structure.
+- **application\_descriptions**: A list of dictionaries containing values from the submitted
   applications in the system (see Section X).
 - **system\_description**: A dictionary containing system information provided by the system administrator (see Section
   X).
-- **current\_plan**: The currently active plan for this policy. Since a previously generated plan may have failed, this
-  argument allows the policy plugin to handle such scenarios appropriately.
+- **mechanisms**: A list of the available mechanisms that the policy can exploit. E.g., fluidity for app deployment, adaptation
+ and monitoring at the cluster-level, and CPU-freq at the node level.
 - **telemetry**: A dictionary containing telemetry data from both the system and the applications.
 - **ml\_connector**: An object handler providing access to the ML Connector service endpoint within the slice. This
   argument is empty if the ML Connector service is not available \[\*\]\[see documentation\].
@@ -118,3 +127,5 @@ of machine learning model usage for each plugin enables MLSysOps to track where 
 employed, monitor their performance, and disable plugins that utilize AI tools if requested. The plug-and-play support
 further allows for the dynamic modification of configuration logic, enabling agents to adapt to varying operational
 scenarios.
+
+Also refer to [policy examples](../../user-guide/policy-implementation.md) for indicative policy implementations.

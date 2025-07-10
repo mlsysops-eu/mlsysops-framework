@@ -6,13 +6,6 @@ import inspect
 
 from mlsysops.logger_util import logger
 
-def get_curr_container_img(comp_name, context):
-    for comp in context['spec']['components']:
-        if comp_name != comp['metadata']['name']:
-            continue
-        container = comp.get("containers")[0]['image']
-        return container
-
 def initialize():
     print(f"Initializing policy {inspect.stack()[1].filename}")
 
