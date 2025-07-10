@@ -45,7 +45,6 @@ def parse_analyze_interval(interval: str) -> int:
 
 
 spec_changes = cycle([
-    {'runtime_class_name': cycle(['crun', 'nvidia'])},
     {'image': cycle(['harbor.nbfc.io/mlsysops/test-app:sha-90e0077', 'harbor.nbfc.io/mlsysops/test-app:latest'])},
     {'platform_requirements': {
             'cpu': { 
