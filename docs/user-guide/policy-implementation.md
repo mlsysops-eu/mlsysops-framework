@@ -353,9 +353,13 @@ async def plan(context, application_description, system_description, mechanisms,
     cpu_suffix = 'm'
     mem_suffix = 'Mi'
 
+    # Get the first component just for demo purposes
     component = application['spec']['components'][0]
     comp_name = component['metadata']['name']
     logger.info(f'component spec {component}')
+
+    # If the component has fixed node placement requirement find the host
+    # else select the first node
     if 'node_placement' in component and 'node' in component['node_placement']:
         node = component['node_placement']['node']
         logger.info(f'Found static placement on {node} for comp {comp_name}')
@@ -372,9 +376,11 @@ async def plan(context, application_description, system_description, mechanisms,
             for container in component['containers']:
 
                 if key == 'image':
+                    # Find the next image to be used and continue
                     container[key] = next(curr_change[key])
                     continue
-
+                
+                # Set random cpu/mem requirements for the component
                 request_cpu = str(random.randint(0, 300))
                 limit_cpu = str(random.randint(301, 400))
 
@@ -404,7 +410,7 @@ async def plan(context, application_description, system_description, mechanisms,
         plan_result['deployment_plan'][comp_name].append({'action': 'change_spec', 'new_spec': component, 'host': node})
         logger.info(f"Applying change type {key} to comp {comp_name}, new spec is {component}")
    
-
+    # If there is a produced plan, extend the plan accordingly with the application name and initial_plan flag
     if plan_result:
         plan_result['name'] = application['name']
         # This policy will only take effect after initial deployment is done.
