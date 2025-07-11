@@ -14,8 +14,7 @@ multiple applications; however, they need to decide on at least one mechanism.
 * The role of `context` structure is to be used across different policy function executions
 and store useful data. It is up to the policy developer to configure this as needed. One 
 can also use `initialize()`. In the following examples we use a dictionary as context.
-* The `new_plan` dictionary must be comprised of the component names as keys,
-and as values the desired list of actions for this component.
+
 
 
 The methods are described as follows:
