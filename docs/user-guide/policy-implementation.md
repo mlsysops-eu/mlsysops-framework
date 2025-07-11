@@ -350,8 +350,9 @@ async def plan(context, application_description, system_description, mechanisms,
     description_changed = False
     change_idx = cycle([0, 1, 2])
     curr_change = next(spec_changes)
-    
-    #logger.info(f'Curr change is {curr_change}')
+    cpu_suffix = 'm'
+    mem_suffix = 'Mi'
+
     component = application['spec']['components'][0]
     comp_name = component['metadata']['name']
     logger.info(f'component spec {component}')
@@ -365,9 +366,6 @@ async def plan(context, application_description, system_description, mechanisms,
     plan_result['deployment_plan'][comp_name] = []
     
     for key in curr_change:
-        logger.info(f"key is {key}")
-        # logger.info(f"curr_change[key] is {curr_change[key]}")
-        # logger.info(f"next(curr_change[key]) is {next(curr_change[key])}")
         if key == 'runtime_class_name': 
             component[key] = next(curr_change[key])
         else:
@@ -379,11 +377,10 @@ async def plan(context, application_description, system_description, mechanisms,
 
                 request_cpu = str(random.randint(0, 300))
                 limit_cpu = str(random.randint(301, 400))
-                cpu_suffix = 'm'
 
                 request_mem = str(random.randint(0, 300))
                 limit_mem = str(random.randint(301, 400))
-                mem_suffix = 'Mi'
+                
                 logger.info(f'request_cpu+cpu_suffix {request_cpu+cpu_suffix}')
 
                 if key not in container or 'cpu' not in container[key] or 'memory' not in container[key]:
