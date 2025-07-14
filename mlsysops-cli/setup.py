@@ -24,6 +24,11 @@ setup(
     package_data={
         "mlsysops_cli": ["templates/*.j2","deployment/*/*.yaml"],
     },
+    entry_points={
+        "console_scripts": [
+            "mls = mlsysops_cli.cli:cli",
+        ],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
