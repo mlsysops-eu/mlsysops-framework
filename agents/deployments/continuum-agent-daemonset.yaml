@@ -23,7 +23,7 @@ spec:
           image: harbor.nbfc.io/mlsysops/continuum-agent
           env:
             - name: KARMADA_API_KUBECONFIG
-              value: /etc/kubeconfigs/mls-test-karmada.kubeconfig
+              value: {{ KARMADA_API_KUBECONFIG }}
             - name: REDIS_HOST
               value: {{ KARMADA_HOST_IP }}
             - name: REDIS_PORT

@@ -36,7 +36,7 @@ components:
     relation: lower_or_equal
     system_metrics_hints: [cpu_frequency]
     target: 20.0
-  restart_policy: on_failure
+  restart_policy: OnFailure
   sensors:
   - camera: {camera_type: rgb, minimum_framerate: 20, model: d455, resolution: 1024x768}
     endpoint_variable: CAMERA_ENDPOINT
@@ -72,7 +72,7 @@ components:
     labels: ["'node-type:rpi'"]
   qos_metrics:
   - {application_metric_id: metric-2, relation: equal, target: 30.0}
-  restart_policy: on_failure
+  restart_policy: OnFailure 
   sensors:
   - endpoint_variable: TEMPERATURE_ENDPOINT
     instances: 1.0

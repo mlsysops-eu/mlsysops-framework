@@ -598,7 +598,7 @@ def deploy_continuum_agents(path, inventory_path):
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("continuum-agent-daemonset.yaml")
-    for r in parse_yaml_from_file(daemonset_path):
+    for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
         client_k8s.create_or_update(r)
 
 def deploy_cluster_agents(path, inventory_path):
@@ -675,7 +675,7 @@ def deploy_node_agents(path, inventory_path):
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("node-agents-daemonset.yaml")
-    for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
+    for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP"), "REDIS_HOST": os.getenv("KARMADA_HOST_IP")}):
         client_karmada.create_or_update(r)
 
 def _apply_namespace_and_rbac(client_instance):
