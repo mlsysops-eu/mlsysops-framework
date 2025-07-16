@@ -55,23 +55,6 @@ def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list 
 
     return sorted_resources
 
-def apply_kubeconfig(config_path, file_to_apply):
-    try:
-        # Construct the kubectl command
-        command = ["/usr/local/bin/kubectl", "apply", "-f", file_to_apply]
-        env = {"KUBECONFIG": config_path}
-
-        # Execute the command
-        result = subprocess.run(command, env=env, check=True, text=True, capture_output=True)
-
-        # Print the output of the command
-        print("Command succeeded. Output:")
-        print(result.stdout)
-    except subprocess.CalledProcessError as e:
-        print("Command failed. Error:")
-        print(e.stderr)
-
-
 def get_method(kind, operation):
     """
     Retrieves the method corresponding to a Kubernetes resource kind and operation. This function maps a
@@ -509,54 +492,30 @@ def run_deploy_all(path, inventory_path):
     except Exception as e:
         print(f"❌ Error in deploy_all: {e}")
         raise
-    # Create Karmada objects - load the client with the Karmada host kubeconfig
-    kubernetes_client = KubernetesLibrary("apps", "v1",
-                                          kubeconfig=os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
-                                          context="karmada-host")
-
-    # Create or update the namespace, RBAC, and service account for the MLSAgent
-    namespace_resources = kubernetes_client.parse_yaml("namespace.yaml")
-    for resource in namespace_resources:
-        kubernetes_client.create_or_update(resource)
-    #
-    rbac_resources = kubernetes_client.parse_yaml("mlsysops-rbac.yaml")
-    for resource in rbac_resources:
-        kubernetes_client.create_or_update(resource)
 
 def deploy_core_services():
     print("🔧 Deploying core services (ejabberd, redis, API service)...")
-    _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_HOST_KUBECONFIG")
-    client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_HOST_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
+    _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
+    client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
+                                   context="karmada-host")
     _apply_namespace_and_rbac(client_k8s)
 
-    # Ruta al archivo xmpp/deployment.yaml
-    xmpp_path = files(deployment).joinpath("xmpp/deployment.yaml")
+    xmpp_path = files(deployment).joinpath("ejabberd-deployment.yaml")
     for r in parse_yaml_from_file(xmpp_path, {"POD_IP": os.getenv("KARMADA_HOST_IP")}):
         client_k8s.create_or_update(r)
 
-    # Ruta al archivo api-service-deployment.yaml
     api_path = files(deployment).joinpath("api-service-deployment.yaml")
     for r in parse_yaml_from_file(api_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
         client_k8s.create_or_update(r)
 
-    # Ruta al archivo redis-stack-deployment.yaml
     redis_path = files(deployment).joinpath("redis-stack-deployment.yaml")
     for r in parse_yaml_from_file(redis_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
         client_k8s.create_or_update(r)
-    # Load continuum agent configmaps
-    kubernetes_client.create_configmap_from_file("descriptions/continuum",
-                                                 "mlsysops-framework",
-                                                 "continuum-system-description")
-
-    kubernetes_client.create_configmap_from_file("descriptions/continuum",
-                                                 "mlsysops-framework",
-                                                 "continuum-karmadapi-config",
-                                                 suffixes=["*.kubeconfig"])
 
 def deploy_continuum_agents(path, inventory_path):
     print("🧠 Deploying Continuum Agent...")
-    _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_HOST_KUBECONFIG")
-    client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_HOST_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
+    _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
+    client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"), context="karmada-host")
     _apply_namespace_and_rbac(client_k8s)
 
     descriptions_path = os.getenv("CONTINUUM_SYSTEM_DESCRIPTIONS_PATH", "descriptions")
@@ -572,18 +531,15 @@ def deploy_continuum_agents(path, inventory_path):
         if not os.path.exists(descriptions_path):
             os.makedirs(descriptions_path)
 
-
         create_continuum_yaml(inventory_path, descriptions_path)
 
     # ConfigMap descriptions
     client_k8s.create_configmap_from_file(descriptions_path, "mlsysops-framework", "continuum-system-description")
-    ## Cluster agent deployment
-    karmada_api_client = KubernetesLibrary("apps", "v1",
-                                          kubeconfig=os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
-                                          context="karmada-apiserver")
 
     kubeconfig_path = files(deployment).joinpath("descriptions/continuum")
-    client_k8s.create_configmap_from_file(kubeconfig_path, "mlsysops-framework", "continuum-karmadapi-config", suffixes=["*.kubeconfig"])
+    print("---------------------- ")
+    client_k8s.create_configmap_from_file(kubeconfig_path, "mlsysops-framework", "continuum-karmadapi-config",
+                                          suffixes=["*.kubeconfig"])
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("continuum-agent-daemonset.yaml")
@@ -592,8 +548,9 @@ def deploy_continuum_agents(path, inventory_path):
 
 def deploy_cluster_agents(path, inventory_path):
     print("🏢 Deploying Cluster Agents...")
-    _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_API_KUBECONFIG")
-    client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_API_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
+    _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
+    client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
+                                       context="karmada-apiserver")
     _apply_namespace_and_rbac(client_karmada)
     client_karmada.apply_mlsysops_propagation_policies()
 
@@ -630,8 +587,9 @@ def deploy_cluster_agents(path, inventory_path):
 
 def deploy_node_agents(path, inventory_path):
     print("🧱 Deploying Node Agents...")
-    _check_required_env_vars("KARMADA_HOST_IP", "KARMADA_API_KUBECONFIG")
-    client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KARMADA_API_KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"))
+    _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
+    client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
+                                       ,context="karmada-apiserver")
 
     descriptions_path = os.getenv("NODE_SYSTEM_DESCRIPTIONS_PATH","descriptions")
     if path:
@@ -675,9 +633,3 @@ def _apply_namespace_and_rbac(client_instance):
     rbac_path = files(deployment).joinpath("mlsysops-rbac.yaml")
     for r in parse_yaml_from_file(rbac_path):
         client_instance.create_or_update(r)
-    ## Node agents deployment
-    karmada_api_client.create_configmap_from_file("descriptions/nodes", "mlsysops-framework", "node-system-descriptions")
-    node_agents_resources = karmada_api_client.parse_yaml("node-agents-daemonset.yaml",
-                                                           {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")})
-    for resource in node_agents_resources:
-        karmada_api_client.create_or_update(resource)

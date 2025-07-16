@@ -20,12 +20,12 @@ spec:
       containers:
         - name: continuum-agent
           imagePullPolicy: IfNotPresent
-          image: registry.mlsysops.eu/agent/agents/continuum:0.0.25
+          image: harbor.nbfc.io/mlsysops/continuum-agent
           env:
             - name: KARMADA_API_KUBECONFIG
               value: /etc/kubeconfigs/mls-test-karmada.kubeconfig
             - name: REDIS_HOST
-              value: 172.25.27.72
+              value: {{ KARMADA_HOST_IP }}
             - name: REDIS_PORT
               value: "6379"
             - name: NODE_NAME

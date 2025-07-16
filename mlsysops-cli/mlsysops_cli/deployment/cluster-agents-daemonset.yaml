@@ -15,7 +15,7 @@ spec:
     spec:
       serviceAccountName: mlsysops-agents-sa
       nodeSelector:
-        mlsysops/continuumLayer: "cluster"
+        mlsysops.eu/continuumLayer: "cluster"
       containers:
         - name: cluster-agent
           image: harbor.nbfc.io/mlsysops/cluster-agent

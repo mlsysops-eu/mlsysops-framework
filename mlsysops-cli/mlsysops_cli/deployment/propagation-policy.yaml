@@ -24,5 +24,7 @@ spec:
   placement:
     clusterAffinity:
       clusterNames:
-        - mls02
+        {% for cluster in cluster_names %}
+        - {{ cluster }}
+        {% endfor %}
 

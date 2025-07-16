@@ -16,7 +16,7 @@ spec:
     spec:
       # Use nodeSelector to target nodes with mlsysops/continuumLayer=node
       nodeSelector:
-        mlsysops/continuumLayer: "node"
+        mlsysops.eu/continuumLayer: "node"
       containers:
         - name: node-agent
           image: harbor.nbfc.io/mlsysops/node-agent

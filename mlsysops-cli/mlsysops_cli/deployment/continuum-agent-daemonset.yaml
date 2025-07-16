@@ -16,7 +16,7 @@ spec:
       serviceAccountName: mlsysops-agents-sa
       # Use nodeSelector to target nodes with mlsysops/continuumLayer=continuum
       nodeSelector:
-        mlsysops/continuumLayer: "continuum"
+        mlsysops.eu/continuumLayer: "continuum"
       containers:
         - name: continuum-agent
           imagePullPolicy: Always
@@ -25,7 +25,7 @@ spec:
             - name: KARMADA_API_KUBECONFIG
               value: /etc/kubeconfigs/mls-test-karmada.kubeconfig
             - name: REDIS_HOST
-              value: 172.25.27.72
+              value: {{ KARMADA_HOST_IP }}
             - name: REDIS_PORT
               value: "6379"
             - name: NODE_NAME
