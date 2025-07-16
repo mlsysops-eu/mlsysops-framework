@@ -31,6 +31,7 @@ kubeconfigs = [
     os.getenv("UTH_PROD_KUBECONFIG", "/root/.kube/uth-prod.kubeconfig"),
 ]
 
+
 # Define Pydantic Model for Validation using v2 syntax
 class ComponentModel(BaseModel):
     Component: Dict[str, Any]
@@ -39,18 +40,21 @@ class ComponentModel(BaseModel):
     restartPolicy: Optional[str] = None
     containers: Optional[Annotated[List[Dict[str, Any]], Field(min_items=1)]] = None
 
+
 class MLSysOpsApplicationModel(BaseModel):
     name: str = Field(..., title="Application Name")
     mlsysops_id: str = Field(..., alias="mlsysops-id", title="MLSysOps ID")
     clusterPlacement: Optional[Dict[str, Any]] = None
     components: Annotated[List[ComponentModel], Field(min_items=1)]
 
+
 class RootModel(BaseModel):
     MLSysOpsApplication: MLSysOpsApplicationModel
 
 
 class RootModel(BaseModel):
     MLSysOpsApplication: MLSysOpsApplicationModel
+
 
 def get_pods_from_kubeconfigs():
     """
@@ -153,6 +157,7 @@ def get_yaml_info(data):
         print(f"Error processing the data: {e}")
         return None, []
 
+
 def remove_none_fields(data):
     if isinstance(data, dict):
         return {
@@ -164,6 +169,8 @@ def remove_none_fields(data):
         return [remove_none_fields(item) for item in data if item is not None]
     else:
         return data
+
+
 def validate_yaml(json_data):
     try:
         validate(instance=json_data, schema=schema)
@@ -172,9 +179,6 @@ def validate_yaml(json_data):
         return e.message
     except Exception as e:
         return str(e)
-
-
-
 
 
 router = APIRouter()
@@ -190,15 +194,14 @@ last_connection_time = None
 "            DEPLOY ML MODEL                                                              "
 "----------------------------------------------------------------------------------------"
 
+
 @router.post("/deploy_ml", tags=["ML-models"])
 async def deploy_ml(payload: RootModel):
     # Convert Pydantic object to dict
 
     parsed_data = payload.dict(by_alias=True)
+    parsed_data = remove_none_fields(parsed_data)
 
-    
-    parsed_data=remove_none_fields(parsed_data)
-    
     # Validate YAML structure
     validation_error = validate_yaml(parsed_data)
 
@@ -208,24 +211,22 @@ async def deploy_ml(payload: RootModel):
         print("The mlsysops-id is not specified in the model description")
 
     if validation_error is None and internal_uid != "0":
-        if r.value_in_hash("endpoint_hash", internal_uid):
-            raise HTTPException(status_code=400,
-                                detail="Error: app_id already exists in the system")
-        else:
-            try:
-                r.push("ml_deployment_queue", json.dumps(parsed_data))
-                timestamp = datetime.now()
-                info = {
-                    'status': 'pending',
-                    'timestamp': str(timestamp)
-                }
-                r.update_dict_value('endpoint_hash', internal_uid, str(info))
-                return {"status": "success", "message": "Deployment request added to queue"}
-            except Exception as e:
-                print(f"Error checking the app in Redis: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+
+        try:
+            r.push("ml_deployment_queue", json.dumps(parsed_data))
+            timestamp = datetime.now()
+            info = {
+                'status': 'pending',
+                'timestamp': str(timestamp)
+            }
+            r.update_dict_value('endpoint_hash', internal_uid, str(info))
+            return {"status": "success", "message": "Deployment request added to queue"}
+        except Exception as e:
+            print(f"Error checking the app in Redis: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
     else:
         raise HTTPException(status_code=400, detail=validation_error)
+
 
 "----------------------------------------------------------------------------------------"
 "            LIST ALL APPS                                                              "
@@ -305,7 +306,7 @@ async def remove_ml_model(model_uid: str):
 
         # If the app_id exists, update the status to 'removed'
         r.update_dict_value('endpoint_hash', model_uid, "To_be_removed")
-        delete_msg = str({model_uid:"delete"})
+        delete_msg = str({model_uid: "delete"})
         r.push("ml_deployment_queue", delete_msg)
         return {"model_uid": model_uid, "message": "Application status updated to 'To_be_removed'."}
 

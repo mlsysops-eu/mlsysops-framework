@@ -9,7 +9,7 @@ MLSysOpsApp:
         uid: server-app-v1
       node_placement:
         node: mls04
-      restart_policy: OnFailure
+      restart_policy: on_failure
       containers:
         - image: harbor.nbfc.io/mlsysops/test-app:latest
           image_pull_policy: IfNotPresent

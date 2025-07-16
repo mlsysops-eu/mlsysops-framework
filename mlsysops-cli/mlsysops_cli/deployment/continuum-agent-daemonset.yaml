@@ -17,13 +17,17 @@ spec:
       # Use nodeSelector to target nodes with mlsysops/continuumLayer=continuum
       nodeSelector:
         mlsysops.eu/continuumLayer: "continuum"
+      initContainers:
+        - name: delay-startup
+          image: busybox
+          command: ["sh", "-c", "echo 'Waiting...' && sleep 10"]
       containers:
         - name: continuum-agent
           imagePullPolicy: Always
           image: harbor.nbfc.io/mlsysops/continuum-agent
           env:
             - name: KARMADA_API_KUBECONFIG
-              value: /etc/kubeconfigs/karmada.kubeconfig
+              value: /etc/kubeconfigs/karmada-api.kubeconfig
             - name: REDIS_HOST
               value: {{ KARMADA_HOST_IP }}
             - name: REDIS_PORT

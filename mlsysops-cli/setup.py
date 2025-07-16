@@ -22,7 +22,7 @@ setup(
           "jinja2>=3.1"
     ],
     package_data={
-        "mlsysops_cli": ["templates/*.j2","deployment/*/*.yaml"],
+        "mlsysops_cli": ["templates/*.j2","deployment/*.yaml"],
     },
     entry_points={
         "console_scripts": [
