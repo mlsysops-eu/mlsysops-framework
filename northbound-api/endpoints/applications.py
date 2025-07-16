@@ -24,7 +24,6 @@ os.environ["TELEMETRY_ENDPOINT"] = "172.25.27.4:4317"
 karmada_api_kubeconfig = "/home/runner/karmada_management/karmada-api.kubeconfig"
 uth_dev_kubeconfig = "/home/runner/karmada_management/uth-dev.kubeconfig"
 uth_prod_kubeconfig = "/home/runner/karmada_management/uth-prod.kubeconfig"
-
 # List of kubeconfig files to check
 kubeconfigs = [
     os.getenv("KARMADA_KUBECONFIG", "/root/.kube/karmada-api.kubeconfig"),
@@ -212,10 +211,17 @@ async def check_deployment_status(comp_name,app_id):
         logger.error(f"Failed to load Karmada kubeconfig: {e}")
         return
 
-    pod_name, host, app_id = get_pod_info(comp_name, app_id, api_client)
+    while True:
+        pod_name, host, app_id = get_pod_info(comp_name, app_id, api_client)
 
+        if not pod_name:
+            logger.debug(f"Failed to find running pod for comp_name: {comp_name}, retrying in 5 seconds...")
+            await asyncio.sleep(5)
+        else:
+            logger.debug(f"Found pod: {pod_name} running on host: {host}")
+            break
 
-    svc_path = f"/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/mlsysops/services/{comp_name}"
+    svc_path = f"/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/default/services/{comp_name}"
     logger.debug(f"Fetching service details from Karmada proxy API: {svc_path}")
     try:
         response = api_client.call_api(
@@ -249,7 +255,7 @@ async def check_deployment_status(comp_name,app_id):
         if global_endpoint_port and node_ip:
             info["global_endpoint"] = f"{node_ip}:{global_endpoint_port}"
 
-
+        logger.debug(f"Pushing endpoint details to Redis: {info}")
 
     await asyncio.sleep(2)
 
