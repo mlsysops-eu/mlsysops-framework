@@ -69,6 +69,6 @@ spec:
     app: redis-stack
   ports:
     - protocol: TCP
-      port: 6379 # Service port
-      targetPort: 6379 # Container port
-  type: ClusterIP # Change to `NodePort` or `LoadBalancer` if external access is required
+      port: 6379
+      targetPort: 6379
+  type: NodePort

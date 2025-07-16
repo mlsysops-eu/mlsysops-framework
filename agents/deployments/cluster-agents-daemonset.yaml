@@ -18,7 +18,7 @@ spec:
         mlsysops.eu/continuumLayer: "cluster"
       containers:
         - name: cluster-agent
-          image: registry.mlsysops.eu/agent/agents/cluster:0.0.25
+          image:  harbor.nbfc.io/mlsysops/cluster-agent
           imagePullPolicy: Always
           env:
             - name: NODE_NAME

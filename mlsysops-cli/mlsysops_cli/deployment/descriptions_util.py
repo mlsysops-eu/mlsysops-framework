@@ -191,34 +191,3 @@ def create_continuum_yaml(input_file, descriptions_path=""):
     with open(continuum_yaml_filename, 'w') as output_file:
         output_file.write(continuum_yaml_content)
     print(f"Continuum YAML written to {continuum_yaml_filename}")
-
-
-def main():
-    input_file = "inventory.yaml"
-
-    with open(input_file, 'r') as file:
-        inventory = yaml.safe_load(file)
-
-    for cluster_name in inventory['all']['children']:
-        try:
-            print(f"Processing cluster: {cluster_name}")
-            create_cluster_yaml(input_file, cluster_name)
-            create_worker_node_yaml(input_file, cluster_name)
-        except ValueError as e:
-            print(f"Skipping cluster '{cluster_name}': {e}")
-
-    # Generate application-level YAML
-    try:
-        create_app_yaml(input_file)
-    except ValueError as e:
-        print(f"Skipping application YAML generation: {e}")
-
-    # Generate continuum-level YAML
-    try:
-        create_continuum_yaml(input_file)
-    except ValueError as e:
-        print(f"Skipping continuum YAML generation: {e}")
-
-
-if __name__ == "__main__":
-    main()
