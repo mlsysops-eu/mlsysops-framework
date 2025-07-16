@@ -21,6 +21,7 @@ spec:
           ports:
             - containerPort: 8000
               name: http-port
+              hostPort: 8000
           env:
             - name: REDIS_HOST
               value: {{ KARMADA_HOST_IP }}

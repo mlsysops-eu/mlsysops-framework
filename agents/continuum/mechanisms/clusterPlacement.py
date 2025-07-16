@@ -81,7 +81,7 @@ async def apply(plan):
 
     logger.info(f"Applying CR in Karmada: {app_id}")
 
-    karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "kubeconfigs/karmada-api.kubeconfig")
+    karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "/etc/kubeconfigs/karmada-api.kubeconfig")
 
     try:
         await kubernetes_asyncio.config.load_kube_config(config_file=karmada_api_kubeconfig)
