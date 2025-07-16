@@ -58,7 +58,8 @@ def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list 
 def get_method(kind, operation):
     """
     Retrieves the method corresponding to a Kubernetes resource kind and operation. This function maps a
-    given resource kind (e.g., 'service', 'secret', 'deployment') and an operation (e.g., 'read', 'create',
+    given resource kind (e.g., 'service', 'secret', 'deployment') and an operation (e.g., 'read', '
+    print(description_directory',
     'delete', 'replace') to the appropriate method provided by the Kubernetes Python client library.
     It ensures that only supported kinds and operations are used.
 
@@ -185,6 +186,8 @@ class KubernetesLibrary:
             config.load_kube_config(context=context)
 
         print(f"Kubernetes configuration loaded successfully")
+        self.config = config
+        self.kubeconfig = kubeconfig
         self.group = group
         self.version = version
         self.custom_objects_api = client.CustomObjectsApi()
@@ -255,18 +258,71 @@ class KubernetesLibrary:
             else:
                 print(f"Error updating Service '{name}' in namespace '{namespace}': {e}")
 
-    def create_configmap_from_file(self, descriptions_directory, namespace, name, suffixes=["*.yml", "*.yaml"]):
+    def dump_context_config(self,full_config, context_name):
+        # Validate the context exists
+        contexts = [ctx['name'] for ctx in full_config.get("contexts", [])]
+        if context_name not in contexts:
+            raise ValueError(f"Context '{context_name}' not found in kubeconfig.")
+
+        # Extract selected context
+        selected_context = next(ctx for ctx in full_config["contexts"] if ctx["name"] == context_name)
+        cluster_name = selected_context["context"]["cluster"]
+        user_name = selected_context["context"]["user"]
+
+        selected_cluster = next(c for c in full_config["clusters"] if c["name"] == cluster_name)
+        selected_user = next(u for u in full_config["users"] if u["name"] == user_name)
+
+        minimal_config = {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "preferences": {},
+            "current-context": context_name,
+            "contexts": [selected_context],
+            "clusters": [selected_cluster],
+            "users": [selected_user]
+        }
+
+        return yaml.dump(minimal_config, sort_keys=False)
+
+    def create_karmada_api_configmap(self, namespace, name):
+
+        files_data_object = {}
+
+        with open(self.kubeconfig, 'r') as f:
+            full_config = yaml.safe_load(f)
+        print(full_config)
+
+        files_data_object["karmada-api.kubeconfig"] =  self.dump_context_config(full_config,"karmada-apiserver")
+
+        config_map = client.V1ConfigMap(
+            metadata=client.V1ObjectMeta(name=name, namespace=namespace),
+            data=files_data_object
+        )
+
+        try:
+            self.core_v1_api.create_namespaced_config_map(namespace, config_map)
+            print(f"✅ Created configmap {name}")
+        except ApiException as e:
+            if e.status != 409:
+                #self.core_v1_api.delete_namespaced_config_map(name,namespace)
+                self.core_v1_api.replace_namespaced_config_map(name, namespace, config_map)
+                print(f"♻️ Updated configmap {name}")
+
+    def create_configmap_from_file(self, descriptions_directory, namespace, name, suffixes=["*.yml", "*.yaml"], key_name = ""):
         """
         Create a ConfigMap from all YAML files inside a given folder inside the package.
         """
         files_data_object = {}
         directory = Path(descriptions_directory)
+
         try:
             for suffix in suffixes:
                 for file in directory.glob(suffix):
                     print(f"Reading file: {file.name}")
                     file_data = file.read_text()
-                    files_data_object[file.name] = file_data
+                    if key_name == "":
+                        key_name = file.name
+                    files_data_object[key_name] = file_data
         except Exception as e:
             print(f"Error reading from {descriptions_directory}: {e}")
             return
@@ -536,10 +592,9 @@ def deploy_continuum_agents(path, inventory_path):
     # ConfigMap descriptions
     client_k8s.create_configmap_from_file(descriptions_path, "mlsysops-framework", "continuum-system-description")
 
-    kubeconfig_path = files(deployment).joinpath("descriptions/continuum")
-    print("---------------------- ")
-    client_k8s.create_configmap_from_file(kubeconfig_path, "mlsysops-framework", "continuum-karmadapi-config",
-                                          suffixes=["*.kubeconfig"])
+    kubeconfig_path = os.getenv("KUBECONFIG_DIR",".")
+    client_k8s.create_karmada_api_configmap("mlsysops-framework","continuum-karmadapi-config")
+
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("continuum-agent-daemonset.yaml")
