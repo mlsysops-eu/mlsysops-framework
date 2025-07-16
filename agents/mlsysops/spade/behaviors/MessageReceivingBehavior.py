@@ -109,11 +109,14 @@ class MessageReceivingBehavior(CyclicBehaviour):
                     }
                     await self.message_queue.put(payload)
                 case _:
-                    logger.debug(f"Received unknown event {event} from {sender} - forwarding to MLSAgent")
-                    payload = {
-                        "event": event,
-                        "payload": json.loads(msg.body)
-                    }
-                    await self.message_queue.put(payload)
+                    try:
+                        logger.debug(f"Received unknown event {event} from {sender} - forwarding to MLSAgent")
+                        payload = {
+                            "event": event,
+                            "payload": json.loads(msg.body)
+                        }
+                        await self.message_queue.put(payload)
+                    except Exception: 
+                        print("Exception ;-)")
         else:
             logger.debug("Did not received any message after 10 seconds")

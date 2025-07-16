@@ -25,6 +25,7 @@ class MLSNodeAgent(MLSAgent):
 
     def __init__(self):
         # Initialize base MLS agent class
+        print("In INIT OF NODE AGENT")
         super().__init__()
 
         # { 'app_name' : { "components" : [component_name] } }

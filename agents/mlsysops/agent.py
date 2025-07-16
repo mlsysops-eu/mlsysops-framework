@@ -56,11 +56,14 @@ class MLSAgent:
         # ## -------- SPADE ------------------#
         logger.debug("Initializing SPADE...")
         try:
+            logger.debug("in try...")
             self.message_queue = asyncio.Queue()
+            logger.debug("after queue...")
             self.spade_instance = MLSSpade(self.state, self.message_queue)
         except Exception as e:
             logger.error(f"Error initializing SPADE: {e}")
 
+        print("blahblahblah")
         # Telemetry
         self.telemetry_controller = TelemetryController(self)
 
@@ -183,6 +186,7 @@ class MLSAgent:
         Main process of the MLSAgent.
         """
         # Apply MLS System description
+        print("In RUN of AGENT")
         try:
             if self.state.configuration.continuum_layer == 'cluster':
                 logger.debug(f"Applying system description")
@@ -206,6 +210,7 @@ class MLSAgent:
         await self.telemetry_controller.initialize()
 
         try:
+            print("In spade_instance_start")
             await self.spade_instance.start(auto_register=True)
         except Exception as e:
             logger.error(f"Error starting SPADE: {traceback.format_exc()}")
