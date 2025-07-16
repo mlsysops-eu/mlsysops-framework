@@ -42,7 +42,10 @@ from mlsysops.spade.redis_mgt import RedisManager
 class MLSSpade(Agent):
 
     def __init__(self, state: MLSState, message_queue: asyncio.Queue):
+        print(state.configuration)
+        print(state)
         super().__init__(state.configuration.n_jid, state.configuration.n_pass)
+        print("AFTER INIT")
 
         self.is_subscribed = None
         self.cluster = state.configuration.cluster
@@ -50,7 +53,9 @@ class MLSSpade(Agent):
         self.snapshot_queue = Queue()
         self.message_queue = message_queue
         self.redis = RedisManager()
+        print("BEFORE redis connect")
         self.redis.connect()
+        print("AFTER redis connect")
         self.state = state
         self.behaviours_config = state.configuration.behaviours
         self.behaviour_classes = {
@@ -68,6 +73,7 @@ class MLSSpade(Agent):
             "FailoverBehaviour": FailoverBehavior,
             "Subscribe": Subscribe
         }
+        print("AFTER INIT END")
 
     async def send_message(self, recipient: str, event: str, payload: dict):
         behavior = MessageSendingBehavior(recipient, event, payload)

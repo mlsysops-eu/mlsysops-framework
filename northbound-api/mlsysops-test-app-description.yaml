@@ -2,14 +2,14 @@ MLSysOpsApp:
   name: test-application
   cluster_placement:
     cluster_id:
-      - mls01
+      - mls04
   components:
     - metadata:
         name: server-app
         uid: server-app-v1
       node_placement:
-        node: mls01
-      restart_policy: OnFailure
+        node: mls04
+      restart_policy: on_failure
       containers:
         - image: harbor.nbfc.io/mlsysops/test-app:latest
           image_pull_policy: IfNotPresent
@@ -37,7 +37,7 @@ MLSysOpsApp:
     - metadata:
         name: client-app
         uid: client-app-v1
-      restart_policy: OnFailure
+      restart_policy: on_failure
       containers:
         - image: harbor.nbfc.io/mlsysops/test-app:latest
           image_pull_policy: IfNotPresent

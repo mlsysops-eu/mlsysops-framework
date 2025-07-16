@@ -28,6 +28,8 @@ spec:
                   fieldPath: spec.nodeName
             - name: EJABBERD_DOMAIN
               value: {{ KARMADA_HOST_IP }}
+            - name: REDIS_HOST 
+              value: {{ KARMADA_HOST_IP }}
             - name: NODE_PASSWORD
               value: "mysecret"
             - name: DESCRIPTION_PATH
