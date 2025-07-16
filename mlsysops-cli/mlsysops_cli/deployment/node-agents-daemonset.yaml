@@ -17,6 +17,10 @@ spec:
       # Use nodeSelector to target nodes with mlsysops/continuumLayer=node
       nodeSelector:
         mlsysops.eu/continuumLayer: "node"
+      initContainers:
+        - name: delay-startup
+          image: busybox
+          command: ["sh", "-c", "echo 'Waiting...' && sleep 35"]
       containers:
         - name: node-agent
           image: harbor.nbfc.io/mlsysops/node-agent
@@ -27,6 +31,8 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: EJABBERD_DOMAIN
+              value: {{ KARMADA_HOST_IP }}
+            - name: REDIS_HOST 
               value: {{ KARMADA_HOST_IP }}
             - name: NODE_PASSWORD
               value: "mysecret"

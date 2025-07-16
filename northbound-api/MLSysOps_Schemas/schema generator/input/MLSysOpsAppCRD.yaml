@@ -470,9 +470,9 @@ spec:
                   restart_policy:
                     type: string
                     enum:
-                      - Always
-                      - OnFailure
-                      - Never
+                      - always
+                      - on_failure
+                      - never
                     description: Restart policy for the container. Default to Always.
                   os:
                     type: string
@@ -768,7 +768,7 @@ spec:
                       metric_id:
                         type: string
                       weight:
-                        type: number
+                        type: number       
           required:
             - components
-            - cluster_placement
+

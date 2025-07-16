@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       - REDIS_HOST=172.25.27.72
-      - REDIS_PORT=6379
+      - REDIS_PORT=30679
       - REDIS_DB_NUMBER=0
       - REDIS_QUEUE_NAME=valid_descriptions_queue
       - REDIS_PASSWORD=secret
@@ -16,10 +16,10 @@ services:
       # Include all kubeconfig files for kubectl commands
       - KUBECONFIG=/root/.kube/karmada-api.kubeconfig:/root/.kube/uth-dev.kubeconfig:/root/.kube/uth-prod.kubeconfig
     volumes:
-      - ./config:/app/config  # Existing app config directory
+      #- ./config:/app/config  # Existing app config directory
       # Mount kubeconfig files
       - /home/runner/karmada_management/karmada-api.kubeconfig:/root/.kube/karmada-api.kubeconfig:ro
-      - /home/runner/karmada_management/uth-dev.kubeconfig:/root/.kube/uth-dev.kubeconfig:ro
-      - /home/runner/karmada_management/uth-prod.kubeconfig:/root/.kube/uth-prod.kubeconfig:ro
+      #- /home/runner/karmada_management/uth-dev.kubeconfig:/root/.kube/uth-dev.kubeconfig:ro
+      #- /home/runner/karmada_management/uth-prod.kubeconfig:/root/.kube/uth-prod.kubeconfig:ro
     network_mode: host  # Use the host network to access localhost services on the VM
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload

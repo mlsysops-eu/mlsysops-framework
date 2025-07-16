@@ -1,7 +1,7 @@
 MLSysOpsNode:
   name: {{ node_name }}
   cluster_id: {{ cluster_id }}
-  continuum_layer: {{ continuum_layer }}
+  continuum_layer: edge
   permitted_actions:{% for action in permitted_actions %}
     - {{ action -}}
 {% endfor %}

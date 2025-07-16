@@ -15,6 +15,10 @@ spec:
       labels:
         app: api-service
     spec:
+      initContainers:
+        - name: delay-startup
+          image: busybox
+          command: ["sh", "-c", "echo 'Waiting...' && sleep 4"]
       containers:
         - name: nb-api-service
           image: harbor.nbfc.io/mlsysops/northbound-api
