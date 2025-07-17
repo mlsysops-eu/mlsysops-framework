@@ -43,6 +43,8 @@ spec:
               value: "/workdir/fluidity"
             - name: DESCRIPTION_PATH
               value: "/etc/mlsysops/descriptions"
+            - name: LOCAL_OTEL_ENDPOINT
+              value: "http://cluster-otel-collector.mlsysops-framework.svc.cluster.local:9999/metrics"
           volumeMounts:
             - name: description-volume
               mountPath: /etc/mlsysops/descriptions

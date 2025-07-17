@@ -1,7 +1,6 @@
   mechanisms:
     - "fluidity_proxy"
-  default_telemetry_metrics:
-    - "node_os_info"
+  default_telemetry_metrics: "None"
   policy_directory: "/etc/mlsysops/policies"
   mechanisms_directory: "mechanisms"
   continuum_layer: "node"

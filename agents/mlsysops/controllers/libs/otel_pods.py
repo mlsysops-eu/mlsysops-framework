@@ -128,7 +128,9 @@ def create_pod_spec(pod_name: str, node_name: str, configmap_name: str) -> str:
         'configmap_name': configmap_name,
         "otlp_grpc_port": int(os.getenv("MLS_OTEL_GRPC_PORT", "43170")),
         "otlp_http_port": int(os.getenv("MLS_OTEL_HTTP_PORT", "43180")),
-        "otlp_prometheus_port": int(os.getenv("MLS_OTEL_PROM_PORT", "9999"))
+        "otlp_prometheus_port": int(os.getenv("MLS_OTEL_PROM_PORT", "9999")),
+        "otel_collector_selector": f"{node_name}-otel-collector"
+
     })
 
     yaml = YAML(typ='safe', pure=True)
@@ -408,7 +410,7 @@ def delete_node_exporter_pod(node_name: str) -> bool:
     return True
 
 
-def create_svc_manifest(name_prefix=None):
+def create_svc_manifest(name_prefix=None,selector="otel-collector"):
     """Create manifest for service-providing component using Jinja template.
        Returns:
            manifest (str): The rendered service manifest as a string.
@@ -427,7 +429,7 @@ def create_svc_manifest(name_prefix=None):
     manifest = template.render({
         'name': name,
         'type': "ClusterIP",
-        'selector': "otel-collector",
+        'selector': selector,
         "otlp_grpc_port": int(os.getenv("MLS_OTEL_GRPC_PORT","43170")),
         "otlp_http_port": int(os.getenv("MLS_OTEL_HTTP_PORT","43180")),
         "otlp_prometheus_port": int(os.getenv("MLS_OTEL_PROM_PORT","9999"))
@@ -439,7 +441,7 @@ def create_svc_manifest(name_prefix=None):
     return manifest_dict
 
 
-async def create_svc(name_prefix=None,svc_manifest=None):
+async def create_svc(name_prefix=None,svc_manifest=None,selector=None):
     """Create a Kubernetes service.
 
     Note: For testing it deletes the service if already exists.
@@ -452,7 +454,7 @@ async def create_svc(name_prefix=None,svc_manifest=None):
     """
     core_api = get_api_handler()
     if svc_manifest is None:
-        svc_manifest = create_svc_manifest(name_prefix)
+        svc_manifest = create_svc_manifest(name_prefix,selector)
     resp = None
     try:
         logger.info('Trying to read service if already exists')
