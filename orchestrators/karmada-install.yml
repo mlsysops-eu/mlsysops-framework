@@ -332,15 +332,35 @@
     - name: Normalize context and cluster names in temporary kubeconfigs
       ansible.builtin.shell: |
         name={{ item.path | basename | regex_replace('-k3s.yaml','') }}
-       
         kubectl --kubeconfig={{ temp_dir }}/{{ item.path | basename }} config rename-context default ${name} || true
-       
         sed -i "s/name: default/name: ${name}/" {{ temp_dir }}/{{ item.path | basename }}
         sed -i "s/cluster: default/cluster: ${name}/" {{ temp_dir }}/{{ item.path | basename }}
+        sed -i "s/user: default/user: ${name}/" {{ temp_dir }}/{{ item.path | basename }}
+        sed -i.bak -e "/^users:/,/^-/ s/name: default/name: ${name}/" {{ temp_dir }}/{{ item.path | basename }}
       args:
         executable: /bin/bash
       loop: "{{ found_configs.files }}"
       when: found_configs.files | length > 0
+
+    - name: Copy management cluster kubeconfig to temporary directory
+      ansible.builtin.copy:
+        src: "/home/{{ ansible_user }}/.kube/config"
+        dest: "{{ temp_dir }}/karmada-host-k3s.yaml"
+        remote_src: yes
+        mode: '0644'
+      when: inventory_hostname in groups['management_cluster']
+
+    - name: Normalize context and cluster names for management cluster
+      ansible.builtin.shell: |
+        name="karmada-host"
+        kubectl --kubeconfig={{ temp_dir }}/karmada-host-k3s.yaml config rename-context default ${name} || true
+        sed -i "s/name: default/name: ${name}/" {{ temp_dir }}/karmada-host-k3s.yaml
+        sed -i "s/cluster: default/cluster: ${name}/" {{ temp_dir }}/karmada-host-k3s.yaml
+        sed -i "s/user: default/user: ${name}/" {{ temp_dir }}/karmada-host-k3s.yaml
+        sed -i.bak -e "/^users:/,/^-/ s/name: default/name: ${name}/" {{ temp_dir }}/karmada-host-k3s.yaml
+      args:
+        executable: /bin/bash
+      when: inventory_hostname in groups['management_cluster']
 
     - name: Merge all kubeconfigs into Karmada config
       ansible.builtin.shell: |

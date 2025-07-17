@@ -13,7 +13,7 @@ This document provides a step-by-step guide to using the provided Ansible playbo
    * [Inventory Configuration](#inventory-configuration)  
    * [k3s Installation Playbook](#k3s-installation-playbook)  
    * [Karmada Installation Playbook](#karmada-installation-playbook)  
-  
+   * [Using the Merged Kubeconfig](#using-the-merged-kubeconfig)  
 
 
 ## Prerequisites
@@ -99,10 +99,10 @@ To add labels, include a labels section under each host with key-value pairs rep
 ```yaml
 labels:
   is_vm: true
-  mlsysops/continuumLayer: node
+  mlsysops.eu/continuumLayer: node
   vaccel: "false"
 ```
-In this setup, labels like `mlsysops/continuumLayer` indicate the layer or role of the node within the MLSysOps architecture:
+In this setup, labels like `mlsysops.eu/continuumLayer` indicate the layer or role of the node within the MLSysOps architecture:
 - `continuum`: Used for management nodes (e.g., in the management cluster).
 - `cluster`: Used for master nodes in k3s clusters.
 - `node`: Used for worker nodes.
@@ -134,7 +134,7 @@ all:
           service_cidr: "x.x.x.x/x"
           labels:
             is_vm: true
-            mlsysops/continuumLayer: continuum
+            mlsysops.eu/continuumLayer: continuum
             vaccel: "false"
 
     cluster1:
@@ -151,7 +151,7 @@ all:
               service_cidr: "x.x.x.x/x"
               labels:
                 is_vm: true
-                mlsysops/continuumLayer: cluster
+                mlsysops.eu/continuumLayer: cluster
                 vaccel: "false"
         worker_nodes:
           hosts:
@@ -163,7 +163,7 @@ all:
               k3s_cluster_name: cluster1
               labels:
                 is_vm: true
-                mlsysops/continuumLayer: node
+                mlsysops.eu/continuumLayer: node
                 vaccel: "false"
             testvm3:
               ansible_host: x.x.x.x # <-- Update with the correct IP address
@@ -173,7 +173,7 @@ all:
               k3s_cluster_name: cluster1
               labels:
                 is_vm: true
-                mlsysops/continuumLayer: node
+                mlsysops.eu/continuumLayer: node
                 vaccel: "false"
 ```
 
@@ -210,5 +210,34 @@ To run [karmada-install.yml](karmada-install.yml), playbook, use the following c
 ansible-playbook -i inventory.yml karmada-install.yml
 ```
 
+### Using the Merged Kubeconfig
 
+After running the `karmada-install.yml` playbook, the kubeconfig files from all clusters are merged into the Karmada config file located at 
+`/home/<ANSIBLE_USER>/karmada-kubeconfig.yaml` on the management cluster. This merged config includes contexts for:
 
+- Each member cluster
+- The management cluster (e.g., karmada-host)
+- The Karmada API server (e.g., karmada-apiserver)
+
+You can use these contexts to manage different clusters or Karmada itself using `kubectl`. For example:
+
+- To list pods in the management cluster:
+```bash
+kubectl --kubeconfig=/home/<ANSIBLE_USER>/karmada-kubeconfig.yaml --context=karmada-host get pods -A 
+```
+
+- To list pods of each cluster:
+```bash
+kubectl --kubeconfig=/home/<ANSIBLE_USER>/karmada-kubeconfig.yaml --context=cluster1 get pods
+```
+
+- To list clusters registered in Karmada:
+```bash
+kubectl --kubeconfig=/home/<ANSIBLE_USER>/karmada-kubeconfig.yaml --context=karmada-apiserver get clusters
+```
+Make sure to replace `<ANSIBLE_USER>` with the actual username used in the inventory.
+
+Note: The exact context names may vary. You can list all available contexts with:
+```bash
+kubectl --kubeconfig=/home/<ANSIBLE_USER>/karmada-kubeconfig.yaml config get-contexts
+```
