@@ -1,7 +1,7 @@
 mechanisms:
 - "fluidity"
 default_telemetry_metrics: "None"
-policy_directory: "policies"
+policy_directory: "/etc/mlsysops/policies"
 mechanisms_directory: "mechanisms"
 
 continuum_layer: "cluster"
