@@ -1,0 +1,54 @@
+all:
+  children:
+    sysops1:
+      children:
+        master_nodes:
+          hosts:
+            sysops01:
+              ansible_host: 192.168.5.79
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: sysops01
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: cluster
+                vaccel: 'false'
+              pod_cidr: 10.12.0.0/16
+              service_cidr: 10.13.0.0/16
+        worker_nodes:
+          hosts:
+            sysops02:
+              ansible_host: 192.168.5.26
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: sysops01
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: node
+                vaccel: 'false'
+            sysops03:
+              ansible_host: 192.168.5.73
+              ansible_user: mlsysops
+              ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+              ansible_python_interpreter: /usr/bin/python3
+              k3s_cluster_name: sysops01
+              labels:
+                is_vm: true
+                mlsysops.eu/continuumLayer: node
+                vaccel: 'false'
+    management_cluster:
+      hosts:
+        sysops04:
+          ansible_host: 192.168.5.5
+          ansible_user: mlsysops
+          ansible_ssh_private_key_file: /home/mlsysops/.ssh/id_rsa
+          ansible_python_interpreter: /usr/bin/python3
+          k3s_cluster_name: management
+          labels:
+            is_vm: true
+            mlsysops.eu/continuumLayer: continuum
+            vaccel: 'false'
+          pod_cidr: 10.10.0.0/16
+          service_cidr: 10.11.0.0/16
