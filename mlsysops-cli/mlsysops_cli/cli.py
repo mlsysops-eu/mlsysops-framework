@@ -15,6 +15,7 @@ from mlsysops_cli.deployment.deploy import (
 )
 
 from mlsysops_cli.deployment.descriptions_util import create_app_yaml
+from mlsysops_cli.deployment.deploy import KubernetesLibrary
 
 # Configurable IP and PORT via environment variables
 IP = os.getenv("MLS_API_IP", "127.0.0.1")
@@ -381,9 +382,11 @@ def deploy_node(path, inventory):
 
 @click.command(help="Create a test application description using an inventory YAML.")
 @click.option('--inventory', type=click.Path(exists=True), required=True, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
-def create_test_app_description(inventory):
+@click.option('--cluster', type=str, required=False, help='Cluster name to prepare the test application description for.')
+
+def create_test_app_description(inventory, cluster):
     try:
-        create_app_yaml(inventory)
+        create_app_yaml(inventory,cluster)
     except Exception as e:
         click.secho(f"❌ Error during test application descriptions creation: {e}", fg='red')
 
@@ -435,6 +438,152 @@ def set_mode(mode):
 manage.add_command(ping_agent)
 manage.add_command(set_mode)
 cli.add_command(manage)
+
+# -----------------------------------------------------------------------------
+# Agent commands (set-policy, delete-policy)
+# -----------------------------------------------------------------------------@click.group()
+@click.group(help="Agent management commands")
+def agent():
+    """Manage policies for agents."""
+    pass
+
+policies_configmap = {
+        "cluster": "cluster-agents-policies",
+        "continuum": "continuum-policies",
+        "node": "node-agents-policies"
+    }
+
+@agent.command(name="set-policy")
+@click.option('--agent', type=click.Choice(['cluster', 'continuum', 'node']), required=True,
+              help="Agent type to add policy for")
+@click.option('--file', 'policy_file', type=click.Path(exists=True), required=True,
+              help="Path to the policy file")
+def policy_add_or_update(agent, policy_file):
+    """Add policy to the specified agent configmap."""
+
+    configmap_name = policies_configmap[agent]
+    namespace = "mlsysops-framework"
+
+    try:
+        with open(policy_file, 'r') as f:
+            content = f.read()
+    except Exception as e:
+        click.echo(f"Error reading file '{policy_file}': {e}")
+        return
+
+    client_k8s = KubernetesLibrary("apps", "v1",
+                                   os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
+                                   context="karmada-apiserver")
+    try:
+        # Using the filename as the key in ConfigMap data, or use a fixed key like "policy.py"
+        key = policy_file.split("/")[-1]  # just filename, no path
+
+        client_k8s.update_configmap_data(namespace, configmap_name, key, content)
+        click.echo(f"Policy added to {agent} agent configmap '{configmap_name}'.")
+    except Exception as e:
+        click.echo(f"Failed to update ConfigMap: {e}")
+
+@agent.command("delete-policy")
+@click.option("--agent", type=click.Choice(["cluster", "continuum", "node"]),
+                                             required=True, help="Agent type to remove a policy from")
+@click.argument("name", type=str)
+def policy_delete(agent: str, name: str):
+    """Delete policy by name for the given agent."""
+    configmap_name = policies_configmap[agent]
+    namespace = "mlsysops-framework"
+
+    client_k8s = KubernetesLibrary(
+        "apps",
+        "v1",
+        os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
+        context="karmada-apiserver",
+    )
+
+    try:
+        # Read current configmap data (implemented inside your KubernetesLibrary)
+        configmap = client_k8s.core_v1_api.read_namespaced_config_map(configmap_name, namespace)
+
+        if not configmap.data or name not in configmap.data:
+            click.echo(f"Policy '{name}' not found in configmap '{configmap_name}'.")
+            return
+
+        del configmap.data[name]  # delete the policy key
+
+        # Update the configmap with the modified data
+        client_k8s.core_v1_api.replace_namespaced_config_map(configmap_name, namespace, configmap)
+        client_k8s.annotate_pod()
+        click.echo(f"Policy '{name}' deleted from {agent} agent policies.")
+    except Exception as e:
+        click.echo(f"Failed to delete policy: {e}")
+
+
+configmap_map = {
+    "cluster": "cluster-agents-config",
+    "continuum": "continuum-agent-config",
+    "node": "node-agents-config",
+}
+
+@agent.command("set-config")
+@click.option("--agent", type=click.Choice(["cluster", "continuum", "node"]))
+@click.option("--file", "config_file", type=click.Path(exists=True), required=True, help="Path to the config file")
+def set_config(agent: str, config_file: str):
+    """Add or update a config entry in the specified agent configmap."""
+    configmap_name = configmap_map[agent]
+    namespace = "mlsysops-framework"
+
+    try:
+        with open(config_file, "r") as f:
+            content = f.read()
+    except Exception as e:
+        click.echo(f"Error reading file '{config_file}': {e}")
+        return
+
+    client_k8s = KubernetesLibrary(
+        "apps",
+        "v1",
+        os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
+        context="karmada-apiserver",
+    )
+
+    try:
+        key = os.path.basename(config_file)
+        client_k8s.update_configmap_data(namespace, configmap_name, key, content)
+        click.echo(f"Config '{key}' added or updated in {agent} agent configmap '{configmap_name}'.")
+    except Exception as e:
+        click.echo(f"Failed to update ConfigMap: {e}")
+
+@agent.command("delete-config")
+@click.option("--agent", type=click.Choice(["cluster", "continuum", "node"]))
+@click.argument("key", type=str)
+def delete_config(agent: str, key: str):
+    """Delete a config entry from the specified agent configmap."""
+    configmap_name = configmap_map[agent]
+    namespace = "mlsysops-framework"
+
+    client_k8s = KubernetesLibrary(
+        "apps",
+        "v1",
+        os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
+        context="karmada-apiserver",
+    )
+
+    try:
+        configmap = client_k8s.core_v1_api.read_namespaced_config_map(configmap_name, namespace)
+
+        if not configmap.data or key not in configmap.data:
+            click.echo(f"Config key '{key}' not found in configmap '{configmap_name}'.")
+            return
+
+        del configmap.data[key]
+
+        client_k8s.core_v1_api.replace_namespaced_config_map(configmap_name, namespace, configmap)
+
+        click.echo(f"Config key '{key}' deleted from {agent} agent configmap '{configmap_name}'.")
+    except Exception as e:
+        click.echo(f"Failed to delete config: {e}")
+
+
+cli.add_command(agent)
 
 if __name__ == "__main__":
     cli()

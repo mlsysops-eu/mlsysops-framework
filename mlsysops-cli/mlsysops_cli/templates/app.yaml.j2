@@ -31,7 +31,7 @@ MLSysOpsApp:
             - container_port: 10000
               protocol: TCP
       qos_metrics:
-        - application_metric_id: test_received_success_counter_total
+        - application_metric_id: test_received_counter_total
           target: 20
           relation: lower_or_equal
     - metadata:
@@ -59,7 +59,7 @@ MLSysOpsApp:
             - container_port: 10000
               protocol: TCP
       qos_metrics:
-        - application_metric_id: metric-2
+        - application_metric_id: test_sent_counter_total
           target: 30
           relation: equal
   component_interactions:
@@ -78,8 +78,8 @@ MLSysOpsApp:
     threshold: 0.7
     relation: greater_than
     achievement_weights:
-      - metric_id: test_received_success_counter
+      - metric_id: test_received_counter_total
         weight: 0.5
-      - metric_id: test_sent_success_counter
+      - metric_id: test_sent_counter_total
         weight: 0.5
 

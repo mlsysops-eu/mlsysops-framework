@@ -4,7 +4,7 @@ metadata:
   name: "{{ pod_name }}"
   namespace: "mlsysops-framework"
   labels:
-    mlsysops-framework/otel: "otel-collector"
+    mlsysops-framework/otel: "{{ otel_collector_selector }}"
 spec:
   serviceAccountName: mlsysops-agents-sa
   containers:

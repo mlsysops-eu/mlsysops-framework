@@ -1,3 +1,5 @@
+import json
+import time
 from pathlib import Path
 from importlib.resources import files
 import kubernetes.client.rest
@@ -290,7 +292,6 @@ class KubernetesLibrary:
 
         with open(self.kubeconfig, 'r') as f:
             full_config = yaml.safe_load(f)
-        print(full_config)
 
         files_data_object["karmada-api.kubeconfig"] =  self.dump_context_config(full_config,"karmada-apiserver")
 
@@ -301,12 +302,12 @@ class KubernetesLibrary:
 
         try:
             self.core_v1_api.create_namespaced_config_map(namespace, config_map)
-            print(f"✅ Created configmap {name}")
+            print(f"✅ Created Karmada API kubeconfig configmap {name}")
         except ApiException as e:
             if e.status != 409:
                 #self.core_v1_api.delete_namespaced_config_map(name,namespace)
                 self.core_v1_api.replace_namespaced_config_map(name, namespace, config_map)
-                print(f"♻️ Updated configmap {name}")
+                print(f"♻️ Updated configmap Karamda API kubeconfig {name}")
 
     def create_configmap_from_file(self, descriptions_directory, namespace, name, suffixes=["*.yml", "*.yaml"], key_name = ""):
         """
@@ -530,6 +531,64 @@ class KubernetesLibrary:
 
         except Exception as e:
             print(f"❌ Error applying PropagationPolicies: {e}")
+
+    def annotate_pod(self):
+        path = "/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/mlsysops-framework/pods"
+
+        api_client = client.ApiClient()
+        response = api_client.call_api(
+            resource_path=path, method="GET", auth_settings=["BearerToken"],
+            response_type="json", _preload_content=False
+        )
+        pods = json.loads(response[0].data.decode("utf-8"))
+
+        for pod in pods.get("items", []):
+            pod_name = pod['metadata']['name']
+            pod_cluster = pod['metadata']['annotations']['resource.karmada.io/cached-from-cluster']
+            if pod_name.startswith("mlsysops-cluster-agent"):
+                print(f"Updating pod {pod_name} from cluster {pod_cluster}")
+
+                pod_path = f"/apis/cluster.karmada.io/v1alpha1/clusters/{pod_cluster}/proxy/api/v1/namespaces/mlsysops-framework/pods/{pod_name}"
+                annotation_patch = {
+                    "metadata": {
+                        "annotations": {
+                            "mlsysops.eu/updatetimestamp": time.strftime("%Y%m%d%H%M%S")
+                        }
+                    }
+                }
+                # Update the client API call to use PATCH
+                response = api_client.call_api(
+                    resource_path=pod_path,
+                    method="PATCH",  # Use PATCH to update the pod
+                    body=annotation_patch,  # Include the annotation patch as the body
+                    header_params={"Content-Type": "application/merge-patch+json"},
+                    # Correct header for JSON Merge Patch
+
+                    auth_settings=["BearerToken"],
+                    response_type="json",
+                    _preload_content=False
+                )
+
+    def update_configmap_data(self, namespace: str, configmap_name: str, key: str, content: str):
+        """
+        Update the given key in the specified ConfigMap with the provided content.
+        If the ConfigMap or key does not exist, create or add them accordingly.
+        """
+        try:
+            # Get existing ConfigMap
+            cm = self.core_v1_api.read_namespaced_config_map(configmap_name, namespace)
+            if cm.data is None:
+                cm.data = {}
+            cm.data[key] = content
+            self.core_v1_api.patch_namespaced_config_map(name=configmap_name, namespace=namespace, body=cm)
+
+            self.annotate_pod()
+
+            print(f"ConfigMap '{configmap_name}' updated successfully.")
+        except Exception as e:
+            print(f"Failed to update ConfigMap '{configmap_name}': {e}")
+            raise
+
 
 def _check_required_env_vars(*required_vars):
     missing = [var for var in required_vars if not os.getenv(var)]

@@ -107,22 +107,35 @@ def create_worker_node_yaml(input_file, cluster_name, descriptions_path=""):
         print(f"Worker YAML written to {worker_yaml_filename}")
 
 
-def create_app_yaml(input_file):
+def create_app_yaml(input_file,cluster_name=None):
     """
-    Generates the application-level YAML with `cluster_id` and `server_placement_node`.
-    """
+      Generates the application-level YAML with `cluster_id` and `server_placement_node`.
+      """
     with open(input_file, 'r') as file:
         inventory = yaml.safe_load(file)
 
-    management_cluster = inventory['all']['children'].get('management_cluster', {})
-    management_nodes = management_cluster.get('hosts', {})
 
-    all_nodes = list(management_nodes.keys())
-    if not all_nodes:
-        raise ValueError("No nodes found in the management cluster")
+    if cluster_name is None:
+        clusters = inventory['all']['children']
+        for parsed_cluster_name in clusters:
+            if parsed_cluster_name != "management_cluster":
+                cluster_name = parsed_cluster_name
 
-    cluster_id = all_nodes[0]  # First management node
-    server_placement_node = all_nodes[0]  # Also the first node for placement
+    cluster = inventory['all']['children'].get(cluster_name, {})
+    master_nodes = cluster.get('children', {}).get('master_nodes', {}).get('hosts', {})
+    worker_nodes = cluster.get('children', {}).get('worker_nodes', {}).get('hosts', {})
+    management_nodes_keys = list(master_nodes.keys())
+
+    if not management_nodes_keys:
+        return
+
+    cluster_id = management_nodes_keys[0]  # First management node
+
+    worker_nodes_keys = list(worker_nodes.keys())
+    if not worker_nodes_keys:
+        return
+
+    server_placement_node = worker_nodes_keys[0]  # Also the first node for placement
 
     app_context = {
         "cluster_id": cluster_id,

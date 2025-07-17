@@ -143,11 +143,12 @@ class TelemetryController(BaseController):
                             tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT"),
                             k8s_cluster_receiver=None,
                             local_endpoint_metrics_expiration=str(scrape_interval + 5) + "s",
+                            otel_collector_selector=f"{self.agent.state.hostname}-otel-collector"
                         )
 
                         self.local_config = parsed_otel_config
 
-                        await create_svc(name_prefix="cluster-")
+                        await create_svc(name_prefix="cluster-",selector=f"{self.agent.state.hostname}-otel-collector")
                         pod_name, config_name = await create_otel_pod(self.agent.state.hostname,parsed_otel_config)
                         self.otel_pod_list.append({
                             "node": self.agent.state.hostname,
@@ -182,6 +183,7 @@ class TelemetryController(BaseController):
                             tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT"),
                             k8s_cluster_receiver=None,
                             local_endpoint_metrics_expiration=str(scrape_interval + 5) + "s",
+                            otel_collector_selector="node-otel-collector"
 
                         )
 
@@ -213,11 +215,13 @@ class TelemetryController(BaseController):
                             loki_export_endpoint=os.getenv("MLS_OTEL_LOKI_EXPORT_ENDPOINT"),
                             tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT"),
                             local_endpoint_metrics_expiration=str(scrape_interval + 5) + "s",
+                            otel_collector_selector="continuum-otel-collector"
+
                         )
 
                         self.local_config = parsed_otel_config
 
-                        await create_svc()
+                        await create_svc(selector="continuum-otel-collector")
                         pod_name, config_name = await create_otel_pod(self.agent.state.hostname, parsed_otel_config)
                         self.node_exporter_pod_list.append({
                             "node": self.agent.state.hostname,
@@ -424,12 +428,14 @@ class TelemetryController(BaseController):
                 tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT"),
                 k8s_cluster_receiver=None,
                 local_endpoint_metrics_expiration=str(self.get_current_scrape_interval() + 5) + "s",
+                otel_collector_selector=f"{self.agent.state.hostname}-otel-collector"
+
             )
 
             self.local_config = parsed_otel_config
 
             try:
-                await create_svc(name_prefix="cluster-")
+                await create_svc(name_prefix="cluster-", selector=f"{self.agent.state.hostname}-otel-collector")
                 await create_otel_pod_with_restart(self.agent.state.hostname, parsed_otel_config)
                 ## todo update local dict
             except Exception as e:
@@ -472,6 +478,7 @@ class TelemetryController(BaseController):
                 tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT"),
                 k8s_cluster_receiver=None,
                 local_endpoint_metrics_expiration=str(min_requested_interval + 5) + "s",
+                otel_collector_selector="node-otel-collector"
 
             )
 

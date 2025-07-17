@@ -40,7 +40,7 @@ def setup_logger():
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    logger.addHandler(mlsclient.getHandler())
+    #logger.addHandler(mlsclient.getHandler())
 
 
 def signal_handler(signum, frame):

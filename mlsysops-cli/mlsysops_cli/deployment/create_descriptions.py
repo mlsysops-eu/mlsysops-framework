@@ -36,7 +36,7 @@ def create_cluster_yaml(input_file, cluster_name):
     }
 
     # Render and write the cluster YAML
-    cluster_yaml = render_template("formal_descriptions/user_provided/cluster.yaml.j2", cluster_context)
+    cluster_yaml = render_template("mlsysops_cli/templates/cluster.yaml.j2", cluster_context)
     with open(cluster_yaml_filename, 'w') as output_file:
         output_file.write(cluster_yaml)
     print(f"Cluster YAML written to {cluster_yaml_filename}")
@@ -78,36 +78,42 @@ def create_worker_node_yaml(input_file, cluster_name):
             "continuum_layer": worker_object['labels']['mlsysops.eu/continuumLayer'],
             "permitted_actions": permitted_actions
         }
-        worker_yaml = render_template("formal_descriptions/user_provided/node.yaml.j2", worker_context)
+        worker_yaml = render_template("mlsysops_cli/templates/node.yaml.j2", worker_context)
         worker_yaml_filename = f"{worker_name}.yaml"
         with open(worker_yaml_filename, 'w') as output_file:
             output_file.write(worker_yaml)
         print(f"Worker YAML written to {worker_yaml_filename}")
 
 
-def create_app_yaml(input_file):
+def create_app_yaml(input_file, cluster_name):
     """
     Generates the application-level YAML with `cluster_id` and `server_placement_node`.
     """
     with open(input_file, 'r') as file:
         inventory = yaml.safe_load(file)
 
-    management_cluster = inventory['all']['children'].get('management_cluster', {})
-    management_nodes = management_cluster.get('hosts', {})
+    cluster = inventory['all']['children'].get(cluster_name, {})
+    master_nodes = cluster.get('children', {}).get('master_nodes', {}).get('hosts', {})
+    worker_nodes = cluster.get('children', {}).get('worker_nodes', {}).get('hosts', {})
+    management_nodes_keys = list(master_nodes.keys())
 
-    all_nodes = list(management_nodes.keys())
-    if not all_nodes:
-        raise ValueError("No nodes found in the management cluster")
+    if not management_nodes_keys:
+        return
 
-    cluster_id = all_nodes[0]  # First management node
-    server_placement_node = all_nodes[0]  # Also the first node for placement
+    cluster_id = management_nodes_keys[0]  # First management node
+
+    worker_nodes_keys = list(worker_nodes.keys())
+    if not worker_nodes_keys:
+        return
+
+    server_placement_node = worker_nodes_keys[0]  # Also the first node for placement
 
     app_context = {
         "cluster_id": cluster_id,
         "server_placement_node": server_placement_node
     }
 
-    app_yaml = render_template("formal_descriptions/user_provided/app.yaml.j2", app_context)
+    app_yaml = render_template("mlsysops_cli/templates/app.yaml.j2", app_context)
     app_yaml_filename = "app-description.yaml"
     with open(app_yaml_filename, 'w') as output_file:
         output_file.write(app_yaml)
@@ -147,7 +153,7 @@ def create_continuum_yaml(input_file):
 
     # Render and write the continuum YAML
     continuum_yaml_filename = f"{continuum_id}.yaml"
-    continuum_yaml_content = render_template("formal_descriptions/user_provided/continuum.yaml.j2", continuum_context)
+    continuum_yaml_content = render_template("mlsysops_cli/templates/continuum.yaml.j2", continuum_context)
     with open(continuum_yaml_filename, 'w') as output_file:
         output_file.write(continuum_yaml_content)
     print(f"Continuum YAML written to {continuum_yaml_filename}")
@@ -167,11 +173,12 @@ def main():
         except ValueError as e:
             print(f"Skipping cluster '{cluster_name}': {e}")
 
-    # Generate application-level YAML
-    try:
-        create_app_yaml(input_file)
-    except ValueError as e:
-        print(f"Skipping application YAML generation: {e}")
+    for cluster_name in inventory['all']['children']:
+        # Generate application-level YAML
+        try:
+            create_app_yaml(input_file,cluster_name)
+        except ValueError as e:
+            print(f"Skipping application YAML generation: {e}")
 
     # Generate continuum-level YAML
     try:

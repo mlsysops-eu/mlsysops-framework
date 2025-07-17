@@ -3,7 +3,7 @@ mechanisms:
 mechanisms_directory: "mechanisms"
 
 default_telemetry_metrics: "None"
-policy_directory: "/etc/mlsysops/policies"
+policy_directory: "policies"
 continuum_layer: "continuum"
 monitor_data_retention_time: 30
 node_exporter_scrape_interval: 10s
