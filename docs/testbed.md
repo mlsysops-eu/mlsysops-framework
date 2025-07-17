@@ -6,10 +6,10 @@ To install the MLSysOps framework, you will need one or more kubernetes clusters
 
 [Prerequisites](#prerequisites)  
 [Installation Steps](#installation-steps)  
- * [Setting Up Ansible](#setting-up-ansible)  
- * [Inventory Configuration](#inventory-configuration)  
- * [k3s Installation Playbook](#k3s-installation-playbook)  
- * [Karmada Installation Playbook](#karmada-installation-playbook)  
+[Setting Up Ansible](#setting-up-ansible)  
+[Inventory Configuration](#inventory-configuration)  
+[k3s Installation Playbook](#k3s-installation-playbook)  
+[Karmada Installation Playbook](#karmada-installation-playbook)  
   
 ## Prerequisites
 Before proceeding, ensure the following:
@@ -27,26 +27,26 @@ To set up Ansible, run the follow commands on the control node:
 
 1) Update System Packages to latest version.
 
-    ```
-    sudo apt update && sudo apt upgrade -y
-    ```
+```
+sudo apt update && sudo apt upgrade -y
+```
 2) Install essential packages that Ansible relies on:
     
-    ```
-    sudo apt install -y python3 software-properties-common
-    ```
+```
+sudo apt install -y python3 software-properties-common
+```
 3) Install Ansible.
 
-    ```
-    sudo apt install -y ansible
-    ```
+```
+sudo apt install -y ansible
+```
 4) After installation, confirm that Ansible is installed and working correctly by checking its version: 
-    ```
-    ansible --version
-    ```
+```
+ansible --version
+```
 Example output:
 
-```
+```console
   ansible 2.10.8
   config file = None
   configured module search path = ['/home/pmavrikos/.ansible/plugins/modules', '/usr/share/ansible/plugins/modules']

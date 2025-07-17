@@ -23,6 +23,7 @@ There are two services that provide additional functionalities to the user:
 - **ML Connector**: This service is responsible for managing and deploying Machine Learning models. It exposes its functionality through a separate API.
 
 To ensure the correct bootstrap, the agents should start in the following order:
+
 1. Continuum agent
 2. Cluster agent 
 3. Node agents
@@ -76,7 +77,7 @@ Descriptions define IDs, managed components, and resource details. All files are
 
 There are two ways to deploy the framework:
 
-#### ✅ Option 1: Automated using the MLSysOps CLI
+#### Option 1: Automated using the MLSysOps CLI
 
 You can install the CLI in two ways:
 
@@ -112,6 +113,7 @@ mls framework deploy-all
 ```
 
 This will:
+
 - Deploy core services (ejabberd, redis, API service)
 - Register system descriptions
 - Deploy all agents in correct order
@@ -130,13 +132,11 @@ Wait for all pods to be created:
 kubectl get pods -n mlsysops-framework
 ```
 
----
-
-#### 🛠 Option 2: Manual Deployment
+#### Option 2: Manual Deployment
 
 Follow the order below to deploy manually if you prefer full control.
 
-### 📍 Management Cluster (Continuum)
+### Management Cluster (Continuum)
 
 ```bash
 export KUBECONFIG=<host kubeconfig>
@@ -175,7 +175,7 @@ kubectl create configmap continuum-system-description --from-file=descriptions/c
 kubectl apply -f continuum-agent-daemonset.yaml
 ```
 
-### 📍 Karmada API Cluster (Cluster Agents)
+### Karmada API Cluster (Cluster Agents)
 
 ```bash
 export KUBECONFIG=<api kubeconfig>
@@ -199,29 +199,30 @@ kubectl create configmap cluster-system-description --from-file=descriptions/clu
 kubectl apply -f cluster-agents-daemonset.yaml
 ```
 
-### 📍 Node Agents
+### Node Agents
 
 - Ensure node descriptions are in place
 - Add them via ConfigMap:
+
 ```bash
 kubectl create configmap node-system-descriptions --from-file=descriptions/nodes --namespace=mlsysops-framework
 ```
 
 - Start Node Agents:
+
 ```bash
 kubectl apply -f node-agents-daemonset.yaml
 ```
-
----
 
 #### Step 4: Deploy a test application
 
 We use a simple TCP Client - Server application, that send messages periodically. 
 The files are in `tests/application` of the repo.
 
-Update the test_CR and test_MLSysOps_description, with the node names of the cluster and the clusterID.
+Update the `test_CR` and `test_MLSysOps_description`, with the node names of the cluster and the clusterID.
 
 apply the CR:
+
 `kubectl apply -f tests/application/test_CR.yaml`
 
 or the description via the MLS CLI:
