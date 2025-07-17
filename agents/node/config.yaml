@@ -2,7 +2,7 @@
     - "fluidity_proxy"
   default_telemetry_metrics:
     - "node_os_info"
-  policy_directory: "policies"
+  policy_directory: "/etc/mlsysops/policies"
   mechanisms_directory: "mechanisms"
   continuum_layer: "node"
   monitor_data_retention_time: 30
