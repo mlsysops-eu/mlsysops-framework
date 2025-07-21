@@ -72,7 +72,7 @@ def set_node_dict(v1: client.CoreV1Api) -> None:
         node_list_dict = []
         initial_list = []
         http_response = v1.list_node() # http GET  , returns a V1NodeList object
-        # Note, the responce is not an ordinary list , it contains V1Node objects
+        # Note, the response is not an ordinary list , it contains V1Node objects
 
         item_list = http_response.items
         for item in item_list: # item represents a node dictionary , item : V1Node

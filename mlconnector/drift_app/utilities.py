@@ -94,7 +94,7 @@ def calculate_drift(train_df, infer_df, numerical_cols, categorical_cols, method
     return results_df
 
 def model_data(engine, model_id):
-    # check for inference data (atleast 10 data points)
+    # check for inference data (at least 10 data points)
     q = """
         SELECT *
         FROM mldeploymentsops

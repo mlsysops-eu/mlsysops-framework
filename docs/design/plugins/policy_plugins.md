@@ -1,7 +1,7 @@
 # Policy Plugins
 
 Policy plugins are the components responsible for determining if a new adaptation is required and generating new
-configuration plans. They follow the MAPE paradigm, specifically implementing the Analyze and Plan tasks. A policy
+configuration plans. They follow the MAP paradigm, specifically implementing the Analyze and Plan tasks. A policy
 plugin is implemented as a Python module, which may import and use any external libraries, and must define three
 specific functions: (i) initialize, (ii) analyze (async), and (iii) plan (async). Each method requires specific arguments and must return
 defined outputs. Each method accepts a common argument, context, which can be used to maintain state between different

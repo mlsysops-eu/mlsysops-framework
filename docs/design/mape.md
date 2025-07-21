@@ -1,6 +1,6 @@
 The primary responsibility of the agents is to manage the system’s assets—entities and components that can be configured
 and/or must be monitored. Typical assets include application components, available configuration mechanisms, and the
-telemetry system. The MAPE tasks continuously monitor the state of these assets, analyze their condition, determine
+telemetry system. The MAP tasks continuously monitor the state of these assets, analyze their condition, determine
 whether a new configuration plan is required, and, if so, create and execute the plan using the mechanism plugins. The
 Analyze and Plan tasks invoke the logic implemented in the policy plugins, whereas the Execution task uses the mechanism
 plugins.

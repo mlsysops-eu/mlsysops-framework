@@ -68,7 +68,7 @@ spec:
                         enum:
                           - Volos
                           - Athens
-                          - Rende
+                          - Render
                           - Milan
                           - Lille
                           - Delft

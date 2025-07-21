@@ -1,4 +1,4 @@
-Controllers are responsible for coordinating all internal components of the framework, including the MAPE tasks, SPADE,
+Controllers are responsible for coordinating all internal components of the framework, including the MAP tasks, SPADE,
 Policy and Mechanism Plugins, and the Northbound and Southbound APIs.
 
 - **Application Controller**: Manages the lifecycle of the Analyze loop for each application submitted to the system. When a
