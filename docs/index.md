@@ -25,7 +25,7 @@ In essence, the framework operates as an abstraction middleware between the part
 * ML Connector service, for easy ML Model management, deployment, retraining, and explainability.
 * Node level management.
 * Deploy using different container runtimes. 
-* Resource contrainted devices management (Far-Edge devices).
+* Resource constrained devices management (Far-Edge devices).
 * Storage service managed by the framework.
 
 ## Use cases

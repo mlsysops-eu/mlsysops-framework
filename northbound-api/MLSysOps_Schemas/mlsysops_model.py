@@ -29,7 +29,7 @@ class CountryEnum(Enum):
 class CityEnum(Enum):
     volos = 'volos'
     athens = 'athens'
-    rende = 'rende'
+    render = 'render'
     milan = 'milan'
     lille = 'lille'
     delft = 'delft'

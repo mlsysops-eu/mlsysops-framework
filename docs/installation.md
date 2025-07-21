@@ -32,7 +32,7 @@ To ensure the correct bootstrap, the agents should start in the following order:
 
 
 All the deployments take place in a Kubernetes cluster, in separate namespace 'mlsysops-framework'. All the third-party services,
-as well as the Continuum agent are deployed in the managament cluster, the same that is installed in karmada host.
+as well as the Continuum agent are deployed in the management cluster, the same that is installed in karmada host.
 
 
 # System descriptions preparation

@@ -230,7 +230,7 @@ class KubernetesLibrary:
                 body=yaml_content,
             )
         except ApiException as e:
-            print(f"Failed to apply kind '{yaml_content['kind']}' to Kuberentes API: {e}")
+            print(f"Failed to apply kind '{yaml_content['kind']}' to Kubernetes API: {e}")
 
 
     def create_or_update(self,resource_yaml):

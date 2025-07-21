@@ -223,7 +223,7 @@ class KubernetesLibrary:
                 body=yaml_content,
             )
         except ApiException as e:
-            print(f"Failed to apply kind '{yaml_content['kind']}' to Kuberentes API: {e}")
+            print(f"Failed to apply kind '{yaml_content['kind']}' to Kubernetes API: {e}")
 
     def create_or_update(self, resource_yaml):
 
@@ -728,7 +728,7 @@ def deploy_node_agents(path, inventory_path):
                 print(f"Skipping cluster '{cluster_name}': {e}")
 
     # ConfigMap
-    print(f"Using node systems decriptions from {descriptions_path}")
+    print(f"Using node systems descriptions from {descriptions_path}")
     client_karmada.create_configmap_from_file(descriptions_path, "mlsysops-framework", "node-system-descriptions")
 
     # DaemonSet YAML

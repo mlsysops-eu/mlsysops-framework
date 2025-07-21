@@ -47,7 +47,7 @@ async def main():
         await asyncio.gather(agent_task)
 
     except asyncio.CancelledError:
-        logger.info("Agent stoped. Performing cleanup...")
+        logger.info("Agent stopped. Performing cleanup...")
         if agent:
             await agent.stop()  # Stop the agent during cleanup
 

@@ -22,7 +22,7 @@ To ensure the correct bootstrap, the agents should start in the following order:
 
 
 All the deployments take place in a Kubernetes cluster, in separate namespace 'mlsysops-framework'. All the third-party services,
-as well as the Continuum agent are deployed in the managament cluster, the same that is installed in karmada host.
+as well as the Continuum agent are deployed in the management cluster, the same that is installed in karmada host.
 
 # System descriptions preparation
 Before the installation process takes place, system descriptions for every layer must be prepared.
@@ -34,7 +34,7 @@ For example, a machine at the node level, with hostname `worker1`, should have a
 the directory `nodes/`.
 
 * **Continuum** level descriptions, require one single file, that declare the continuumID and the clusters that we allow MLSysOps to manage.
-* **Cluster** level descritptions, require a file for each cluster registered in Karmada. It contains the clusterID and a list of node hostnames, that MLSysOps is allowed to manage.
+* **Cluster** level descriptions, require a file for each cluster registered in Karmada. It contains the clusterID and a list of node hostnames, that MLSysOps is allowed to manage.
 * **Node** level descriptions, contain the detailed information about the node resources. Example [here](descriptions/nodes/worker1.yaml).
 
 # Automated Deployment
@@ -129,7 +129,7 @@ The files are in repo/tests/application.
 
 Update the test_CR and test_MLSysOps_description, with the node names of the cluster and the clusterID.
 
-apply the CR or the descirption via the MLS CLI:
+apply the CR or the descriptions via the MLS CLI:
 `kubectl apply -f tests/application/test_CR.yaml`
 
 `mls.py apps deploy-app --path tests/application/test_MLSysOps_descirption.yaml`

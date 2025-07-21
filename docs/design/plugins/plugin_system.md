@@ -11,7 +11,7 @@ have been developed, up to the time of writing of this document
 
 ## Execution Flow
 
-Figure X illustrates the execution flow of the MAPE tasks and the integration of both policy and mechanism plugins. The
+Figure X illustrates the execution flow of the MAP tasks and the integration of both policy and mechanism plugins. The
 Monitor task runs periodically at all times, regardless of whether an application has been submitted, collecting
 telemetry data and updating the local state. When a new application is submitted to the system, a separate Analyze task
 thread is launched, which uses the analyze method of the corresponding policy plugin. Based on the result, the analysis

@@ -317,7 +317,7 @@ def framework():
 
 
 @click.command(help="Deploy all components (core services, continuum, clusters, nodes)")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the descriptions directory. It MUST include path/continuum,path/cluster,path/node')
 @click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_all(path, inventory):
     # Ensure only one of the --path or --uri options is provided
@@ -339,7 +339,7 @@ def deploy_services():
 
 
 @click.command(help="Deploy the continuum agent")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the descriptions directory. It MUST include path/continuum,path/cluster,path/node')
 @click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_continuum(path, inventory):
     # Ensure only one of the --path or --uri options is provided
@@ -353,7 +353,7 @@ def deploy_continuum(path, inventory):
 
 
 @click.command(help="Deploy the cluster agents")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the descriptions directory. It MUST include path/continuum,path/cluster,path/node')
 @click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_cluster(path, inventory):
     # Ensure only one of the --path or --uri options is provided
@@ -367,7 +367,7 @@ def deploy_cluster(path, inventory):
 
 
 @click.command(help="Deploy the node agents")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the descriptions directory. It MUST include path/continuum,path/cluster,path/node')
 @click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_node(path, inventory):
     # Ensure only one of the --path or --uri options is provided

@@ -60,8 +60,8 @@ class TrainingData(BaseModel):
 
 class FeatureList(BaseModel):
     feature_name: Optional[str] = Field(None, description="The name of the feature, eg time_ms")
-    type: Optional[str] = Field(None, description="The type of data, eg 'cont' for continous, or 'cat' for categorical")
-    kind: Optional[int] = Field(None, description="If the feature is dependant, or independent 0, 1")
+    type: Optional[str] = Field(None, description="The type of data, eg 'cont' for continuous, or 'cat' for categorical")
+    kind: Optional[int] = Field(None, description="If the feature is dependent, or independent 0, 1")
     units: Optional[int] = Field(None, description="Units")
 
 class ModelPerformance(BaseModel):

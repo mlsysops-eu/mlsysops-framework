@@ -35,7 +35,7 @@ def apply(command: dict[str, any]):
             "frequency" : "min" | "max" | "1000000 Hz"
         }
     """
-    # The rest of the code ommited 
+    # The rest of the code omitted 
     cpufreq.set_frequencies(command['frequency'])
     # .....
 ```

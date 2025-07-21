@@ -960,7 +960,7 @@ app_schema = {
                                             "enum": [
                                                 "Volos",
                                                 "Athens",
-                                                "Rende",
+                                                "Render",
                                                 "Milan",
                                                 "Lille",
                                                 "Delft",

@@ -23,7 +23,7 @@ The MLConnector dynamically creates and stores docker images for inference appli
 - `DOCKER_PASSWORD`: Your Docker registry password
 
 ### 2. AWS (File Storage)
-The MLConnector uses an external storage service, S3 to store it's data including training data and other files. You will need to setup and S3 bucket, or S3 compatible service to complete this setup. After, please provide the following details. If you do not have access to S3 bucket, or S3 compatible service, please contact us and we can help setup a temporarly one. 
+The MLConnector uses an external storage service, S3 to store it's data including training data and other files. You will need to setup and S3 bucket, or S3 compatible service to complete this setup. After, please provide the following details. If you do not have access to S3 bucket, or S3 compatible service, please contact us and we can help setup a temporarily one. 
 - `AWS_ACCESS_URL`: AWS S3 endpoint URL
 - `AWS_ACCESS_KEY_ID`: AWS access key ID
 - `AWS_SECRET_ACCESS_KEY`: AWS secret access key

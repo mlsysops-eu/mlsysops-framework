@@ -30,7 +30,7 @@ To ensure the correct bootstrap, the agents should start in the following order:
 
 
 All the deployments take place in a Kubernetes cluster, in separate namespace 'mlsysops-framework'. All the third-party services,
-as well as the Continuum agent are deployed in the managament cluster, the same that is installed in karmada host.
+as well as the Continuum agent are deployed in the management cluster, the same that is installed in karmada host.
 
 #### Step 1: Clone the repo 
 
@@ -50,7 +50,7 @@ For example, a machine at the node level, with hostname `node-1`, should have a 
 the directory `nodes/`.
 
 * **Continuum** level descriptions, require one single file, that declare the continuumID and the clusters that we allow MLSysOps to manage.
-* **Cluster** level descritptions, require a file for each cluster registered in Karmada. It contains the clusterID and a list of node hostnames, that MLSysOps is allowed to manage.
+* **Cluster** level descriptions, require a file for each cluster registered in Karmada. It contains the clusterID and a list of node hostnames, that MLSysOps is allowed to manage.
 * **Node** level descriptions, contain the detailed information about the node resources. Example [here](descriptions/nodes/node-1.yaml).
 
 Before deploying, prepare system descriptions as Kubernetes CRDs:

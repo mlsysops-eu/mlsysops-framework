@@ -8,9 +8,9 @@ policy developers, whereas the Southbound API is primarily intended for system a
 
 <img src="../../assets/img/agent_high.png" width="600" style="margin:auto; display:block;"/>
 
-The agent follows MAPE (Monitor-Analyze-Plan-Execute) paradigm, which was proposed in 2003 [55] to manage autonomic
+The agent follows MAP (Monitor-Analyze-Plan-Execute) paradigm, which was proposed in 2003 [55] to manage autonomic
 systems given high-level objectives from the system administrators, by using the same notion for the main configuration
-tasks, depicted as MAPE Tasks in Figure 32. The programming language of choice is Python, and leverages SPADE Python
+tasks, depicted as MAP Tasks in Figure 32. The programming language of choice is Python, and leverages SPADE Python
 multi-agent framework [56] to form a network of agents that can communicate through XMPP protocol and a set of defined
 messages, providing any necessary functionality from internal tasks that are called behaviours. To achieve seamless
 operation between the various sub-modules, the agent implements a set of controllers that are responsible for managing
