@@ -1,106 +1,117 @@
 # MLSysOps Framework
 
-The *MLSysOps Framework* is the open‑source outcome of the EU‑funded MLSysOps
-Horizon Europe project (Grant ID 101092912), running from Jan 2023 to Dec 2025.
-Its aim is to deliver an AI‑enabled, agent‑based platform for autonomic,
-cross‑layer management of compute, storage, and network resources across cloud,
-edge, and IoT environments.
+The **MLSysOps Framework** is the open-source result of the Horizon Europe _MLSysOps_ project (Grant ID 101092912), running from Jan 2023 to Dec 2025. It delivers an AI-enabled, agent-based platform for autonomic, cross-layer management of compute, storage, and network resources across cloud, edge, and IoT environments.
 
-## Key Objectives
+---
 
-- Provide an *open, AI‑ready framework* for scalable, trustworthy,
-  explainable system operation across heterogeneous infrastructures.
-- Enable *continual ML learning* and retraining during runtime via
-  hierarchical agents.
-- Support *portable, efficient execution* using container innovation and
-  modular, FaaS-inspired offloading.
-- Promote *green, resource‑efficient, and secure operations* while
-  maintaining `QoS`/`QoE` targets.
-- Facilitate realistic evaluation using real-world deployments in smart‑city
-  and precision‑agriculture scenarios.
+## 🚀 Key Objectives
 
-## Core Components
+- Provide an **AI-ready, open framework** for scalable and explainable operations across heterogeneous infrastructures.
+- Enable **continual ML learning and retraining** at runtime using hierarchical agents.
+- Support **portable and efficient execution** via containers and modular, FaaS-style offloading.
+- Promote **green, resource-efficient, and secure operations** while maintaining QoS/QoE.
+- Enable **realistic evaluation** through deployments in smart city and precision agriculture scenarios.
 
-- Hierarchical Agent Architecture: Interfaces with orchestration/control
-  systems and exposes an ML‑model API for plug‑and‑play explainable/re-trainable
-  models.
+---
 
-- Telemetry & Control Knobs: Collects metrics across the continuum and adjusts
-  configuration (e.g., compute, network, storage, accelerator usage)
-  dynamically.
+## 🧩 Core Components
 
-- Distributed FaaS‑style Executor: Enables function offloading across tiers to
-  optimize latency, energy, and performance.
+- **Hierarchical Agent Architecture**  
+  Interfaces with orchestration/control systems and supports plug-and-play ML models.
 
-- Explainable ML & Reinforcement Learning Module: Offers transparent decisions,
-  highlighting input factors influencing agent actions.
+- **Telemetry & Control Knobs**  
+  Collects metrics and dynamically tunes compute, network, storage, and accelerators.
 
-- Use-cases: Includes real applications focusing on smart cities and agriculture.
+- **Distributed FaaS-style Executor**  
+  Offloads functions across layers to optimize latency, energy, and performance.
 
-## Repository Contents
+- **Explainable ML & RL Modules**  
+  Provides transparent decision-making and insight into agent behavior.
 
-| Directory | Description |
-|----------|-------------|
-| `agents/` | Core autonomic agents with policy-based plugins and ML/analytics |
-| `orchestrators/` | Scripts to facilitate testbed setup |
-| `mlsysops-cli/` | Tool to manage MLSysOps-related descriptors (agents, applications, etc.)|
-| `northbound-api/` | Glue API from the CLI to the core Agent framework|
-| `docs/` | Internal and public-facing documentation |
+- **Real-world Use Cases**  
+  Includes smart city and precision agriculture applications.
 
-## Getting Started
+---
+
+## 📁 Repository Structure
+
+| Directory         | Description                                                            |
+| ----------------- | ---------------------------------------------------------------------- |
+| `agents/`         | Core autonomic agents with policy plugins and ML analytics             |
+| `orchestrators/`  | Scripts and tools for testbed orchestration                            |
+| `mlsysops-cli/`   | Command Line Interface to manage agents, applications, and deployments |
+| `northbound-api/` | API layer connecting CLI with the core framework                       |
+| `docs/`           | Design documents, usage guides, and contribution guidelines            |
+
+---
+
+## 🛠️ Getting Started
 
 ### Prerequisites
 
-- Kubernetes v1.26+
+- Kubernetes `v1.26+`
 - `kubectl`, `karmada`
-- Python 3.10+
+- Python `3.10+`
 - Access to a 4-node testbed environment
 
 ### Quick Start
 
-Install the CLI tool:
+Install the CLI:
 
 ```bash
 pip install mlsysops-cli
 ```
 
-Given an `ansible` inventory to setup 4 nodes in `inv.yml`, you can deploy the framework:
+Clone the repository:
 
 ```bash
-mls framework deploy-all --inventory inv.yml
+git clone https://github.com/RR-Sahoo/mlsysops-framework.git
+cd mlsysops-framework
 ```
 
-Create and deploy an example application:
+Launch the test environment:
 
 ```bash
-mls framework create-app-test-description
-mls apps deploy-app --path mlsysops-app-test-description.yaml
+make deploy-testbed
 ```
 
-See docs/ for detailed component setup guides.
+Use the CLI:
 
-## Documentation
+```bash
+mlsysops-cli --help
+```
 
-Check the full documentation at [docs.mlsysops.eu](https://docs.mlsysops.eu)
+---
 
-## Contributing
+## 🤝 Contributing
 
 We welcome contributions from the community!
 
-Browse [good first issues](https://github.com/mlsysops-eu/mlsysops-framework/issues?q=is%3Aissue%20state%3Aopen%20label%3Agood-first-issue)
+- See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+- Read our [Code of Conduct](docs/CODE_OF_CONDUCT.md).
+- For design details, refer to [docs/design-overview.md](docs/design-overview.md).
 
-Review our [CONTRIBUTING.md](https://docs.mlsysops.eu/developer-guide/contribute/)
+---
 
-Follow our [CODE_OF_CONDUCT.md](https://github.com/mlsysops-eu/mlsysops-framework/blob/main/docs/developer-guide/Code-of-Conduct.md)
+## 👥 Maintainers
 
-## License
+The MLSysOps Framework is maintained by:
 
-This project is licensed under the Apache 2.0 License.
+- [Your Name / Org 1](mailto:your.email@example.com)
+- [Your Name / Org 2](mailto:another.email@example.com)
 
-## Acknowledgements
+See [MAINTAINERS.md](docs/MAINTAINERS.md) for the full list.
 
-This framework is developed as part of the Horizon Europe MLSysOps Project
-(Grant ID 101092912), coordinated by the University of Thessaly, with
-contributions from 12 European partners across academia and industry.
+---
 
-Learn more at [mlsysops.eu](https://mlsysops.eu)
+## 📄 License
+
+This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## 📢 Acknowledgements
+
+This work is funded by the European Union’s Horizon Europe program under Grant Agreement No. 101092912 (MLSysOps).
+
+---

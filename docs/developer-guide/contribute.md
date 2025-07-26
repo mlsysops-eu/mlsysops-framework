@@ -4,188 +4,158 @@ title: "Contributing"
 description: "Contributing guidelines"
 ---
 
-The MLSysOps framework is an open-source project licensed under the [Apache
-License
-2.0](https://github.com/mlsysops-eu/mlsysops-framework/blob/main/LICENSE).
-We welcome anyone who would be interested in contributing to `MLSysOps framework`.
-As a first step, please take a look at the following document.
-The current document provides a high level overview of `MLSysOps framework`'s code structure, along with a few guidelines regarding contributions to the project.
+# 🛠️ How to Contribute
 
-## Table of contents:
+Welcome! 👋 We're thrilled you're considering contributing to the **MLSysOps Framework**. This guide will help you get started.
 
-1. [Code organization](#code-organization)
-2. [How to contribute](#how-to-contribute)
-3. [Opening an issue](#opening-an-issue)
-4. [Requesting new features](#requesting-new-features)
-5. [Submitting a PR](#submitting-a-pr)
-6. [Style guide](#style-guide)
-7. [Contact](#contact)
+---
 
-## Code organization
+## 📌 Table of Contents
 
-The MLSysOps framework is structured as follows:
+- [Ground Rules](#-ground-rules)
+- [Code of Conduct](#-code-of-conduct)
+- [Ways to Contribute](#-ways-to-contribute)
+- [How to Submit a PR](#-how-to-submit-a-pr)
+- [Writing Good Commit Messages](#-writing-good-commit-messages)
+- [Issue Labels](#-issue-labels)
+- [Branching Strategy](#-branching-strategy)
+- [Contact](#-contact)
 
-TBC
+---
 
-## How to contribute
+## 📋 Ground Rules
 
-There are plenty of ways to contribute to an open source project, even without changing or touching the code.
-Therefore, anyone who is interested in this project is very welcome to contribute in one of the following ways:
+- Be respectful and considerate to others.
+- Make sure your contributions align with the project's goals.
+- Write clear, concise, and grammatically correct Markdown.
+- Ensure documentation and code are easy to read and understand.
+- When in doubt, open an issue and ask for guidance.
 
-1.  Using `MLSysOps framework`. Try it out yourself and let us know your experience. Did everything work well? Were the instructions clear?
-2.  Improve or suggest changes to the documentation of the project. Documentation is very important for every project, hence any ideas on how to improve the documentation to make it more clear are more than welcome.
-3.  Request new features. Any proposals for improving or adding new features are very welcome.
-4.  Find a bug and report it. Bugs are everywhere and some are hidden very well. As a result, we would really appreciate it if someone found a bug and reported it to the maintainers.
-5.  Make changes to the code. Improve the code, add new functionalities and make `MLSysOps framework` even more useful.
+---
 
-## Opening an issue
+## 🤝 Code of Conduct
 
-We use Github issues to track bugs and requests for new features.
-Anyone is welcome to open a new issue, which is either related to a bug or a request for a new feature.
+By participating in this project, you agree to abide by our [Code of Conduct](../../CODE_OF_CONDUCT.md). Please take a moment to read it.
 
-### Reporting bugs
+---
 
-In order to report a bug or misbehavior in `MLSysOps framework`, a user can open a new issue explaining the problem.
-For the time being, we do not use any strict template for reporting any issues.
-However, in order to easily identify and fix the problem, it would be very helpful to provide enough information.
-In that context, when opening a new issue regarding a bug, we kindly ask you to:
+## ✨ Ways to Contribute
 
-- Mark the issue with the bug label
-- Provide the following information:
+We welcome contributions of all kinds, including:
 
-    1. A short description of the bug.
-    2. The respective logs both from the output and containerd.
-    3. Framework's version manifest (either the commit hash or the version manifest file).
-    4. The execution environment (CPU architecture, VMM etc.).
-    5. Any particular steps to reproduce the issue.
-- Keep an eye on the issue for possible questions from the maintainers.
+- 📖 Improving documentation and fixing typos
+- 💡 Suggesting new features or enhancements
+- 🐛 Reporting bugs
+- 🧪 Writing or improving tests
+- 💻 Fixing issues
+- 🌐 Translating the project
+- 🧱 Improving code structure or consistency
 
-A template for an issue could be the following one:
+---
+
+## 🔀 How to Submit a PR
+
+1. **Fork the repository**  
+   Click the **Fork** button on the top-right of this repo's GitHub page.
+
+2. **Clone your forked repo**
+
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/mlsysops-framework.git
+   cd mlsysops-framework
+   ```
+
+3. **Create a new branch**
+
+   ```bash
+   git checkout -b your-feature-name
+   ```
+
+4. **Make your changes**
+   Ensure your code follows existing style guidelines and passes all checks.
+
+5. **Commit your changes**
+
+   ```bash
+   git commit -m "feat: Add a descriptive message"
+   ```
+
+6. **Push your branch**
+
+   ```bash
+   git push origin your-feature-name
+   ```
+
+7. **Open a Pull Request**
+   Go to the GitHub page of your fork, and click "Compare & pull request".
+   Provide a clear title and description of your changes.
+
+---
+
+## ✍️ Writing Good Commit Messages
+
+Follow the conventional commit format:
+
+```bash
+<type>(scope): short description
 ```
-## Description
-An explanation of the issue 
 
-## System info
+**Examples:**
 
-- Version:
-- Arch:
-- VMM:
-- ... 
+- `feat(docs): add contributing guidelines`
+- `fix(auth): resolve login redirect issue`
+- `chore: update dependencies`
 
-## Steps to reproduce
-A list of steps that can reproduce the issue.
+**Types:**
+
+- `feat` – A new feature
+- `fix` – A bug fix
+- `docs` – Documentation only changes
+- `style` – Changes that do not affect the meaning of the code
+- `refactor` – Code changes that neither fix a bug nor add a feature
+- `test` – Adding missing tests
+- `chore` – Changes to the build process or tools
+
+---
+
+## 🏷️ Issue Labels
+
+Our GitHub issues use the following labels to help contributors find where they can help:
+
+- `good first issue` – Great for newcomers!
+- `help wanted` – We need help with this.
+- `bug` – Confirmed bugs.
+- `enhancement` – Feature or improvement requests.
+- `question` – Discussions or clarifications.
+
+---
+
+## 🌱 Branching Strategy
+
+We follow a simple Git branching model:
+
+- `main` – Stable, production-ready code.
+- `dev` – Development branch. All features and bug fixes should branch from and merge back into dev.
+
+**Example workflow:**
+
+```bash
+# Start from dev
+git checkout dev
+git pull
+
+# Create your feature branch
+git checkout -b feat/component-xyz
 ```
 
-### Requesting new features
+---
 
-We will be very happy to listen from users about new features that they would like to see in `MLSysOps framework`.
-One way to communicate such a request is using Github issues.
-For the time being, we do not use any strict template for requesting new features.
-However, we kindly ask you to mark the issue with the enhancement label and provide a description of the new feature.
+## 📬 Contact
 
-## Submitting a PR
+If you have questions, suggestions, or just want to say hi, feel free to:
 
-Anyone should feel free to submit a change or an addition to the codebase of `MLSysOps framework`.
-Currently, we use Github's Pull Requests (PRs) to submit changes to `MLSysOps framework`'s codebase.
-Before creating a new PR, please follow the guidelines below:
+- Open an issue
+- Start a discussion
+- Reach out via email
 
-- Make sure that the changes do not break the building process of `MLSysOps framework`.
-- Make sure that all the tests run successfully.
-- Make sure that no commit in a PR breaks the building process of `MLSysOps framework`
-- Make sure to sign-off your commits.
-- Provide meaningful commit messages, describing shortly the changes.
-- Provide a meaningful PR message
-
-As soon as a new PR is created the following workflow will take place:
-
-  1. The creator of the PR should invoke the tests by adding the `ok-to-test` label.
-  2. If the tests pass, request from one or more `MLSysOps framework`'s [maintainers](https://github.com/nubificus/MLSysOps framework/blob/main/MAINTAINERS) to review the PR.
-  3. The reviewers submit their review.
-  4. The author of the PR should address all the comments from the reviewers.
-  5. As soon as a reviewer approves the PR, an action will add the appropriate git trailers in the PR's commits.
-  6. The reviewer who accepted the changes will merge the new changes.
-
-## Labels for the CI
-
-We use github workflows to invoke some tests when a new PR opens for `MLSysOps framework`.
-In particular, we perform the following workflows tests:
-
-- Linting of the commit message. Please check the [git commit message style](#git-commit-messages) below for more info.
-- Spell check, since `MLSysOps framework` repository contains its documentation too.
-- License check
-- Code linting.
-- Building artifacts for amd64 and aarch64.
-- Unit tests
-- End-to-end tests
-
-For a better control over the tests and workflows that run in a PR, we define
-three labels which can be used:
-
-- `ok-to-test`: Runs a full CI workflow, meaning all lint tests (commit
-  message, spellcheck, license), Code linting, building for x86 and aarch64,
-  unit tests and at last end-to-end tests.
-- `skip-build`: Skips the building workflows along with unit and end-to end tests
-  running all the linting tests. This is useful when
-  the PR is related to docs and it can help for catching spelling errors etc. In
-  addition, if the changes are not related to the codebase, running the
-  end-to-end tests is not required and saves some time.
-- `skip-lint`: Skips the linting phase. This is particularly useful on draft
-  PRs, when we want to just test the functionality of the code (either a bug
-  fix, or a new feature) and defer the cleanup/polishing of commits, code, and
-  docs to when the PR will be ready for review.
-
-**Note**: Both `skip-build` and `skip-lint` assume that the `ok-to-test` label
-is added.
-
-## Style guide
-
-### Git commit messages
-
-Please follow the below guidelines for your commit messages:
-
-- Limit the first line to 72 characters or less.
-- Limit all the other lines to 80 characters
-- Follow the [Conventional Commits](https://www.conventionalcommits.org/)
-  specification and, specifically, format the header as `<type>[optional scope]:
-  <description>`, where `description` must not end with a fullstop and `type`
-  can be one of:
-
-  - *feat*: A new feature
-  - *fix*: A bug fix
-  - *docs*: Documentation only changes
-  - *style*: Changes that do not affect the meaning of the code (white-space,
-    formatting, missing semi-colons, etc)
-  - *refactor*: A code change that neither fixes a bug nor adds a feature
-  - *`perf`*: A code change that improves performance
-  - *test*: Adding missing tests
-  - *build*: Changes that affect the build system or external dependencies
-    (example scopes: gulp, broccoli, `npm`)
-  - *ci*: Changes to our CI configuration files and scripts (example scopes:
-    `Travis`, `Circle`, `BrowserStack`, `SauceLabs`)
-  - *chore*: Other changes that don't modify src or test files
-  - *revert*: Reverts a previous commit
-- In case the PR is associated with an issue, please refer to it, using the git trailer `Fixes: #Nr_issue`
-- Always sign-off your commit message
-
-Since the MLSysOps framework comprises code written in various programming
-languages we use the following styles for each:
-
-### Golang code style
-
-We follow `gofmt`'s rules on formatting GO code. Therefore, we ask all
-contributors to do the same.  Go provides the `gofmt` tool, which can be used
-for formatting your code.
-
-### Python
-TBC 
-
-### C
-TBC
-
-## Contact
-
-Feel free to contact any of the
-[maintainers](https://github.com/mlsysops-eu/mlsysops-framework/blob/main/MAINTAINERS)
-or using one of the below email addresses:
-
-- info@mlsysops.eu
+Thank you for contributing to MLSysOps Framework! 💙
