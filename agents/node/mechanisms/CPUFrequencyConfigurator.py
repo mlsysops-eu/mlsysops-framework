@@ -1,58 +1,42 @@
 from cpufreq import cpuFreq
+from agents.mlsysops.logger_util import logger
 
 
 def initialize(inbound_queue, outbound_queue,agent_state=None):
     pass
 
-# TODO change to paylod
-async def apply(value: dict[str, any]) -> bool:
-    """
-    Applies the given CPU frequency settings based on the provided parameters.
 
-    This method modifies the CPU's frequency settings by either applying the changes across
-    all CPUs or targeting a specific CPU. The modifications set a new minimum and maximum
-    frequency based on the input values.
+async def apply(self, payload: dict[str, any]) -> bool:
+    """
+    Apply CPU frequency settings based on the provided payload.
+
+    Expected payload structure:
+        {
+            "core_id": int,
+            "frequency": str  # e.g., "2.3GHz"
+        }
 
     Args:
-        value (dict):
-         {
-            "command": "reset" | "set",
-            "cpu": "all" | "0,1,2...",
-            "frequency" : "min" | "max" | "1000000 Hz"
-        }
+        payload (dict): Dictionary containing CPU configuration details.
+
+    Returns:
+        bool: True if applied successfully, False otherwise.
     """
-    return True
+    try:
+        core_id = payload.get("core_id")
+        frequency = payload.get("frequency")
 
-    if "command" not in value:
+        if core_id is None or frequency is None:
+            raise ValueError("Payload must contain 'core_id' and 'frequency'")
+
+        # Example: Apply the frequency (actual implementation depends on your mechanism)
+        # For now, just log or simulate
+        logger.debug(f"Applying CPU frequency: {frequency} to core {core_id}")
+        
         return True
-
-
-    match value['command']:
-        case "reset":
-            reset_to_governor()
-            return
-        case "set":
-            cpufreq = cpuFreq()
-            set_governor(governor="userspace", cpu="all")
-            try:
-                # Set frequency for all CPUs
-                cpufreq.set_governor("userspace", cpu="all")
-                if value['cpu'] == "all":
-                    if value['cpu'] == "min":
-                        set_to_min()
-                    elif value['cpu'] == "max":
-                        set_to_max()
-                    else:
-                        cpufreq.set_frequencies(value['frequency'])
-                else:
-                    # Set frequency for a specific CPU
-                    cpufreq.set_governor("userspace", cpu=value['cpu'])
-                    cpufreq.set_frequencies(int(value['frequency']), value['cpu'])
-                print(f"Frequency successfully set {value}")
-            except Exception as e:
-                print(f"Error setting CPU frequency: {e}")
-            finally:
-                reset_to_governor()
+    except Exception as e:
+        logger.error(f"Error applying CPU settings: {e}")
+        return False
 
 def get_options():
     """

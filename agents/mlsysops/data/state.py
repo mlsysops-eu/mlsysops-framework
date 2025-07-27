@@ -318,3 +318,6 @@ class MLSState:
 
             # Send updates to the task log
             return self.update_task_log(plan_uid, updates=updates)
+    
+    def is_plan_app_active(self, app_id: str) -> bool:
+        return app_id in self.applications or app_id in self.active_mechanisms
