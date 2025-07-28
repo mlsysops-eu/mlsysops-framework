@@ -1,12 +1,13 @@
+import time
 import asyncio
-from fastapi import FastAPI, APIRouter, HTTPException
 import spade
+from fastapi import FastAPI, APIRouter, HTTPException
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour
 from spade.message import Message
 from spade.template import Template
 from redis_setup import redis_mgt as rm
-import time
+from agents.mlsysops.logger_util import logger
 
 app = FastAPI()
 router = APIRouter()
@@ -25,7 +26,7 @@ class NBAgent(Agent):
         """ A behavior that sends a ping message to a specific recipient and waits for a response. """
 
         async def run(self):
-            print("PingBehaviour running...")
+            logger.info("PingBehaviour running...")
             recipient_jid = "continuum@karmada.mlsysops.eu"
             time.sleep(2)
 
@@ -34,21 +35,21 @@ class NBAgent(Agent):
             msg.set_metadata("performative", "ping")
             msg.body = "Ping from " + str(self.agent.jid)
 
-            print(f"Sending ping to {recipient_jid}")
+            logger.info(f"Sending ping to {recipient_jid}")
             await self.send(msg)
 
             # Wait for response for 5 seconds
             response = await self.receive(timeout=10)
             if response:
-                print(f"Received response: {response.body}")
-                print("Agent Alive")
+                logger.info(f"Received response: {response.body}")
+                logger.info("Agent Alive")
                 return {"status": "alive", "response": response.body}
             else:
-                print("Did not receive a response. Agent Error.")
+                logger.info("Did not receive a response. Agent Error.")
                 return {"status": "error", "message": "No response received"}
 
     async def setup(self):
-        print("Starting NBAPI agent...")
+        logger.info("Starting NBAPI agent...")
         redis_manager = rm.RedisManager()
         redis_manager.connect()
 
@@ -73,7 +74,7 @@ class MLAgent(Agent):
             self.mode = mode  # Store the mode value (0 or 1)
 
         async def run(self):
-            print(f"ManageModeBehaviour running with mode {self.mode}...")
+            logger.info(f"ManageModeBehaviour running with mode {self.mode}...")
 
             recipient_jids = self.r.get_keys("system_agents")
             recipient_jids.append("continuum@karmada.mlsysops.eu")
@@ -81,11 +82,11 @@ class MLAgent(Agent):
                 msg = Message(to=recipient_jid)
                 msg.set_metadata("performative", "ch_mode")
                 msg.body = f"Change management mode to: {self.mode}"  # Send mode in the message
-                print(f"Sending mode {self.mode} to {recipient_jid}")
+                logger.info(f"Sending mode {self.mode} to {recipient_jid}")
                 await self.send(msg)
 
     async def setup(self):
-        print("Starting ML_client agent...")
+        logger.info("Starting ML_client agent...")
 
 
 @router.get("/ping", tags=["Management"])

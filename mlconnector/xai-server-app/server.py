@@ -5,6 +5,7 @@ import pandas as pd
 from database import getModelByManager, getModelDataById
 from ShapExplainer import ShapExplainer  # Assuming your class is in shap_explainer.py
 from typing import Optional
+from agents.mlsysops.logger_util import logger
 
 app = FastAPI()
 
@@ -67,7 +68,7 @@ models = {}
 #         for v in ["local_time", "download_time_ms"]:
 #             if v in test_data.keys():
 #                 test_data = test_data.head(1000).drop(v, axis=1)
-#         print("-I- Data Downloaded Successfully")
+#         logger("-I- Data Downloaded Successfully")
 #         models[request.model_id] = {"shap_explainer_instance":None, "test_data":test_data, "status":"Processing"}
 #         shap_explainer_instance = ShapExplainer(model_path=model_data, test_data=test_data)
 #         if not request.wait_for_trining:
@@ -124,7 +125,7 @@ def initFromManager(request: InitFromRepoRequest):
         for v in ["local_time", "download_time_ms"]:
             if v in test_data.keys():
                 test_data = test_data.head(1000).drop(v, axis=1)
-        print("-I- Data Downloaded Successfully")
+        logger.info("-I- Data Downloaded Successfully")
         models[request.model_id] = {"shap_explainer_instance":None, "test_data":test_data, "status":"Processing"}
         shap_explainer_instance = ShapExplainer(model_path=model_data, test_data=test_data)
         if not request.wait_for_trining:

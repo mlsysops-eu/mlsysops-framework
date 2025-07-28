@@ -21,6 +21,8 @@ from utils.manage_s3 import S3Manager
 import utils.mldeployments
 #myuuid = uuid.uuid4()
 
+from agents.mlsysops.logger_util import logger
+
 
 s3_manager = S3Manager(
     os.getenv("AWS_S3_BUCKET_DATA"),
@@ -40,8 +42,8 @@ def _serialize(obj):
 async def update_deployments(db: AsyncSession, deployments: List[dict]):
     count = 1
     for row in deployments:
-        print("Processing deployment: ", count, " of ", len(deployments))
-        print("*"*20)
+        logger.debug("Processing deployment: ", count, " of ", len(deployments))
+        logger.debug("*"*20)
         # Convert the dictionary to a Pydantic model
         ml_deployment = MLDeploymentCreate(
             modelid=row['modelid'],
@@ -51,7 +53,7 @@ async def update_deployments(db: AsyncSession, deployments: List[dict]):
             inference_data=0,  
         )
         results = await utils.mldeployments.create_deployment(db=db, deployment=ml_deployment, create_new=True)
-        print("Deployment created: ", results)
+        logger.info("Deployment created: ", results)
         count += 1
        
         """# Check if the deployment is already in the database
@@ -178,7 +180,7 @@ async def upload_models(
         return True
 
     except Exception as e:
-        print(f"[ERROR] upload_models failed: {e}")
+        logger.error(f"upload_models failed: {e}")
         return False
 
     finally:

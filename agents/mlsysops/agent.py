@@ -63,7 +63,7 @@ class MLSAgent:
         except Exception as e:
             logger.error(f"Error initializing SPADE: {e}")
 
-        print("blahblahblah")
+        logger.info("blahblahblah")
         # Telemetry
         self.telemetry_controller = TelemetryController(self)
 
@@ -133,15 +133,15 @@ class MLSAgent:
         """
         Task to listen for messages from the message queue and act upon them.
         """
-        print("Starting default Message Queue Listener...")
+        logger("Starting default Message Queue Listener...")
         while True:
             try:
                 # Wait for a message from the queue (default behavior)
                 message = await self.message_queue.get()
-                print(f"Received message: {message}")
+                logger(f"Received message: {message}")
                 # Default handling logic (can be extended in subclasses)
             except Exception as e:
-                print(f"Error in message listener: {e}")
+                logger(f"Error in message listener: {e}")
 
     async def send_message_to_node(self, recipient, event, payload):
         """
@@ -186,7 +186,7 @@ class MLSAgent:
         Main process of the MLSAgent.
         """
         # Apply MLS System description
-        print("In RUN of AGENT")
+        logger("In RUN of AGENT")
         try:
             if self.state.configuration.continuum_layer == 'cluster':
                 logger.debug(f"Applying system description")
@@ -210,7 +210,7 @@ class MLSAgent:
         await self.telemetry_controller.initialize()
 
         try:
-            print("In spade_instance_start")
+            logger("In spade_instance_start")
             await self.spade_instance.start(auto_register=True)
         except Exception as e:
             logger.error(f"Error starting SPADE: {traceback.format_exc()}")

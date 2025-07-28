@@ -3,6 +3,7 @@ import threading
 from subprocess import Popen, PIPE
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from agents.mlsysops.logger_util import logger
 import re
 import json
 import pytest
@@ -54,7 +55,7 @@ def run_agent():
     Runs the cluster/main.py script as a subprocess and ensures the agent starts.
     Captures stdout/stderr and writes them to both test.log and the console for debugging.
     """
-    print("Starting agent process...")
+    logger.info("Starting agent process...")
     env = os.environ.copy()
     env.update(ENV_VARS)
 
@@ -92,7 +93,7 @@ def parse_test_logs():
     parsed_logs = {}  # Dictionary to store the parsed results
     consistent_planuuid = None  # To ensure all stages use the same planuid
 
-    print("Parsing agent.log for TEST messages...")
+    logger.info("Parsing agent.log for TEST messages...")
     try:
         with open(log_file_path, "r") as logfile:
             logs = logfile.readlines()
@@ -139,29 +140,29 @@ def parse_test_logs():
                     parsed_logs[path_filename][test_number] = message_data
 
         # Write the resulting parsed_logs dictionary to a file as JSON
-        print(f"Writing parsed log data to {output_file_path}...")
+        logger.info(f"Writing parsed log data to {output_file_path}...")
         with open(output_file_path, "w") as outfile:
             json.dump(parsed_logs, outfile, indent=4)
 
-        print("Log parsing completed. Parsed data written to JSON.")
+        logger.info("Log parsing completed. Parsed data written to JSON.")
         return parsed_logs
 
     except FileNotFoundError:
-        print(f"Error: Log file {log_file_path} not found.")
+        logger.error(f"Error: Log file {log_file_path} not found.")
     except Exception as e:
-        print(f"An error occurred while processing the logs: {e}")
+        logger.error(f"An error occurred while processing the logs: {e}")
 
 def rename_file(old_filename, new_filename):
     try:
         # Rename the file
         os.rename(old_filename, new_filename)
-        print(f"File renamed from {old_filename} to {new_filename}.")
+        logger.info(f"File renamed from {old_filename} to {new_filename}.")
     except FileNotFoundError:
-        print(f"Error: {old_filename} not found.")
+        logger.error(f"Error: {old_filename} not found.")
     except PermissionError:
-        print("Error: Permission denied.")
+        logger.error("Error: Permission denied.")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.error(f"An unexpected error occurred: {e}")
 
 def assert_payloads(subtests, expected_logs, parsed_logs):
     # Step 3: Validate each stage using subtests
@@ -192,7 +193,7 @@ def assert_payloads(subtests, expected_logs, parsed_logs):
                 f"Inconsistent `planuid` values found across stages: {all_planuids}"
             )
 
-    print("All parsed logs match expected statuses and structure!")
+    logger.info("All parsed logs match expected statuses and structure!")
 
 @pytest.mark.timeout(40)  # Fail the test if it exceeds 40 seconds
 def test_cluster_relocate_plan(subtests):
@@ -205,7 +206,7 @@ def test_cluster_relocate_plan(subtests):
         subtests (SubTests): A SubTests instance for managing multiple subtest contexts within
                              a single test function.
     """
-    print("Setting up environment variables...")
+    logger.info("Setting up environment variables...")
     for key, value in ENV_VARS.items():
         os.environ[key] = value
 
@@ -224,11 +225,11 @@ def test_cluster_relocate_plan(subtests):
 
     try:
         observer.start()
-        print(f"Watching marker in {AGENT_LOG_PATH}: {EXPECTED_LOG_MARKER}")
+        logger.debug(f"Watching marker in {AGENT_LOG_PATH}: {EXPECTED_LOG_MARKER}")
         if not stop_event.wait(timeout=30):
-            print("Timeout: Marker not found in logs.")
+            logger.debug("Timeout: Marker not found in logs.")
         else:
-            print(f"Marker found: {EXPECTED_LOG_MARKER}")
+            logger.debug(f"Marker found: {EXPECTED_LOG_MARKER}")
         agent_process.terminate()
 
     finally:
@@ -290,7 +291,7 @@ def test_cluster_relocate_plan(subtests):
 #         subtests (SubTests): A SubTests instance for managing multiple subtest contexts within
 #                              a single test function.
 #     """
-#     print("Setting up environment variables...")
+#     logger("Setting up environment variables...")
 #     for key, value in ENV_VARS.items():
 #         os.environ[key] = value
 #
@@ -309,11 +310,11 @@ def test_cluster_relocate_plan(subtests):
 #
 #     try:
 #         observer.start()
-#         print(f"Watching marker in {AGENT_LOG_PATH}: {EXPECTED_LOG_MARKER}")
+#         logger(f"Watching marker in {AGENT_LOG_PATH}: {EXPECTED_LOG_MARKER}")
 #         if not stop_event.wait(timeout=30):
-#             print("Timeout: Marker not found in logs.")
+#             logger("Timeout: Marker not found in logs.")
 #         else:
-#             print(f"Marker found: {EXPECTED_LOG_MARKER}")
+#             logger(f"Marker found: {EXPECTED_LOG_MARKER}")
 #         agent_process.terminate()
 #
 #     finally:

@@ -38,4 +38,4 @@ class CheckInactiveClustersBehaviour(PeriodicBehaviour):
                 last_seen_time = datetime.fromisoformat(last_seen)
                 if now - last_seen_time > self.timeout:
                     self.r.remove_key(self.r.redis_dict, node_jid)
-                    print(f"Node {node_jid} removed due to inactivity.")
+                    logger.debug(f"Node {node_jid} removed due to inactivity.")

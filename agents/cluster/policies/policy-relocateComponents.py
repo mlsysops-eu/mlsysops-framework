@@ -11,7 +11,7 @@ from mlsysops.logger_util import logger
 from mlsysops.utilities import evaluate_condition
 
 def initialize():
-    print(f"Initializing policy {inspect.stack()[1].filename}")
+    logger.info(f"Initializing policy {inspect.stack()[1].filename}")
 
     initialContext = {
         "telemetry": {

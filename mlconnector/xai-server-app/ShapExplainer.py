@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import io
 import base64
+from agents.mlsysops.logger_util import logger
 
 
 class ShapExplainer:
@@ -15,7 +16,7 @@ class ShapExplainer:
         self.model_path = model_path
         self.model = self.load_model()
         self.test_data = test_data
-        print(self.model)
+        logger.info(self.model)
     def load_model(self):
         return joblib.load(self.model_path)
 

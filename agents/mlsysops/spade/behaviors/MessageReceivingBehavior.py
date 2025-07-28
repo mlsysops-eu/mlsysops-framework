@@ -117,6 +117,6 @@ class MessageReceivingBehavior(CyclicBehaviour):
                         }
                         await self.message_queue.put(payload)
                     except Exception: 
-                        print("Exception ;-)")
+                        logger.error("Exception ;-)")
         else:
             logger.debug("Did not received any message after 10 seconds")

@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from jsonschema import validate, ValidationError
 from MLSysOps_Schemas.mlsysops_schemas import node_schema, cluster_schema, datacenter_schema, continuum_schema
 from redis_setup import redis_mgt as rm
+from agents.mlsysops.logger_util import logger
 
 # JSON schema with enum validation for the city
 # Update the required fields in the JSON schema
@@ -56,15 +57,15 @@ last_connection_time = None
 async def deploy_infra(request: Request):
     try:
         data = await request.json()
-        #print(data)
+        #logger(data)
     except json.JSONDecodeError:
-        print("error")
+        logger.error("error")
         return HTTPException(status_code=400, detail="Invalid JSON payload")
 
     if 'uri' in data:
         # Retrieve and process the application configuration from the URI
         uri = data['uri']
-        print(f"The path uri received is  {uri}")
+        logger.error(f"The path uri received is  {uri}")
 
         try:
             response = requests.get(uri)
@@ -80,7 +81,7 @@ async def deploy_infra(request: Request):
     validation_error = validate_infrastructure_file(json_data)
 
     if validation_error is None:
-        print("Now execute the validation with the actual infrastructure and save in a datastructure")
+        logger.info("Now execute the validation with the actual infrastructure and save in a datastructure")
 
     else:
         raise HTTPException(status_code=400, detail=validation_error)
@@ -93,7 +94,7 @@ async def deploy_infra(request: Request):
 
 @router.get("/list/", tags=["Infra"])
 async def list_infra(id_type: str, id_value: str):
-    print(f"requested info : {id_type}, with id {id_value}")
+    logger.info(f"requested info : {id_type}, with id {id_value}")
 
 
 
@@ -107,7 +108,7 @@ async def list_infra(id_type: str, id_value: str):
 # POST a new product
 @router.get("/node/{node_id}", tags=["Infra"])
 async def get_node_state(app_id: str):
-    print("return the app mQoS metric of ", app_id)
+    logger.info("return the app mQoS metric of ", app_id)
     return (json.dumps(app_id))
 
 

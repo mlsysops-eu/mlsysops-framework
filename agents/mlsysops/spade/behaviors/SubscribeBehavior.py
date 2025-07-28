@@ -43,7 +43,7 @@ class Subscribe(CyclicBehaviour):
         logger.debug(self.agent_to_subscribe)
         logger.debug(msg.thread)
         await self.send(msg)
-        # print("Subscription sent!\n")
+        # logger("Subscription sent!\n")
 
         response = await self.receive(timeout=10)  # Wait for a response
 

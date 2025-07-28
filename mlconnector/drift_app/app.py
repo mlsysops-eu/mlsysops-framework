@@ -10,6 +10,7 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 import utilities as utl
 import json
+from agents.mlsysops.logger_util import logger
 
 
 load_dotenv(override=True)
@@ -139,7 +140,7 @@ def update_features(selected_model):
         q = "SELECT DISTINCT feature FROM drift_metrics WHERE modelid = %s ORDER BY feature"
         features = pd.read_sql(q, engine, params=(selected_model,))["feature"].tolist()
     except Exception as e:
-        print("Error reading features:", e)
+        logger.exception("Error reading features:", str(e))
         return [], None, "❌ Error loading features", True
 
     if not features:
@@ -170,7 +171,7 @@ def update_graph(selected_model, selected_feature):
         """
         df = pd.read_sql(q, engine, params=(selected_model, selected_feature))
     except Exception as e:
-        print("Error loading drift data:", e)
+        logger.error("Error loading drift data:", str(e))
         return {}, html.Span("❌ Error loading data.", className="text-danger fw-bold")
 
     if df.empty:
@@ -216,7 +217,7 @@ def update_table(selected_model):
         df["timestamp"] = df["timestamp"].astype(str)
         return df.to_dict("records")
     except Exception as e:
-        print("Error loading table data:", e)
+        logger.error("Error loading table data:", str(e))
         return []
     
 def drif_job():

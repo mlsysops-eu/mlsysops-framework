@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, List, Any
 from enum import Enum
 from mlsysops.events import MessageEvents
+from agents.mlsysops.logger_util import logger
 
 # --------------- SHARED COMPONENTS --------------- #
 
@@ -317,8 +318,8 @@ if __name__ == "__main__":
         try:
             event = FluidityEvent(**example)
             parsed_payload = event.get_payload_model()
-            print(f"Event: {example['event']}")
-            print(parsed_payload.model_dump_json(indent=4))
+            logger.info(f"Event: {example['event']}")
+            logger.info(parsed_payload.model_dump_json(indent=4))
         except Exception as e:
-            print(f"Error processing event: {example['event']}")
-            print(f"Exception: {str(e)}")
+            logger.error(f"Error processing event: {example['event']}")
+            logger.error(f"Exception: {str(e)}")

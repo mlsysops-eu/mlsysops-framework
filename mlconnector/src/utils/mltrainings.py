@@ -17,6 +17,7 @@ import os
 import json
 from utils.manage_s3 import S3Manager
 from dotenv import load_dotenv
+from agents.mlsysops.logger_util import logger
 
 load_dotenv(verbose=True, override=True)
 
@@ -39,7 +40,7 @@ def prepare_file_artifact(s3_manager: S3Manager, file_name: str, download_dir: s
 
     # download from S3
     s3_manager.download_file(object_name=file_name, download_path=local_path)
-    print(f"File downloaded to {local_path}")
+    logger.info(f"File downloaded to {local_path}")
     return local_path
 
 async def get_train_deplyment_id(db: AsyncSession, modelid: str):
@@ -62,7 +63,7 @@ async def create_training(db: AsyncSession, mltrain: MLTrainCreate):
     else:
         local_code_path = prepare_file_artifact(s3_manager, file_code[0].filename)
         local_data_path = prepare_file_artifact(s3_manager, file_data[0].filename)
-        #print(model[0][1].filename)
+        #logger(model[0][1].filename)
         image_name = "registry.mlsysops.eu/usecases/augmenta-demo-testbed/"+deployment_id+":0.0.1"
         build_and_push_image(
             mltrain.modelid, 
@@ -86,7 +87,7 @@ async def create_training(db: AsyncSession, mltrain: MLTrainCreate):
         )
         deployment_json = json.dumps(new_deployment)
         
-        print(str(deployment_json))
+        logger.debug(str(deployment_json))
         
         
         new_train = MLTraining(

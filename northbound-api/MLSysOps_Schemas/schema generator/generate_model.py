@@ -7,6 +7,7 @@ import yaml
 import json
 import subprocess
 from jsonschema import validate, ValidationError
+from agents.mlsysops.logger_util import logger
 
 def find_single_crd_yaml(crd_dir: str):
     """
@@ -20,10 +21,10 @@ def find_single_crd_yaml(crd_dir: str):
         matches.extend(glob.glob(p))
 
     if not matches:
-        print(f"[✗] No .yaml/.yml file found under '{crd_dir}'.")
+        logger.info(f"[✗] No .yaml/.yml file found under '{crd_dir}'.")
         sys.exit(1)
     if len(matches) > 1:
-        print(f"[!] Multiple CRD files found under '{crd_dir}'. Using the first:\n    {matches[0]}")
+        logger.info(f"[!] Multiple CRD files found under '{crd_dir}'. Using the first:\n    {matches[0]}")
     return matches[0]
 
 def convert_yaml_crd_to_json(yaml_file: str, json_file: str):
@@ -83,10 +84,10 @@ def convert_yaml_crd_to_json(yaml_file: str, json_file: str):
 
         with open(json_file, 'w') as f:
             json.dump(full_schema, f, indent=4)
-        print(f"[✓] JSON Schema written to: {json_file}")
+        logger.info(f"[✓] JSON Schema written to: {json_file}")
 
     except Exception as e:
-        print(f"[✗] Error converting YAML→JSON: {e}")
+        logger.error(f"[✗] Error converting YAML→JSON: {e}")
         sys.exit(1)
 
 def run_datamodel_codegen(json_schema_file: str, output_model_file: str):
@@ -100,14 +101,14 @@ def run_datamodel_codegen(json_schema_file: str, output_model_file: str):
         "--output", output_model_file
     ]
     try:
-        print(f"[>] Running: {' '.join(cmd)}")
+        logger.info(f"[>] Running: {' '.join(cmd)}")
         subprocess.check_call(cmd)
-        print(f"[✓] Model written to: {output_model_file}")
+        logger.info(f"[✓] Model written to: {output_model_file}")
     except FileNotFoundError:
-        print("[✗] 'datamodel-codegen' not found. Please install it (pip install datamodel-code-generator).")
+        logger.error("[✗] 'datamodel-codegen' not found. Please install it (pip install datamodel-code-generator).")
         sys.exit(1)
     except subprocess.CalledProcessError as e:
-        print(f"[✗] datamodel-codegen failed: {e}")
+        logger.error(f"[✗] datamodel-codegen failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -138,5 +139,5 @@ if __name__ == "__main__":
     except OSError:
         pass
 
-    print("\nDone. Your Pydantic model is here:")
-    print(f"    {model_py_path}")
+    logger.info("\nDone. Your Pydantic model is here:")
+    logger.info(f"    {model_py_path}")

@@ -61,7 +61,7 @@ spec_changes = cycle([
 
 
 def initialize():
-    print(f"Initializing policy {inspect.stack()[1].filename}")
+    logger.info(f"Initializing policy {inspect.stack()[1].filename}")
 
     initialContext = {
         "telemetry": {

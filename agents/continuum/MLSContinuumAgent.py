@@ -85,7 +85,7 @@ class MLSContinuumAgent(MLSAgent):
         except Exception as e:
             logger.error(f"Error in running tasks: {e}")
 
-        print("MLSAgent stopped.")
+        logger.critical("MLSAgent stopped.")
 
     async def message_queue_listener(self):
         """
@@ -118,11 +118,11 @@ class MLSContinuumAgent(MLSAgent):
                         "payload": {"name": data['name']},
                     })
                 else:
-                    print(f"Unhandled event type: {event}")
+                    logger(f"Unhandled event type: {event}")
 
             except Exception as e:
-                print(f"Error processing message: {e}")
-                logger.error(traceback.format_exc())
+                logger.info(f"Error processing message: {e}")
+                logger.exception(traceback.format_exc())
 
     async def apply_propagation_policies(self):
         """
@@ -412,5 +412,5 @@ class MLSContinuumAgent(MLSAgent):
             return return_object
 
         except Exception as e:
-            print(f"Error retrieving clusters: {e}")
+            logger.error(f"Error retrieving clusters: {e}")
             return []

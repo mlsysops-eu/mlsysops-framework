@@ -16,6 +16,7 @@
 
 
 from mlsysops.events import MessageEvents
+from mlsysops.logger_util import logger
 import asyncio
 
 queues = {"inbound": None, "outbound": None}
@@ -42,7 +43,7 @@ async def fluidity_proxy_loop():
             case "NETWORK_REDIRECT":
                 continue # TODO
             case _:
-                print("Unknown event in fluidity proxy")
+                logger.warning("Unknown event in fluidity proxy")
         pass
 
     return False # async
@@ -58,7 +59,7 @@ def initialize(inbound_queue=None, outbound_queue=None, agent_state=None):
     asyncio.create_task(fluidity_proxy_loop())
 
 async def apply(plan):
-    print("--------------------------Applying fluidity plan", plan)
+    logger.info("--------------------------Applying fluidity plan", plan)
     global node_name
     # This mechanism uses the messaging interface to send to cluster fluidity
     await queues['outbound'].put({

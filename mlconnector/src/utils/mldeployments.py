@@ -23,6 +23,9 @@ import ast
 from textwrap import dedent
 from utils.manage_s3 import S3Manager
 from sqlalchemy import update
+
+from agents.mlsysops.logger_util import logger
+
 #myuuid = uuid.uuid4()
 
 load_dotenv(verbose=True, override=True)
@@ -56,15 +59,15 @@ async def deploy_ml_application(endpoint, payload):
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print(f"Error deploying ML application: {e}")
+        logger.info(f"Error deploying ML application: {e}")
         return
 
     # On success
-    print(f"Status Code: {response.status_code}")
+    logger.info(f"Status Code: {response.status_code}")
     try:
-        print("Response JSON:", response.json())
+        logger.info("Response JSON:", response.json())
     except ValueError:
-        print("Response Text:", response.text)
+        logger.error("Response Text:", response.text)
 
 def prepare_model_artifact(s3_manager: S3Manager, model_name: str, download_dir: str = "/code/utils/api"):
     """
@@ -77,7 +80,7 @@ def prepare_model_artifact(s3_manager: S3Manager, model_name: str, download_dir:
 
     # download from S3
     s3_manager.download_file(object_name=model_name, download_path=local_path)
-    print(f"Model downloaded to {local_path}")
+    logger.info(f"Model downloaded to {local_path}")
     return local_path
 
 
@@ -117,14 +120,14 @@ async def get_deployment_by_id(db: AsyncSession, deployment_id: str):
 async def get_deployment_status(db: AsyncSession, deployment_id: str):
     BASE_URL = os.getenv('NOTHBOUND_API_ENDPOINT')
     url = f"{BASE_URL}/ml/status/{deployment_id}"
-    #print(url)
+    #logger(url)
     headers = {"Accept": "application/json"}
     
     try:
         resp = requests.get(url, headers=headers)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Status fetch failed: {e}")
+        logger.error(f"[ERROR] Status fetch failed: {e}")
         return False
 
     try:
@@ -145,14 +148,14 @@ async def get_deployment_status(db: AsyncSession, deployment_id: str):
 async def return_all_deployments(db: AsyncSession):
     BASE_URL = os.getenv('NOTHBOUND_API_ENDPOINT')
     url = f"{BASE_URL}/ml/list_all/"
-    #print(url)
+    #logger(url)
     headers = {"Accept": "application/json"}
     
     try:
         resp = requests.get(url, headers=headers)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Status fetch failed: {e}")
+        logger.error(f"Status fetch failed: {e}")
         return False
 
     try:
@@ -184,8 +187,8 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
         deployment_id = str(uuid.uuid4())
     else:
         deployment_id = deployment.deployment_id
-    #print(model.featurelist)
-    #print(file_model)
+    #logger(model.featurelist)
+    #logger(file_model)
     schema_code = ""
     if(deployment.inference_data==0):
         schema_code = generate_schema_code(flag=0, feature_list_str=json.dumps((extract_feature_names(model.featurelist))))
@@ -226,7 +229,7 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
         )
        
         #deployment_json = json.dumps(new_deployment)
-        #print(str(new_deployment))
+        #logger(str(new_deployment))
         
         #con = await create_redis_connection()
         #await con.rpush(os.getenv("DEPLOYMENT_QUEUE"), [str(deployment_json)])

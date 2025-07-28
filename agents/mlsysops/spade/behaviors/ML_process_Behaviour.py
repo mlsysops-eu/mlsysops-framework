@@ -94,11 +94,11 @@ class ML_process_Behaviour(CyclicBehaviour):
 
             q_info = self.r.pop(self.r.ml_q)
             q_info = q_info.replace("'", '"')
-            print(q_info)
+            logger.info(q_info)
             data_queue = json.loads(q_info)
             if 'MLSysOpsApplication' not in data_queue:
                 # probably it is removal
-                print(f"fffff {data_queue.keys()}")
+                logger.debug(f"fffff {data_queue.keys()}")
                 for key in data_queue.keys():
                     model_id = key
             else:
@@ -111,7 +111,7 @@ class ML_process_Behaviour(CyclicBehaviour):
                     self.r.update_dict_value("ml_location", model_id, cluster_id)
                 except KeyError:
                     cluster_id = self.r.get_dict_value("ml_location", model_id)
-                    print("CLUSTER ID " + str(cluster_id))
+                    logger.info("CLUSTER ID " + str(cluster_id))
 
             group = "mlsysops.eu"
             version = "v1"
@@ -140,9 +140,9 @@ class ML_process_Behaviour(CyclicBehaviour):
                     self.r.remove_key("endpoint_hash", model_id)
                 except ApiException as e:
                     if e.status == 404:
-                        print(f"Custom Resource '{name}' not found. Skipping deletion.")
+                        logger.debug(f"Custom Resource '{name}' not found. Skipping deletion.")
                     else:
-                        print(f"Error deleting Custom Resource '{name}': {e}")
+                        logger.debug(f"Error deleting Custom Resource '{name}': {e}")
                         raise
             else:
                 try:

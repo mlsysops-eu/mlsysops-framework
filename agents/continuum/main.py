@@ -49,7 +49,7 @@ async def main():
         await asyncio.gather(agent_task)
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
 
 
 if __name__ == "__main__":

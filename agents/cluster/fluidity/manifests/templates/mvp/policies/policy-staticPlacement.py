@@ -7,7 +7,7 @@ import inspect
 from mlsysops.logger_util import logger
 
 def initialize():
-    print(f"Initializing policy {inspect.stack()[1].filename}")
+    logger.info(f"Initializing policy {inspect.stack()[1].filename}")
 
     initialContext = {
         "telemetry": {
