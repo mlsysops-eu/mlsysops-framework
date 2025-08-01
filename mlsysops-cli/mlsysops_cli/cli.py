@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import asyncio
+import sys
 import traceback
 
 import click
@@ -82,6 +84,7 @@ def list_all():
     except Exception as e:
         click.secho(f"Connection Error: {e}", fg='red')
 
+
 @click.command(help='Takes as Input a ticket and returns the performance of the app')
 @click.argument('app_id')
 def get_app_performance(app_id):
@@ -126,7 +129,6 @@ def get_app_performance(app_id):
             error_message = "Unknown error (Failed to parse error response)"
 
         click.echo(click.style(f"❌ ERROR. Reason: {error_message}", fg='red'))
-
 
 
 @click.command(help='Takes as Input a ticket and returns the deployment status')
@@ -225,6 +227,7 @@ def remove_app(app_id):
         error_message = response.json().get("detail", "Unknown error")
         click.echo(click.style(f"ERROR. Reason: {error_message}", fg='red'))
 
+
 apps.add_command(deploy_app)
 apps.add_command(list_all)
 apps.add_command(get_app_status)
@@ -233,7 +236,6 @@ apps.add_command(get_app_performance)
 apps.add_command(remove_app)
 
 cli.add_command(apps)
-
 
 
 # -----------------------------------------------------------------------------
@@ -317,8 +319,10 @@ def framework():
 
 
 @click.command(help="Deploy all components (core services, continuum, clusters, nodes)")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
-@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+@click.option('--path', type=click.Path(exists=True), required=False,
+              help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False,
+              help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_all(path, inventory):
     # Ensure only one of the --path or --uri options is provided
     if path and inventory:
@@ -339,8 +343,10 @@ def deploy_services():
 
 
 @click.command(help="Deploy the continuum agent")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
-@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+@click.option('--path', type=click.Path(exists=True), required=False,
+              help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False,
+              help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_continuum(path, inventory):
     # Ensure only one of the --path or --uri options is provided
     if path and inventory:
@@ -353,8 +359,10 @@ def deploy_continuum(path, inventory):
 
 
 @click.command(help="Deploy the cluster agents")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
-@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+@click.option('--path', type=click.Path(exists=True), required=False,
+              help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False,
+              help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_cluster(path, inventory):
     # Ensure only one of the --path or --uri options is provided
     if path and inventory:
@@ -367,8 +375,10 @@ def deploy_cluster(path, inventory):
 
 
 @click.command(help="Deploy the node agents")
-@click.option('--path', type=click.Path(exists=True), required=False, help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
-@click.option('--inventory', type=click.Path(exists=True), required=False, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+@click.option('--path', type=click.Path(exists=True), required=False,
+              help='Path to the desriptions directory. It MUST include path/continuum,path/cluster,path/node')
+@click.option('--inventory', type=click.Path(exists=True), required=False,
+              help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
 def deploy_node(path, inventory):
     # Ensure only one of the --path or --uri options is provided
     if path and inventory:
@@ -380,15 +390,94 @@ def deploy_node(path, inventory):
     except Exception as e:
         click.secho(f"❌ Error during node agents deployment: {e}", fg='red')
 
-@click.command(help="Create a test application description using an inventory YAML.")
-@click.option('--inventory', type=click.Path(exists=True), required=True, help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
-@click.option('--cluster', type=str, required=False, help='Cluster name to prepare the test application description for.')
 
+@click.command(help="Create a test application description using an inventory YAML.")
+@click.option('--inventory', type=click.Path(exists=True), required=True,
+              help='Path to the inventory YAML that was used from cluster/karmada setup ansible script.')
+@click.option('--cluster', type=str, required=False,
+              help='Cluster name to prepare the test application description for.')
 def create_test_app_description(inventory, cluster):
     try:
-        create_app_yaml(inventory,cluster)
+        create_app_yaml(inventory, cluster)
     except Exception as e:
         click.secho(f"❌ Error during test application descriptions creation: {e}", fg='red')
+
+# -----------------------------------------------------------------------------
+# Deploy FITA command
+# -----------------------------------------------------------------------------
+
+@framework.command('deploy-fita')
+@click.option('--release-name', required=True, help='The name for the Helm release.')
+@click.option('--chart-path', required=True, help='The path to the Helm chart directory.')
+@click.option('--namespace', default='default', show_default=True, help='The Kubernetes namespace to deploy into.')
+@click.option('--create-namespace', is_flag=True, help='Create the namespace if it does not exist.')
+@click.option('--values', '-f', multiple=True, type=click.Path(exists=True), help='Path to a Helm values YAML file. Can be specified multiple times.')
+async def deploy_fita(release_name, chart_path, namespace, create_namespace, values):
+    """
+    Deploys FITA components using a Helm chart with asyncio.
+
+    This command wraps 'helm install' to provide a standardized deployment method.
+    """
+    click.echo(f"🚀  Starting FITA deployment for release '{release_name}'...")
+
+    # --- Construct the Helm Command ---
+    # We start with the base command.
+    helm_command = [
+        'helm', 'install', release_name, chart_path,
+        '--namespace', namespace
+    ]
+
+    # If the --create-namespace flag is used, add it to the command.
+    if create_namespace:
+        helm_command.append('--create-namespace')
+
+    # Add any specified values files to the command.
+    for value_file in values:
+        helm_command.extend(['--values', value_file])
+
+    click.echo("--------------------------------------------------")
+    click.echo(f"Executing command: {' '.join(helm_command)}")
+    click.echo("--------------------------------------------------")
+
+    # --- Execute the Helm Command with asyncio ---
+    # We use asyncio.create_subprocess_exec to run the command asynchronously.
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *helm_command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT  # Redirect stderr to stdout
+        )
+
+        # Asynchronously read the output line by line and print it.
+        # This provides real-time feedback to the user.
+        if process.stdout:
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                # The output is in bytes, so we decode it to a string.
+                sys.stdout.write(line.decode('utf-8'))
+                sys.stdout.flush()
+
+        # Wait for the subprocess to complete and get the return code.
+        return_code = await process.wait()
+
+        if return_code:
+            # If the command fails, we report an error.
+            click.secho(f"\n❌ Error: Helm command failed with exit code {return_code}.", fg='red')
+            sys.exit(return_code)
+
+        click.echo("\n--------------------------------------------------")
+        click.secho(f"✅  FITA deployed successfully!", fg='green')
+
+    except FileNotFoundError:
+        click.secho("\n❌ Error: 'helm' command not found.", fg='red')
+        click.echo("Please ensure Helm is installed and in your system's PATH.")
+        sys.exit(1)
+    except Exception as e:
+        click.secho(f"\n❌ An unexpected error occurred: {e}", fg='red')
+        sys.exit(1)
+
 
 # Add commands to the 'framework' group
 framework.add_command(deploy_all)
@@ -397,6 +486,7 @@ framework.add_command(deploy_continuum)
 framework.add_command(deploy_cluster)
 framework.add_command(deploy_node)
 framework.add_command(create_test_app_description)
+framework.add_command(deploy_fita)
 
 cli.add_command(framework)
 
@@ -439,6 +529,7 @@ manage.add_command(ping_agent)
 manage.add_command(set_mode)
 cli.add_command(manage)
 
+
 # -----------------------------------------------------------------------------
 # Agent commands (set-policy, delete-policy)
 # -----------------------------------------------------------------------------@click.group()
@@ -447,11 +538,13 @@ def agent():
     """Manage policies for agents."""
     pass
 
+
 policies_configmap = {
-        "cluster": "cluster-agents-policies",
-        "continuum": "continuum-policies",
-        "node": "node-agents-policies"
-    }
+    "cluster": "cluster-agents-policies",
+    "continuum": "continuum-policies",
+    "node": "node-agents-policies"
+}
+
 
 @agent.command(name="set-policy")
 @click.option('--agent', type=click.Choice(['cluster', 'continuum', 'node']), required=True,
@@ -483,9 +576,10 @@ def policy_add_or_update(agent, policy_file):
     except Exception as e:
         click.echo(f"Failed to update ConfigMap: {e}")
 
+
 @agent.command("delete-policy")
 @click.option("--agent", type=click.Choice(["cluster", "continuum", "node"]),
-                                             required=True, help="Agent type to remove a policy from")
+              required=True, help="Agent type to remove a policy from")
 @click.argument("name", type=str)
 def policy_delete(agent: str, name: str):
     """Delete policy by name for the given agent."""
@@ -523,6 +617,7 @@ configmap_map = {
     "node": "node-agents-config",
 }
 
+
 @agent.command("set-config")
 @click.option("--agent", type=click.Choice(["cluster", "continuum", "node"]))
 @click.option("--file", "config_file", type=click.Path(exists=True), required=True, help="Path to the config file")
@@ -551,6 +646,7 @@ def set_config(agent: str, config_file: str):
         click.echo(f"Config '{key}' added or updated in {agent} agent configmap '{configmap_name}'.")
     except Exception as e:
         click.echo(f"Failed to update ConfigMap: {e}")
+
 
 @agent.command("delete-config")
 @click.option("--agent", type=click.Choice(["cluster", "continuum", "node"]))
