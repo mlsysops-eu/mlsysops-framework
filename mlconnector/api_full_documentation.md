@@ -642,7 +642,7 @@ Below, we build a simple regression model using scikit-learn and save it to loca
 
 ```python
 ...
-# Replace with your training pipleline
+# Replace with your training pipeline
 reg = Ridge(alpha=1.0, random_state=0)
 reg.fit(X, y)
 ...
@@ -720,7 +720,7 @@ The above step should return a model_id that will be used in the next steps. Her
 - Training data. This will be used for explainability and drift detection. (Note, it has to be the exact same data used to train the model, otherwise you will get wrong results)
 - Requirements file that defines the environment the model was trained in.
 
-Upload these one by one using the example bellow;
+Upload these one by one using the example below;
 Note: file_kind can be `model`, `data`, `code`, and `env`
 ```python
 import requests

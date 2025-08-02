@@ -7,7 +7,7 @@ access to telemetry.
 instructions.
 - The Continuum Agent sits at the top level, interfacing with external stakeholders (via northbound APIs), receiving
 high-level intents and application descriptors, and coordinating decision-making across slices.
-Each layer operates a Monitor–Analyze–Plan–Execute (MAPE) control loop, enabling autonomous adaptation based on local
+Each layer operates a Monitor–Analyze–Plan–Execute (MAP) control loop, enabling autonomous adaptation based on local
 and global telemetry, system optimization targets, and ML-driven policies. Importantly, this architecture separates
 management logic from resource control, allowing for modular evolution and system introspection.
 

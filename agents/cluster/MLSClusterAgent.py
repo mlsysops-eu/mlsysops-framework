@@ -187,7 +187,7 @@ class MLSClusterAgent(MLSAgent):
                     case MessageEvents.APP_UPDATED.value:
                         logger.debug(f"Application was updated")
                         await self.application_controller.on_application_updated(data)
-                    case MessageEvents.COMPONENT_PLACED.value: # DEPRACATED
+                    case MessageEvents.COMPONENT_PLACED.value: # DEPRECATED
                         # logger.debug(f"Application component placed")
                         # logger.debug(f"Data: {data}")
                         # Update internal structure
