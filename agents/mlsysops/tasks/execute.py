@@ -20,39 +20,53 @@ from ..data.state import MLSState
 
 
 class ExecuteTask(BaseTask):
+    """
+    Task to execute a command for a specific mechanism as part of a plan.
 
-    def __init__(self, asset, new_command, state: MLSState = None, plan_uid=None):
+    Attributes:
+        asset_name (str): Name of the mechanism (e.g., 'cpu', 'gpu').
+        new_command (dict): Command details for execution.
+        state (MLSState): Shared system state.
+        plan_uid (str): Unique identifier of the plan associated with this task.
+    """
+
+    def __init__(self, asset: str, new_command: dict, state: MLSState = None, plan_uid: str = None):
         super().__init__(state)
-
         self.asset_name = asset
         self.new_command = new_command
-        self.state = state
         self.plan_uid = plan_uid
 
-    async def run(self):
+    async def run(self) -> bool:
+        """
+        Execute the mechanism's apply method with the provided command.
 
-        if self.asset_name in self.state.configuration.mechanisms and self.asset_name in self.state.active_mechanisms:
-            # Agent is configured to handle this mechanism
-            # TODO we can do this check in scheduler?
-            mechanism_handler = self.state.active_mechanisms[self.asset_name]['module']
-            logger.debug(f"New command for {self.asset_name} - plan id {self.plan_uid}")
+        Returns:
+            bool: True if execution succeeded, False otherwise.
+        """
+        if not (self.asset_name in self.state.configuration.mechanisms and
+                self.asset_name in self.state.active_mechanisms):
+            logger.warning(f"Mechanism {self.asset_name} is not active or configured. Skipping execution.")
+            return False
 
-            try:
-                # Inject plan UUID
-                self.new_command["plan_uid"] = self.plan_uid
-                execute_async = await mechanism_handler.apply(self.new_command)
-                # TODO introduce fail checks?
-                if execute_async:
-                    logger.test(
-                        f"|1| Plan with planuid:{self.new_command['plan_uid']} executed by applying to mechanism:{self.asset_name} status:Success")
-                    self.state.update_plan_status(self.plan_uid, self.asset_name,"Success")
-                else:
-                    self.state.update_task_log(self.plan_uid, updates={"status": "Pending"})
-                    logger.test(
-                        f"|1| Plan with planuid:{self.new_command['plan_uid']} executed by applying to mechanism:{self.asset_name} status:Pending")
-            except Exception as e:
-                logger.error(f"Error executing command: {e}")
-                self.state.update_task_log(self.plan_uid, updates={"status": "Failed"})
+        logger.debug(f"Executing command for {self.asset_name} - plan id {self.plan_uid}")
+
+        try:
+            # Attach plan UID to command
+            self.new_command["plan_uid"] = self.plan_uid
+
+            # Call mechanism apply method
+            success = await self.state.active_mechanisms[self.asset_name]['module'].apply(self.new_command)
+
+            if success:
+                logger.test(f"|1| Plan {self.plan_uid} executed for mechanism {self.asset_name} - Status: Success")
+                self.state.update_plan_status(self.plan_uid, self.asset_name, "Success")
+                return True
+            else:
+                logger.test(f"|1| Plan {self.plan_uid} execution pending for mechanism {self.asset_name}")
+                self.state.update_task_log(self.plan_uid, updates={"status": "Pending"})
                 return False
 
-        return True
+        except Exception as e:
+            logger.error(f"Error executing command for {self.asset_name}: {e}")
+            self.state.update_task_log(self.plan_uid, updates={"status": "Failed"})
+            return False

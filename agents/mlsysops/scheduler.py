@@ -23,17 +23,24 @@ from .logger_util import logger
 from .data.plan import Plan
 from .data.task_log import Status
 
+MECHANISM_TYPE = {
+    "cpu_freq": "singleton",
+    "component_placement": "multi"
+}
+
+
 class PlanScheduler:
     def __init__(self, state):
         self.state = state
         self.period = 1
         self.pending_plans = []
 
+
     async def update_pending_plans(self):
-        for pending_plan in self.pending_plans:
-            task_log = self.state.get_task_log(pending_plan.uuid)
-            if task_log.status != Status.PENDING:
-                self.pending_plans.remove(pending_plan) # remove it
+        self.pending_plans = [
+            plan for plan in self.pending_plans
+            if self.state.get_task_log(plan.uuid)['status'] == Status.PENDING
+        ]
 
     async def run(self):
         logger.debug("Plan Scheduler started")
@@ -62,7 +69,6 @@ class PlanScheduler:
                     for plan in current_plan_list:
 
                         # Use FIFO logic - execute the first plan, and save the mechanisms touched.
-                        # TODO declare mechanisms as singletons or multi-instanced.
                         # Singletons (e.g. CPU Freq): Can be configured once per Planning/Execution cycle, as they have
                         # global effect
                         # Multi-instance (e.g. component placement): Configure different parts of the system, that do not
@@ -73,9 +79,10 @@ class PlanScheduler:
                             logger.info(f"Processing {str(plan.uuid)} plan for mechanism {asset} for application {plan.application_id}")
 
                             should_discard = False
+                            mechanism_type = MECHANISM_TYPE.get(asset, "multi")
 
                             # if was executed a plan earlier, then discard it.
-                            if asset in mechanisms_touched:
+                            if mechanism_type == "singleton" and asset in mechanisms_touched:
                                 should_discard = True
 
                             task_log = self.state.get_task_log(plan.uuid)
@@ -87,20 +94,18 @@ class PlanScheduler:
                                     should_discard = True
 
                             # check if the application has been removed for this application scoped plan
-                            if (plan.application_id not in self.state.applications and
-                                plan.application_id not in self.state.active_mechanisms): # TODO easy way to do for now. different mechanism scope
+                            if not self.state.is_plan_app_active(plan.application_id):
                                 should_discard = True
 
-                            # TODO: check for fluidity debug
                             # Check if it is core, should override the discard mechanism
                             if not plan.core and should_discard:
-                                logger.test(f"|1| Plan planuid:{str(plan.uuid)} status:Discarded")
-                                self.state.update_task_log(plan.uuid,updates={"status": "Discarded"})
+                                logger.debug(f"Plan {plan.uuid} discarded.")
+                                self.state.update_task_log(plan.uuid, updates={"status": Status.DISCARDED.value})
                                 continue
 
 
-                            self.state.update_task_log(plan.uuid,updates={"status": "Scheduled"})
-                            logger.test(f"|1| Plan with planuid:{plan.uuid} scheduled for execution status:Scheduled")
+                            self.state.update_task_log(plan.uuid, updates={"status": Status.SCHEDULED.value})
+                            logger.debug(f"Plan {plan.uuid} scheduled for execution.")
                             # mark mechanism touched only for non-core
                             if not plan.core:
                                 mechanisms_touched[asset] = {
