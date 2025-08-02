@@ -1,4 +1,5 @@
 from cpufreq import cpuFreq
+from agents.mlsysops.logger_util import logger
 
 
 def initialize(inbound_queue, outbound_queue,agent_state=None):
@@ -48,9 +49,9 @@ async def apply(value: dict[str, any]) -> bool:
                     # Set frequency for a specific CPU
                     cpufreq.set_governor("userspace", cpu=value['cpu'])
                     cpufreq.set_frequencies(int(value['frequency']), value['cpu'])
-                print(f"Frequency successfully set {value}")
+                logger.info(f"Frequency successfully set {value}")
             except Exception as e:
-                print(f"Error setting CPU frequency: {e}")
+                logger.error(f"Error setting CPU frequency: {e}")
             finally:
                 reset_to_governor()
 
@@ -101,9 +102,9 @@ def reset_to_governor(governor: str = "ondemand"):
     cpufreq = cpuFreq()
     try:
         cpufreq.set_governor(governor)
-        print(f"Successfully reset CPU governor to '{governor}'")
+        logger.info(f"Successfully reset CPU governor to '{governor}'")
     except Exception as e:
-        print(f"Error setting governor: {e}")
+        logger.error(f"Error setting governor: {e}")
 
 def set_governor(governor: str, cpu: str = "all"):
     """
@@ -118,9 +119,9 @@ def set_governor(governor: str, cpu: str = "all"):
             cpufreq.set_governor(governor)
         else:
             cpufreq.set_governor(cpu=cpu, governor=governor)
-        print(f"Successfully set governor to '{governor}' for {cpu}")
+        logger.info(f"Successfully set governor to '{governor}' for {cpu}")
     except Exception as e:
-        print(f"Error setting governor: {e}")
+        logger.error(f"Error setting governor: {e}")
 
 def set_to_min(cpu: str = "all"):
     """
@@ -128,7 +129,7 @@ def set_to_min(cpu: str = "all"):
     """
     frequencies = get_cpu_available_frequencies()
     min_freq = min(frequencies)
-    print(f"Setting {cpu} to minimum frequency: {min_freq} kHz")
+    logger.info(f"Setting {cpu} to minimum frequency: {min_freq} kHz")
     if cpu == "all":
         set_governor("userspace", cpu="all")
         cpu.set_frequencies(min_freq)
@@ -137,7 +138,7 @@ def set_to_min(cpu: str = "all"):
         set_governor("userspace", cpu=cpu)
         cpu.set_frequencies(min_freq, cpu)
 
-    print(f"Set {cpu} to minimum frequency: {min_freq} kHz")
+    logger.info(f"Set {cpu} to minimum frequency: {min_freq} kHz")
 
 def set_to_max(cpu: str = "all"):
     """
@@ -153,4 +154,4 @@ def set_to_max(cpu: str = "all"):
         set_governor("userspace", cpu=cpu)
         cpu.set_frequencies(max_freq, cpu)
 
-    print(f"Set {cpu} to maximum frequency: {max_freq} kHz")
+    logger.info(f"Set {cpu} to maximum frequency: {max_freq} kHz")

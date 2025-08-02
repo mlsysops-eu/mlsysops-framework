@@ -14,9 +14,10 @@ from kubernetes.client import ApiException
 
 from MLSysOps_Schemas.mlsysops_model import MlsysopsappSchema, Component
 from redis_setup import redis_mgt as rm  # Your RedisManager class
+from agents.mlsysops.logger_util import logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+
 
 os.environ["LOCAL_OTEL_ENDPOINT"] = "http://172.25.27.4:9464/metrics"
 os.environ["TELEMETRY_ENDPOINT"] = "172.25.27.4:4317"
@@ -41,7 +42,7 @@ def get_pod_info(comp_name, model_id, api_client):
             response_type="json", _preload_content=False
         )
         pods = json.loads(response[0].data.decode("utf-8"))
-        print(pods)
+        logger.debug(pods)
 
     except ApiException as exc:
         logger.error(f"Failed to fetch pods: {exc}")
@@ -196,7 +197,7 @@ def store_qos_metrics(request:Request,app_id, app_description):
                 redis_mgr.update_dict_value("component_metrics", redis_key, metric_id)
 
     except:
-        print(f"Error updating metrics in redis : ")
+        logger.error(f"Error updating metrics in redis : ")
 
 
 async def check_deployment_status(comp_name,app_id):
@@ -366,7 +367,7 @@ async def get_app_status(request: Request,app_id: str):
     try:
         # Fetch the value of the given app_id from Redis
         app_status = redis_mgr.get_dict_value('system_app_hash', app_id)
-        print(app_status)
+        logger.debug(app_status)
         if app_status is None:
             # If the app_id doesn't exist in Redis, return a 404 error
             raise HTTPException(status_code=404, detail=f"App ID '{app_id}' not found in the system.")
@@ -400,11 +401,11 @@ async def get_app_details(request: Request,app_id: str):
         if not components:
             raise Exception(f"No components found for application '{app_id}'.")
 
-        print(components)
-        print("--------------------")
+        logger.debug(components)
+        logger.debug("--------------------")
 
         pods_info = get_pods_from_kubeconfigs()
-        print(pods_info)
+        logger.debug(pods_info)
 
         component_details = []
         for component in components:
@@ -438,7 +439,7 @@ async def get_app_performance(request: Request,app_id: str):
     :return: A list of tuples [(metric_name, metric_value), ...]
     """
     redis_mgr: rm.RedisManager = request.app.state.redis
-    print("Returning the app mQoS metric for", app_id)
+    logger.info("Returning the app mQoS metric for", app_id)
 
     if not redis_mgr.redis_conn:
         return {"error": "Redis connection not established"}
@@ -462,7 +463,7 @@ async def get_app_performance(request: Request,app_id: str):
             if metric_value:
                 metric_name = metric_value.decode("utf-8")  # Decode Redis stored value
                 metric_name = str(metric_name).lower()
-                print(metric_name)
+                logger.info(metric_name)
 
         return results  # Returns a list of tuples [(metric_name, metric_value), ...]
 

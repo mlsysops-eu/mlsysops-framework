@@ -16,6 +16,7 @@ from mlsysops_cli.deployment.deploy import (
 
 from mlsysops_cli.deployment.descriptions_util import create_app_yaml
 from mlsysops_cli.deployment.deploy import KubernetesLibrary
+from agents.mlsysops.logger_util import logger
 
 # Configurable IP and PORT via environment variables
 IP = os.getenv("MLS_API_IP", "127.0.0.1")
@@ -56,7 +57,7 @@ def deploy_app(path, uri):
 
         if response.status_code == 200:
             click.secho("DESCRIPTION UPLOADED SUCCESSFULLY!", fg='green')
-            print(response.text)
+            logger.info(response.text)
         else:
             click.secho(f"ERROR: {response.json().get('detail', 'Unknown error')}", fg='red')
     except Exception as e:
@@ -216,7 +217,7 @@ def remove_app(app_id):
                                data=json.dumps({'app_id': app_id}),
                                headers={'Content-Type': 'application/json'}
                                )
-    print(response.json())
+    logger.debug(response.json())
     if response.status_code == 200:
         responses = response.json()
         click.echo(click.style(f"AppID:{responses['app_id']}  status updated to 'To_be_removed'.", fg='bright_blue'))
@@ -296,7 +297,7 @@ def deploy_ml(path, uri):
 
         if response.status_code == 200:
             click.secho("ML MODEL UPLOADED SUCCESSFULLY!", fg='green')
-            print(response.json())
+            logger.debug(response.json())
         else:
             click.secho(f"ERROR: {response.json().get('detail', 'Unknown error')}", fg='red')
     except Exception as e:

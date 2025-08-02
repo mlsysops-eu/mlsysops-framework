@@ -1,5 +1,6 @@
 import yaml
 from jinja2 import Template
+from agents.mlsysops.logger_util import logger
 
 def render_template(template_file, context):
     """
@@ -39,7 +40,7 @@ def create_cluster_yaml(input_file, cluster_name):
     cluster_yaml = render_template("formal_descriptions/user_provided/cluster.yaml.j2", cluster_context)
     with open(cluster_yaml_filename, 'w') as output_file:
         output_file.write(cluster_yaml)
-    print(f"Cluster YAML written to {cluster_yaml_filename}")
+    logger.info(f"Cluster YAML written to {cluster_yaml_filename}")
 
 
 def create_worker_node_yaml(input_file, cluster_name):
@@ -82,7 +83,7 @@ def create_worker_node_yaml(input_file, cluster_name):
         worker_yaml_filename = f"{worker_name}.yaml"
         with open(worker_yaml_filename, 'w') as output_file:
             output_file.write(worker_yaml)
-        print(f"Worker YAML written to {worker_yaml_filename}")
+        logger.info(f"Worker YAML written to {worker_yaml_filename}")
 
 
 def create_app_yaml(input_file):
@@ -111,7 +112,7 @@ def create_app_yaml(input_file):
     app_yaml_filename = "app-description.yaml"
     with open(app_yaml_filename, 'w') as output_file:
         output_file.write(app_yaml)
-    print(f"Application YAML written to {app_yaml_filename}")
+    logger.info(f"Application YAML written to {app_yaml_filename}")
 
 
 def create_continuum_yaml(input_file):
@@ -150,7 +151,7 @@ def create_continuum_yaml(input_file):
     continuum_yaml_content = render_template("formal_descriptions/user_provided/continuum.yaml.j2", continuum_context)
     with open(continuum_yaml_filename, 'w') as output_file:
         output_file.write(continuum_yaml_content)
-    print(f"Continuum YAML written to {continuum_yaml_filename}")
+    logger.info(f"Continuum YAML written to {continuum_yaml_filename}")
 
 
 def main():
@@ -161,23 +162,23 @@ def main():
 
     for cluster_name in inventory['all']['children']:
         try:
-            print(f"Processing cluster: {cluster_name}")
+            logger.debug(f"Processing cluster: {cluster_name}")
             create_cluster_yaml(input_file, cluster_name)
             create_worker_node_yaml(input_file, cluster_name)
         except ValueError as e:
-            print(f"Skipping cluster '{cluster_name}': {e}")
+            logger.error(f"Skipping cluster '{cluster_name}': {e}")
 
     # Generate application-level YAML
     try:
         create_app_yaml(input_file)
     except ValueError as e:
-        print(f"Skipping application YAML generation: {e}")
+        logger.error(f"Skipping application YAML generation: {e}")
 
     # Generate continuum-level YAML
     try:
         create_continuum_yaml(input_file)
     except ValueError as e:
-        print(f"Skipping continuum YAML generation: {e}")
+        logger.error(f"Skipping continuum YAML generation: {e}")
 
 
 if __name__ == "__main__":

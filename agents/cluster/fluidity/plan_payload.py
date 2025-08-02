@@ -19,6 +19,7 @@
 from pydantic import BaseModel, Field, ValidationError, model_validator, RootModel
 from typing import Any, Dict, List, Optional, Union
 import re
+from agents.mlsysops.logger_util import logger
 
 
 class PlatformRequirements(BaseModel):
@@ -144,6 +145,6 @@ if __name__ == "__main__":
     # Validate the payload
     try:
         validated_payload = FluidityPlanPayload(**payload)
-        print("Validation successful!")
+        logger.info("Validation successful!")
     except ValidationError as e:
-        print(f"Validation failed: {e}")
+        logger.error(f"Validation failed: {e}")

@@ -95,18 +95,18 @@ def get_node_ip(host, api_client):
 #             internal_ip = None
 #             external_ip = None
 #             addresses = node.status.addresses
-#             print('Addresses ' + addresses)
+#             logger('Addresses ' + addresses)
 #             for address in addresses:
 #                 if address.type == "ExternalIP":
 #                     external_ip = address.address
-#                     print(f"Node: {node_name}, External IP: {external_ip}")
+#                     logger(f"Node: {node_name}, External IP: {external_ip}")
 #                 elif address.type == "InternalIP":
 #                     internal_ip = address.address
-#                     print(f"Node: {node_name}, Internal IP: {internal_ip}")
+#                     logger(f"Node: {node_name}, Internal IP: {internal_ip}")
 #             if external_ip == None:
-#                 print('External IP not found for node that should be accessible externally.')
+#                 logger('External IP not found for node that should be accessible externally.')
 #                 if internal_ip == None:
-#                     print('Internal IP not found for node that should be accessible externally.')
+#                     logger('Internal IP not found for node that should be accessible externally.')
 #                 else:
 #                     node_ip = internal_ip
 #             else:
@@ -204,12 +204,12 @@ class Check_ml_deployment_Behaviour(OneShotBehaviour):
         #         namespace=config.NAMESPACE)
         # except ApiException as exc:
         #     if exc.status != 404:
-        #         print('Unknown error reading service: ' + exc)n
+        #         logger('Unknown error reading service: ' + exc)n
         #         return None
         #
         # # Retrieve svc endpoint info
         # if svc_obj is None:
-        #     print('Failed to read svc with name ' + self.comp_name)
+        #     logger('Failed to read svc with name ' + self.comp_name)
         #     # Add handling
         #
         # # Retrieve the assigned VIP:port
@@ -231,7 +231,7 @@ class Check_ml_deployment_Behaviour(OneShotBehaviour):
         #     if global_endpoint_port and node_ip:
         #         info['global_endpoint'] = node_ip + ':' + global_endpoint_port
         #
-        #     print('Going to push to redis_conf endpoint_queue the value ' + str(info))
+        #     logger('Going to push to redis_conf endpoint_queue the value ' + str(info))
         #     # NOTE: PLACEHOLDER FOR REDIS - YOU CAN CHANGE THIS WITH ANOTHER TYPE OF COMMUNICATION
         #     self.r.update_dict_value('endpoint_hash', self.model_id, str(info))
         #

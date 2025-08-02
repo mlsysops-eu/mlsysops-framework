@@ -25,7 +25,7 @@ class MLSNodeAgent(MLSAgent):
 
     def __init__(self):
         # Initialize base MLS agent class
-        print("In INIT OF NODE AGENT")
+        logger.debug("In INIT OF NODE AGENT")
         super().__init__()
 
         # { 'app_name' : { "components" : [component_name] } }
@@ -60,7 +60,7 @@ class MLSNodeAgent(MLSAgent):
         except Exception as e:
             logger.error(f"Error in running tasks: {e}")
 
-        print("MLSAgent stopped.")
+        logger("MLSAgent stopped.")
 
     async def message_queue_listener(self):
         """
@@ -193,4 +193,4 @@ class MLSNodeAgent(MLSAgent):
             except Exception as e:
                 logger.error(f"fluidityproxy_message_listener: Error processing msg: {e}")
                 await asyncio.sleep(1)
-        print(f"MLSAGENT::::  stopping fluidity message listener.... ")
+        logger(f"MLSAGENT::::  stopping fluidity message listener.... ")

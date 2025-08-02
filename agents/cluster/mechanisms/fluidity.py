@@ -363,8 +363,8 @@ async def apply(plan):
         logger.test(f"|1| Fluidity mechanism forwarded planuid:{plan['plan_uid']} to Fluidity status:True")
 
     except Exception as e:
-        logger.debug("Error in sending message to fluidity")
-        print(traceback.format_exc())
+        logger.error("Error in sending message to fluidity")
+        logger.exception(traceback.format_exc())
 
     return False
 
@@ -376,8 +376,8 @@ async def send_message(msg):
     try:
         await fluidity_mechanism_instance.internal_queue_outbound.put(msg)
     except Exception as e:
-        logger.debug("Error in sending message to fluidity")
-        print(traceback.format_exc())
+        logger.error("Error in sending message to fluidity")
+        logger.exception(traceback.format_exc())
 
 
 def get_state():

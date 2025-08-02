@@ -8,6 +8,7 @@ from pkg_resources import Requirement
 from io import StringIO
 
 from utils.manage_s3 import S3Manager
+from agents.mlsysops.logger_util import logger
 
 load_dotenv(verbose=True, override=True)
 
@@ -83,13 +84,13 @@ def get_single_explanation(model_id, data):
                 json_response = response.json()
                 return json_response
             except Exception as json_err:
-                print("Error parsing JSON response:", json_err)
+                logger("Error parsing JSON response:", json_err)
                 return None
         else:
-            print(f"Error: Received status code {{response.status_code}}. Response content: {{response.text}}")
+            logger(f"Error: Received status code {{response.status_code}}. Response content: {{response.text}}")
             return None
     except Exception as err:
-        print("Request error occurred:", err)
+        logger("Request error occurred:", err)
         return None
 
 
@@ -106,7 +107,7 @@ async def make_prediction(request: DynamicSchema):
     current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     try:
         loaded_model = joblib.load("{model}")
-        print("Model loaded successfully!")
+        logger("Model loaded successfully!")
         if data_source == 0:
             data_dict = request.data.dict()
             df = pd.DataFrame([data_dict])
@@ -120,11 +121,11 @@ async def make_prediction(request: DynamicSchema):
                 "timestamp": current_timestamp
             }}
             response = requests.post(url, headers=headers, json=data)
-            print(f"Status Code: {{response.status_code}}")
+            logger(f"Status Code: {{response.status_code}}")
             try:
-                print("Response JSON:", response.json())
+                logger("Response JSON:", response.json())
             except ValueError:
-                print("No JSON response returned.")
+                logger("No JSON response returned.")
             #if request.explanation:
             #    explanation_res = get_single_explanation(model_id,data_dict)
             #    if explanation_res:
@@ -153,7 +154,7 @@ def prepare_model_artifact(s3_manager: S3Manager, model_name: str, download_dir:
 
     # download from S3
     s3_manager.download_file(object_name=model_name, download_path=local_path)
-    print(f"Model downloaded to {local_path}")
+    logger.info(f"Model downloaded to {local_path}")
     return local_path
 
 def merge_requirements_from_dir(req_dir: str) -> list[str]:
@@ -228,7 +229,7 @@ def generate_dockerfile(model_id):
         """
     with open("/code/utils/api/Dockerfile", "w") as file:
         file.write(dockerfile_content)
-    print("Dockerfile generated successfully!")
+    logger.info("Dockerfile generated successfully!")
 
 
 
@@ -249,30 +250,30 @@ def build_and_push_image(model, registry_url, image_name, registry_username, reg
     with open("/code/utils/api/main.py", "w") as f:
         f.write(generated_code)
 
-    print("Python file 'main.py' has been created with the provided parameters.")
+    logger.info("Python file 'main.py' has been created with the provided parameters.")
 
     generate_dockerfile(model_id)
     client = docker.from_env()
 
     try:
-        print("Building Docker image...")
+        logger.debug("Building Docker image...")
         image, build_logs = client.images.build(path="/code/utils/api/", tag=image_name)
         for log in build_logs:
-            print(log.get("stream", "").strip())
+            logger.debug(log.get("stream", "").strip())
     except docker.errors.BuildError as e:
-        print(f"Error building image: {e}")
+        logger.error(f"Error building image: {e}")
         return
 
-    print("Pushing Docker image...")
+    logger.info("Pushing Docker image...")
     #registry_url, image_tag = image_name.split("/", 1)
     client.login(username=registry_username, password=registry_password, registry=registry_url)
 
     try:
         push_logs = client.images.push(image_name, stream=True, decode=True)
         for log in push_logs:
-            print(log)
+            logger.debug(log)
     except docker.errors.APIError as e:
-        print(f"Error pushing image: {e}")
+        logger.error(f"Error pushing image: {e}")
 
 
 """def generate_json(deployment_id: str, image: str, placement, port: int = 8000):

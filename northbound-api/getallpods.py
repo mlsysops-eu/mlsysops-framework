@@ -1,4 +1,5 @@
 import subprocess
+from agents.mlsysops.logger_util import logger
 
 # Define kubeconfig files
 karmada_api_kubeconfig = "/home/runner/karmada_management/karmada-api.kubeconfig"
@@ -89,12 +90,12 @@ def main():
     if isinstance(pod_details, list):
         for pod in pod_details:
             if "error" in pod:
-                print(f"❌ {pod['error']}")
+                logger.error(f"❌ {pod['error']}")
             else:
-                print(f"✅ Pod: {pod['pod_name']}, Status: {pod['pod_status']}, Node: {pod['node_name']}, "
+                logger.info(f"✅ Pod: {pod['pod_name']}, Status: {pod['pod_status']}, Node: {pod['node_name']}, "
                       f"Cluster: {pod['cluster_name']}, Kubeconfig: {pod['kubeconfig']}")
     else:
-        print("Unexpected error: pod_details is not a list")
+        logger.error("Unexpected error: pod_details is not a list")
 
 if __name__ == "__main__":
     main()

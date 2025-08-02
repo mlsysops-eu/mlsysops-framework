@@ -122,7 +122,7 @@ class ApplicationController:
         """
         while True:
             for app_id, app_object in MLSState.applications.items():
-                print(f'Application {app_id}')
+                logger.debug(f'Application {app_id}')
 
             # Check periodically (adjust the sleep interval as needed)
             await asyncio.sleep(10)

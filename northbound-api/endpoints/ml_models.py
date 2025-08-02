@@ -15,6 +15,7 @@ from kubernetes.client.rest import ApiException
 
 from typing import Annotated, List, Optional, Dict, Any
 from pydantic import BaseModel, Field
+from agents.mlsysops.logger_util import logger
 
 # JSON schema with enum validation for the city
 schema = app_schema
@@ -154,7 +155,7 @@ def get_yaml_info(data):
 
         return app_name, components
     except Exception as e:
-        print(f"Error processing the data: {e}")
+        logger.error(f"Error processing the data: {e}")
         return None, []
 
 
@@ -208,7 +209,7 @@ async def deploy_ml(payload: RootModel):
     try:
         internal_uid = parsed_data["MLSysOpsApplication"]["mlsysops-id"]
     except KeyError:
-        print("The mlsysops-id is not specified in the model description")
+        logger.error("The mlsysops-id is not specified in the model description")
 
     if validation_error is None and internal_uid != "0":
 
@@ -222,7 +223,7 @@ async def deploy_ml(payload: RootModel):
             r.update_dict_value('endpoint_hash', internal_uid, str(info))
             return {"status": "success", "message": "Deployment request added to queue"}
         except Exception as e:
-            print(f"Error checking the app in Redis: {e}")
+            logger.error(f"Error checking the app in Redis: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     else:
         raise HTTPException(status_code=400, detail=validation_error)
@@ -266,7 +267,7 @@ async def get_ml_status(model_uid: str):
     try:
         # Fetch the value of the given app_id from Redis
         app_status = r.get_dict_value('endpoint_hash', model_uid)
-        print(app_status)
+        logger.info(app_status)
         if app_status is None:
             # If the app_id doesn't exist in Redis, return a 404 error
             raise HTTPException(status_code=404, detail=f"Model ID '{model_uid}' not found in the system.")

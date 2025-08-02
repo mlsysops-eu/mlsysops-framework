@@ -1,4 +1,5 @@
 import requests
+from agents.mlsysops.logger_util import logger
 
 url = "http:///model/get/"
 
@@ -9,4 +10,4 @@ headers = {
 
 response = requests.request("GET", url, headers=headers, data=payload)
 
-print(response.text)
+logger.info(response.text)

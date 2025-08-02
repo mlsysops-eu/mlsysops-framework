@@ -2,7 +2,7 @@ import redis
 import json
 import time
 from redis_setup import redis_config as rc
-
+from agents.mlsysops.logger_util import logger
 
 class RedisManager:
     def __init__(self):
@@ -27,30 +27,30 @@ class RedisManager:
         try:
             self.redis_conn = redis.Redis(host=self.host, port=self.port, db=self.db, password=self.redis_password)
             if self.redis_conn.ping():
-                print(f"Successfully connected to Redis at {self.host}.")
+                logger.info(f"Successfully connected to Redis at {self.host}.")
             else:
                 raise Exception("Could not connect to Redis.")
         except redis.ConnectionError as e:
-            print(f"Connection error: {e}")
+            logger.error(f"Connection error: {e}")
             self.redis_conn = None
 
     # --- Queue Methods ---
     def push(self, q_name, value):
         if self.redis_conn:
             self.redis_conn.rpush(q_name, value)
-            print(f"'{value}' added to the queue '{q_name}'.")
+            logger.info(f"'{value}' added to the queue '{q_name}'.")
         else:
-            print("Redis connection not established.")
+            logger.info("Redis connection not established.")
 
     def pop(self, q_name):
         if self.redis_conn:
             value = self.redis_conn.lpop(q_name)
             if value:
-                print(f"'{value.decode()}' removed from the queue '{q_name}'.")
+                logger.info(f"'{value.decode()}' removed from the queue '{q_name}'.")
                 return value.decode()
-            print(f"The queue '{q_name}' is empty.")
+            logger.info(f"The queue '{q_name}' is empty.")
         else:
-            print("Redis connection not established.")
+            logger.info("Redis connection not established.")
 
     def is_empty(self, q_name):
         return self.redis_conn.llen(q_name) == 0 if self.redis_conn else True
@@ -63,39 +63,39 @@ class RedisManager:
     def pub_ping(self, message):
         if self.redis_conn:
             self.redis_conn.publish(self.channel_name, message)
-            print(f"'{message}' published to the channel '{self.channel_name}'.")
+            logger.info(f"'{message}' published to the channel '{self.channel_name}'.")
         else:
-            print("Redis connection not established.")
+            logger.info("Redis connection not established.")
 
     def subs_ping(self):
         if self.redis_conn:
             pubsub = self.redis_conn.pubsub()
             pubsub.subscribe(self.channel_name)
-            print(f"Subscribed to the channel '{self.channel_name}'.")
+            logger.info(f"Subscribed to the channel '{self.channel_name}'.")
             for message in pubsub.listen():
                 if message and message['type'] == 'message':
-                    print(f"Message received: {message['data'].decode()}")
+                    logger.info(f"Message received: {message['data'].decode()}")
         else:
-            print("Redis connection not established.")
+            logger.info("Redis connection not established.")
 
     # --- Dictionary (Hash Map) Methods ---
     def update_dict_value(self, dict_name, key, value):
         if self.redis_conn:
             self.redis_conn.hset(dict_name, key, value)
-            print(f"Value for key '{key}' updated to '{value}' in dictionary '{dict_name}'.")
+            logger.info(f"Value for key '{key}' updated to '{value}' in dictionary '{dict_name}'.")
         else:
-            print("Redis connection not established.")
+            logger.info("Redis connection not established.")
 
     def get_dict_value(self, dict_name, key):
         if self.redis_conn:
             value = self.redis_conn.hget(dict_name, key)
             return value.decode() if value else None
-        print("Redis connection not established.")
+        logger.info("Redis connection not established.")
 
     def get_dict(self, dict_name):
         if self.redis_conn:
             return {k.decode(): v.decode() for k, v in self.redis_conn.hgetall(dict_name).items()}
-        print("Redis connection not established.")
+        logger.info("Redis connection not established.")
 
     def remove_key(self, dict_name, key):
         return bool(self.redis_conn.hdel(dict_name, key)) if self.redis_conn else False

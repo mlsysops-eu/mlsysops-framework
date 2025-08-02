@@ -461,7 +461,7 @@ async def create_svc(name_prefix=None,svc_manifest=None,selector=None):
         resp = core_api.read_namespaced_service(
             name=svc_manifest['metadata']['name'],
             namespace=namespace)
-        #print(resp)
+        #logger(resp)
     except ApiException as exc:
         if exc.status != 404:
             logger.error('Unknown error reading service: %s', exc)
@@ -472,13 +472,13 @@ async def create_svc(name_prefix=None,svc_manifest=None,selector=None):
             resp = core_api.delete_namespaced_service(
                 name=svc_manifest['metadata']['name'],
                 namespace=namespace)
-            #print(resp)
+            #logger(resp)
         except ApiException as exc:
             logger.error('Failed to delete service: %s', exc)
     try:
         svc_obj = core_api.create_namespaced_service(body=svc_manifest,
                                                      namespace=namespace)
-        #print(svc_obj)
+        #logger(svc_obj)
         return svc_obj
     except ApiException as exc:
         logger.error('Failed to create service: %s', exc)

@@ -13,6 +13,7 @@ from jinja2 import Template
 import subprocess
 from mlsysops_cli import deployment
 from mlsysops_cli.deployment.descriptions_util import create_cluster_yaml, create_worker_node_yaml,create_continuum_yaml
+from agents.mlsysops.logger_util import logger
 
 
 def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list | None:
@@ -33,7 +34,7 @@ def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list 
     yaml = YAML(typ='safe')
 
     if not path_obj.exists():
-        print(f"❌ File does not exist: {path_obj}")
+        logger.error(f"❌ File does not exist: {path_obj}")
         return None
 
     raw_template = path_obj.read_text(encoding="utf-8")
@@ -42,7 +43,7 @@ def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list 
     resources = list(yaml.load_all(rendered_template))
 
     if not resources:
-        print(f"⚠️ No resources found in file: {path_obj}")
+        logger.error(f"⚠️ No resources found in file: {path_obj}")
         return None
 
     resource_order = [
@@ -61,7 +62,7 @@ def get_method(kind, operation):
     """
     Retrieves the method corresponding to a Kubernetes resource kind and operation. This function maps a
     given resource kind (e.g., 'service', 'secret', 'deployment') and an operation (e.g., 'read', '
-    print(description_directory',
+    logger(description_directory',
     'delete', 'replace') to the appropriate method provided by the Kubernetes Python client library.
     It ensures that only supported kinds and operations are used.
 
@@ -178,16 +179,16 @@ class KubernetesLibrary:
 
         # Load Kubernetes configuration for the specified environment and context
         if kubeconfig:
-            print(f"Loading kubeconfig from {kubeconfig}, context: {context}")
+            logger.info(f"Loading kubeconfig from {kubeconfig}, context: {context}")
             config.load_kube_config(config_file=kubeconfig, context=context)
         elif 'KUBERNETES_PORT' in os.environ:
-            print("Loading in-cluster Kubernetes configuration")
+            logger.info("Loading in-cluster Kubernetes configuration")
             config.load_incluster_config()
         else:
-            print(f"Loading default kubeconfig, context: {context}")
+            logger.info(f"Loading default kubeconfig, context: {context}")
             config.load_kube_config(context=context)
 
-        print(f"Kubernetes configuration loaded successfully")
+        logger.info(f"Kubernetes configuration loaded successfully")
         self.config = config
         self.kubeconfig = kubeconfig
         self.group = group
@@ -208,7 +209,7 @@ class KubernetesLibrary:
                 body=yaml_content,
             )
         except ApiException as e:
-            print(f"Failed to apply kind '{yaml_content['kind']}' to Kubernetes API: {e}")
+            logger.error(f"Failed to apply kind '{yaml_content['kind']}' to Kubernetes API: {e}")
 
     def update_custom_object(self, name, yaml_content):
         kind = yaml_content["kind"]
@@ -223,7 +224,7 @@ class KubernetesLibrary:
                 body=yaml_content,
             )
         except ApiException as e:
-            print(f"Failed to apply kind '{yaml_content['kind']}' to Kuberentes API: {e}")
+            logger.error(f"Failed to apply kind '{yaml_content['kind']}' to Kuberentes API: {e}")
 
     def create_or_update(self, resource_yaml):
 
@@ -232,7 +233,7 @@ class KubernetesLibrary:
             kind = resource_yaml["kind"].lower()
             name = resource_yaml["metadata"].get("name", "None")
             namespace = resource_yaml["metadata"].get("namespace")
-            print(f"Creating/Updating resource: {name} of kind {kind} in namespace {namespace} ")
+            logger.info(f"Creating/Updating resource: {name} of kind {kind} in namespace {namespace} ")
             if namespace is not None:
                 existing_resource = get_method(kind, "read")(name, namespace=namespace)
                 get_method(kind, "replace")(name=name, namespace=namespace, body=resource_yaml)
@@ -241,13 +242,13 @@ class KubernetesLibrary:
                 existing_resource = get_method(kind, "read")(name)
                 get_method(kind, "replace")(name=name, body=resource_yaml)
 
-                print(f"Updated resource: {name}")
+                logger.info(f"Updated resource: {name}")
         except KeyError as e:
-            print(f"Error parsing resource: {e}")
+            logger.error(f"Error parsing resource: {e}")
             return
         except client.exceptions.ApiException as e:
             if e.status == 404:
-                print(f"Resource '{name}' of kind '{kind}' not found. Creating it now. {namespace}")
+                logger.error(f"Resource '{name}' of kind '{kind}' not found. Creating it now. {namespace}")
                 if namespace is not None:
                     if kind in ['serviceaccount', 'configmap', 'daemonset', "deployment", "service",
                                 "persistentvolumeclaim"]:
@@ -258,7 +259,7 @@ class KubernetesLibrary:
                 else:
                     get_method(kind, "create")(body=resource_yaml)
             else:
-                print(f"Error updating Service '{name}' in namespace '{namespace}': {e}")
+                logger.error(f"Error updating Service '{name}' in namespace '{namespace}': {e}")
 
     def dump_context_config(self,full_config, context_name):
         # Validate the context exists
@@ -302,12 +303,12 @@ class KubernetesLibrary:
 
         try:
             self.core_v1_api.create_namespaced_config_map(namespace, config_map)
-            print(f"✅ Created Karmada API kubeconfig configmap {name}")
+            logger.info(f"✅ Created Karmada API kubeconfig configmap {name}")
         except ApiException as e:
             if e.status != 409:
                 #self.core_v1_api.delete_namespaced_config_map(name,namespace)
                 self.core_v1_api.replace_namespaced_config_map(name, namespace, config_map)
-                print(f"♻️ Updated configmap Karamda API kubeconfig {name}")
+                logger.info(f"♻️ Updated configmap Karamda API kubeconfig {name}")
 
     def create_configmap_from_file(self, descriptions_directory, namespace, name, suffixes=["*.yml", "*.yaml"], key_name = ""):
         """
@@ -319,12 +320,12 @@ class KubernetesLibrary:
         try:
             for suffix in suffixes:
                 for file in directory.glob(suffix):
-                    print(f"Reading file: {file.name}")
+                    logger.debug(f"Reading file: {file.name}")
                     file_data = file.read_text()
                     key_name = file.name
                     files_data_object[key_name] = file_data
         except Exception as e:
-            print(f"Error reading from {descriptions_directory}: {e}")
+            logger.error(f"Error reading from {descriptions_directory}: {e}")
             return
 
         config_map = client.V1ConfigMap(
@@ -334,11 +335,11 @@ class KubernetesLibrary:
 
         try:
             self.core_v1_api.create_namespaced_config_map(namespace, config_map)
-            print(f"✅ Created configmap {name}")
+            logger.info(f"✅ Created configmap {name}")
         except ApiException as e:
             if e.status != 409:
                 self.core_v1_api.replace_namespaced_config_map(name, namespace, config_map)
-                print(f"♻️ Updated configmap {name}")
+                logger.info(f"♻️ Updated configmap {name}")
 
     def get_karmada_clusters(self):
         """
@@ -372,7 +373,7 @@ class KubernetesLibrary:
             return return_object
 
         except Exception as e:
-            print(f"Error retrieving clusters: {e}")
+            logger.error(f"Error retrieving clusters: {e}")
             return []
 
     def apply_karmada_policy(self, policy_name: str, policy_body: dict, plural: str, namespaced: bool = False,
@@ -394,7 +395,7 @@ class KubernetesLibrary:
             group = "policy.karmada.io"
             version = "v1alpha1"
 
-            print(
+            logger.info(
                 f"Applying resource '{policy_name}' with group: {group}, version: {version}, plural: {plural}, namespaced: {namespaced}"
             )
 
@@ -424,7 +425,7 @@ class KubernetesLibrary:
                 resource_version = current_resource["metadata"]["resourceVersion"]
                 policy_body["metadata"]["resourceVersion"] = resource_version
 
-                print(f"Resource '{policy_name}' exists. Updating it...")
+                logger.info(f"Resource '{policy_name}' exists. Updating it...")
 
                 # Perform an update using replace
                 if namespaced:
@@ -444,12 +445,12 @@ class KubernetesLibrary:
                         name=policy_name,
                         body=policy_body
                     )
-                print(f"Resource '{policy_name}' updated successfully.")
+                logger.info(f"Resource '{policy_name}' updated successfully.")
 
             except ApiException as e:
                 if e.status == 404:
                     # If the resource doesn't exist, create a new one
-                    print(f"Resource '{policy_name}' not found. Creating a new one...")
+                    logger.warning(f"Resource '{policy_name}' not found. Creating a new one...")
 
                     # Create the new resource
                     if namespaced:
@@ -467,12 +468,12 @@ class KubernetesLibrary:
                             plural=plural,
                             body=policy_body
                         )
-                    print(f"New resource '{policy_name}' created successfully.")
+                    logger.info(f"New resource '{policy_name}' created successfully.")
             else:
                 raise  # Re-raise any non-404 exceptions
 
         except Exception as e:
-            print(f"Error applying resource '{policy_name}': {e}")
+            logger.error(f"Error applying resource '{policy_name}': {e}")
 
     def apply_mlsysops_propagation_policies(self):
         """
@@ -482,7 +483,7 @@ class KubernetesLibrary:
             # Extract cluster names where the cluster status is True (ready)
             cluster_names = [name for name, status in self.get_karmada_clusters().items() if status.lower() == 'true']
 
-            print(f"Applying PropagationPolicy with cluster names: {cluster_names}")
+            logger.info(f"Applying PropagationPolicy with cluster names: {cluster_names}")
 
             # Correctly load template path using importlib.resources
             templates_path = str(files(deployment))
@@ -503,10 +504,10 @@ class KubernetesLibrary:
                     plural="clusterpropagationpolicies",
                     namespaced=False,
                 )
-                print(f"✅ Cluster-Wide PropagationPolicy applied.")
+                logger.info(f"✅ Cluster-Wide PropagationPolicy applied.")
 
             except Exception as e:
-                print(f"❌ Error applying Cluster-Wide PropagationPolicy: {e}")
+                logger.error(f"❌ Error applying Cluster-Wide PropagationPolicy: {e}")
 
             # Apply Simple PropagationPolicy
             try:
@@ -524,13 +525,13 @@ class KubernetesLibrary:
                     namespaced=True,
                     namespace="default"
                 )
-                print(f"✅ Simple PropagationPolicy applied.")
+                logger.info(f"✅ Simple PropagationPolicy applied.")
 
             except Exception as e:
-                print(f"❌ Error applying Simple PropagationPolicy: {e}")
+                logger.error(f"❌ Error applying Simple PropagationPolicy: {e}")
 
         except Exception as e:
-            print(f"❌ Error applying PropagationPolicies: {e}")
+            logger.error(f"❌ Error applying PropagationPolicies: {e}")
 
     def annotate_pod(self):
         path = "/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/mlsysops-framework/pods"
@@ -546,7 +547,7 @@ class KubernetesLibrary:
             pod_name = pod['metadata']['name']
             pod_cluster = pod['metadata']['annotations']['resource.karmada.io/cached-from-cluster']
             if pod_name.startswith("mlsysops-cluster-agent"):
-                print(f"Updating pod {pod_name} from cluster {pod_cluster}")
+                logger.info(f"Updating pod {pod_name} from cluster {pod_cluster}")
 
                 pod_path = f"/apis/cluster.karmada.io/v1alpha1/clusters/{pod_cluster}/proxy/api/v1/namespaces/mlsysops-framework/pods/{pod_name}"
                 annotation_patch = {
@@ -584,9 +585,9 @@ class KubernetesLibrary:
 
             self.annotate_pod()
 
-            print(f"ConfigMap '{configmap_name}' updated successfully.")
+            logger.info(f"ConfigMap '{configmap_name}' updated successfully.")
         except Exception as e:
-            print(f"Failed to update ConfigMap '{configmap_name}': {e}")
+            logger.error(f"Failed to update ConfigMap '{configmap_name}': {e}")
             raise
 
 
@@ -597,18 +598,18 @@ def _check_required_env_vars(*required_vars):
 
 def run_deploy_all(path, inventory_path):
     try:
-        print("🚀 Deploying all MLSysOps components...")
+        logger.info("🚀 Deploying all MLSysOps components...")
         deploy_core_services()
         deploy_continuum_agents(path, inventory_path)
         deploy_cluster_agents(path, inventory_path)
         deploy_node_agents(path, inventory_path)
-        print("✅ All components deployed successfully.")
+        logger.info("✅ All components deployed successfully.")
     except Exception as e:
-        print(f"❌ Error in deploy_all: {e}")
+        logger.error(f"❌ Error in deploy_all: {e}")
         raise
 
 def deploy_core_services():
-    print("🔧 Deploying core services (ejabberd, redis, API service)...")
+    logger.info("🔧 Deploying core services (ejabberd, redis, API service)...")
     _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
     client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
                                    context="karmada-host")
@@ -627,7 +628,7 @@ def deploy_core_services():
         client_k8s.create_or_update(r)
 
 def deploy_continuum_agents(path, inventory_path):
-    print("🧠 Deploying Continuum Agent...")
+    logger.info("🧠 Deploying Continuum Agent...")
     _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
     client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"), context="karmada-host")
     _apply_namespace_and_rbac(client_k8s)
@@ -660,7 +661,7 @@ def deploy_continuum_agents(path, inventory_path):
         client_k8s.create_or_update(r)
 
 def deploy_cluster_agents(path, inventory_path):
-    print("🏢 Deploying Cluster Agents...")
+    logger.info("🏢 Deploying Cluster Agents...")
     _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
     client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
                                        context="karmada-apiserver")
@@ -685,10 +686,10 @@ def deploy_cluster_agents(path, inventory_path):
 
         for cluster_name in inventory['all']['children']:
             try:
-                print(f"Processing cluster: {cluster_name}")
+                logger.info(f"Processing cluster: {cluster_name}")
                 create_cluster_yaml(inventory_path, cluster_name, descriptions_path)
             except ValueError as e:
-                print(f"Skipping cluster '{cluster_name}': {e}")
+                logger.error(f"Skipping cluster '{cluster_name}': {e}")
 
     # ConfigMap
     client_karmada.create_configmap_from_file(descriptions_path, "mlsysops-framework", "cluster-system-description")
@@ -699,7 +700,7 @@ def deploy_cluster_agents(path, inventory_path):
         client_karmada.create_or_update(r)
 
 def deploy_node_agents(path, inventory_path):
-    print("🧱 Deploying Node Agents...")
+    logger.info("🧱 Deploying Node Agents...")
     _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
     client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
                                        ,context="karmada-apiserver")
@@ -722,13 +723,13 @@ def deploy_node_agents(path, inventory_path):
 
         for cluster_name in inventory['all']['children']:
             try:
-                print(f"Processing cluster: {cluster_name}")
+                logger.info(f"Processing cluster: {cluster_name}")
                 create_worker_node_yaml(inventory_path, cluster_name,descriptions_path)
             except ValueError as e:
-                print(f"Skipping cluster '{cluster_name}': {e}")
+                logger.error(f"Skipping cluster '{cluster_name}': {e}")
 
     # ConfigMap
-    print(f"Using node systems decriptions from {descriptions_path}")
+    logger.info(f"Using node systems decriptions from {descriptions_path}")
     client_karmada.create_configmap_from_file(descriptions_path, "mlsysops-framework", "node-system-descriptions")
 
     # DaemonSet YAML

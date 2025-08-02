@@ -20,7 +20,6 @@ CRUD operations to Fluidity custom objects at the Kubernetes cluster.
 """
 from __future__ import print_function
 # import json
-import logging
 import os
 # import sys
 
@@ -118,7 +117,6 @@ def register_all_fluidity_crd():
     for crd_info in CRDS_INFO_LIST:
         if crd_info['singular'] not in current_crds_names:
             logger.info('Creating Fluidity CRD: %s', crd_info['kind'])
-            print('Creating Fluidity CRD: %s' % crd_info['kind'])
             try:
                 yaml = YAML(typ='safe')
                 with open(crd_info['crd_file'], 'r') as data:
@@ -131,5 +129,4 @@ def register_all_fluidity_crd():
                 ext_api.create_custom_resource_definition(body)
             except ApiException as exc:
                 logger.exception('%s update failed: %s', crd_info['kind'], exc)
-                print('%s update failed: %s' % (crd_info['kind'], exc))
                 raise FluidityCrdsApiException from exc

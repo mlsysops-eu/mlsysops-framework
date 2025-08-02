@@ -33,17 +33,17 @@ class APIPingBehaviour(CyclicBehaviour):
         # wait for a message for 10 seconds
         msg = await self.receive(timeout=1)
         if msg:
-            #print(str(msg._sender).split("/")[0])
-            #print(msg.to)
+            #logger(str(msg._sender).split("/")[0])
+            #logger(msg.to)
             logger.debug("Ping received with content: {}".format(msg.body))
 
             # Create a response message
             resp = Message(to=str(msg._sender).split("/")[0])  # Replace with the actual recipient JID
             resp.set_metadata("performative", "ping")  # Set the "inform" FIPA performative
             resp.body = "Response From " + str(msg.to)  # Set the message content
-            #print(resp.body)
+            #logger(resp.body)
             # Send the response message
             await self.send(resp)
-            #print("Callback message sent!\n")
+            #logger("Callback message sent!\n")
         else:
             await asyncio.sleep(5)

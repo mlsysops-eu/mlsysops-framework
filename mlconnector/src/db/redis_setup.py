@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 import asyncio_redis
 #import redis
-
+from agents.mlsysops.logger_util import logger
 
 load_dotenv(verbose=True, override=True)
 
@@ -23,10 +23,10 @@ async def create_redis_connection():
         # Ping the Redis server
         #ping = await redis_client.ping()  # Awaiting the ping
         if await redis_client.ping():
-            print(f"Successfully connected to Redis at {os.getenv('REDIS_HOST')}.")
+            logger.info(f"Successfully connected to Redis at {os.getenv('REDIS_HOST')}.")
             return redis_client
         else:
             raise Exception("Could not connect to Redis.")
     except Exception as e:
-        print(f"Redis connection error: {e}")
+        logger.critical(f"Redis connection error: {e}")
         raise

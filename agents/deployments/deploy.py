@@ -8,6 +8,7 @@ from ruamel.yaml import YAML
 import os
 from jinja2 import Template
 import subprocess
+from agents.mlsysops.logger_util import logger
 
 
 def get_method(kind, operation):
@@ -130,16 +131,16 @@ class KubernetesLibrary:
 
         # Load Kubernetes configuration for the specified environment and context
         if kubeconfig:
-            print(f"Loading kubeconfig from {kubeconfig}, context: {context}")
+            logger.info(f"Loading kubeconfig from {kubeconfig}, context: {context}")
             config.load_kube_config(config_file=kubeconfig, context=context)
         elif 'KUBERNETES_PORT' in os.environ:
-            print("Loading in-cluster Kubernetes configuration")
+            logger.info("Loading in-cluster Kubernetes configuration")
             config.load_incluster_config()
         else:
-            print(f"Loading default kubeconfig, context: {context}")
+            logger.info(f"Loading default kubeconfig, context: {context}")
             config.load_kube_config(context=context)
 
-        print(f"Kubernetes configuration loaded successfully")
+        logger.info(f"Kubernetes configuration loaded successfully")
         self.group = group
         self.version = version
         self.custom_objects_api = client.CustomObjectsApi()
@@ -167,7 +168,7 @@ class KubernetesLibrary:
         yaml = YAML(typ='safe')  # Safe loading of YAML
 
         if resource_file is None:
-            print("No resource file specified.")
+            logger.warning("No resource file specified.")
             return None
 
         # Load the file and use Jinja2 for template rendering
@@ -182,7 +183,7 @@ class KubernetesLibrary:
         resources = list(yaml.load_all(rendered_template))  # Load all YAML resource definitions
 
         if not resources:
-            print(f"No resources found in file: {resource_file}")
+            logger.warning(f"No resources found in file: {resource_file}")
             return None
 
         # Define the order for sorting resources by 'kind'
@@ -215,7 +216,7 @@ class KubernetesLibrary:
                 body=yaml_content,
             )
         except ApiException as e:
-            print(f"Failed to apply kind '{yaml_content['kind']}' to Kubernetes API: {e}")
+            logger.critical(f"Failed to apply kind '{yaml_content['kind']}' to Kubernetes API: {e}")
 
     def update_custom_object(self, name, yaml_content):
         kind = yaml_content["kind"]
@@ -230,7 +231,7 @@ class KubernetesLibrary:
                 body=yaml_content,
             )
         except ApiException as e:
-            print(f"Failed to apply kind '{yaml_content['kind']}' to Kuberentes API: {e}")
+            logger.critical(f"Failed to apply kind '{yaml_content['kind']}' to Kuberentes API: {e}")
 
 
     def create_or_update(self,resource_yaml):
@@ -240,7 +241,7 @@ class KubernetesLibrary:
             kind = resource["kind"].lower()
             name = resource["metadata"].get("name","None")
             namespace = resource["metadata"].get("namespace")
-            print(f"Creating/Updating resource: {name} of kind {kind} in namespace {namespace} ")
+            logger.info(f"Creating/Updating resource: {name} of kind {kind} in namespace {namespace} ")
             if namespace is not None :
                 existing_resource = get_method(kind, "read")(name,namespace=namespace)
                 get_method(kind, "replace")(name=name, namespace=namespace, body=resource_yaml)
@@ -249,13 +250,13 @@ class KubernetesLibrary:
                 existing_resource = get_method(kind, "read")(name)
                 get_method(kind, "replace")(name=name,body=resource_yaml)
 
-                print(f"Updated resource: {name}")
+                logger.info(f"Updated resource: {name}")
         except KeyError as e:
-            print(f"Error parsing resource: {e}")
+            logger.error(f"Error parsing resource: {e}")
             return
         except client.exceptions.ApiException as e:
             if e.status == 404:
-                print(f"Resource '{name}' of kind '{kind}' not found. Creating it now. {namespace}")
+                logger.warning(f"Resource '{name}' of kind '{kind}' not found. Creating it now. {namespace}")
                 if namespace is not None:
                     if kind in ['serviceaccount','configmap','daemonset',"deployment", "service", "persistentvolumeclaim"]:
                         get_method(kind, "create")(namespace=namespace, body=resource_yaml)
@@ -265,13 +266,13 @@ class KubernetesLibrary:
                 else:
                     get_method(kind, "create")(body=resource_yaml)
             else:
-                print(f"Error updating Service '{name}' in namespace '{namespace}': {e}")
+                logger.error(f"Error updating Service '{name}' in namespace '{namespace}': {e}")
 
     def create_configmap_from_file(self, descriptions_directory, namespace, name,suffixes=["*.yml", "*.yaml"]):
 
         directory = Path(descriptions_directory)
         if not directory.exists() or not directory.is_dir():
-            print(f"Invalid directory: {descriptions_directory}")
+            logger.warning(f"Invalid directory: {descriptions_directory}")
             exit()
 
         # Iterate through files in the directory and filter YAML files
@@ -281,7 +282,7 @@ class KubernetesLibrary:
 
         files_data_object = {}
         for single_file in file_paths:
-            print(f"Reading file: {single_file}")
+            logger.info(f"Reading file: {single_file}")
             with open(single_file, "r") as file:
                 file_data = file.read()
                 files_data_object[single_file.name] = file_data
@@ -293,11 +294,11 @@ class KubernetesLibrary:
         )
         try:
             self.core_v1_api.create_namespaced_config_map(namespace, config_map)
-            print(f"Created configmap {name}")
+            logger.info(f"Created configmap {name}")
         except ApiException as e:
             if e.status != 409:
                 self.core_v1_api.replace_namespaced_config_map(name, namespace, config_map)
-                print(f"Updated configmap {name}")
+                logger.info(f"Updated configmap {name}")
 
 
     def delete(self, kind, namespace, name):
@@ -305,7 +306,7 @@ class KubernetesLibrary:
             get_method(kind,"delete")(name=name, namespace=namespace)
         except client.exceptions.ApiException as e:
             if e.status != 404:
-                print(f"Error deleting Service: {e}")
+                logger.error(f"Error deleting Service: {e}")
 
     def get_karmada_clusters(self):
         """
@@ -339,7 +340,7 @@ class KubernetesLibrary:
             return return_object
 
         except Exception as e:
-            print(f"Error retrieving clusters: {e}")
+            logger.error(f"Error retrieving clusters: {e}")
             return []
 
     def apply_karmada_policy(self, policy_name: str, policy_body: dict, plural: str, namespaced: bool = False, namespace: str = None):
@@ -360,7 +361,7 @@ class KubernetesLibrary:
             group = "policy.karmada.io"
             version = "v1alpha1"
 
-            print(
+            logger.info(
                 f"Applying resource '{policy_name}' with group: {group}, version: {version}, plural: {plural}, namespaced: {namespaced}"
             )
 
@@ -390,7 +391,7 @@ class KubernetesLibrary:
                 resource_version = current_resource["metadata"]["resourceVersion"]
                 policy_body["metadata"]["resourceVersion"] = resource_version
 
-                print(f"Resource '{policy_name}' exists. Updating it...")
+                logger.info(f"Resource '{policy_name}' exists. Updating it...")
 
                 # Perform an update using replace
                 if namespaced:
@@ -410,12 +411,12 @@ class KubernetesLibrary:
                         name=policy_name,
                         body=policy_body
                     )
-                print(f"Resource '{policy_name}' updated successfully.")
+                logger.info(f"Resource '{policy_name}' updated successfully.")
 
             except ApiException as e:
                 if e.status == 404:
                     # If the resource doesn't exist, create a new one
-                    print(f"Resource '{policy_name}' not found. Creating a new one...")
+                    logger.warning(f"Resource '{policy_name}' not found. Creating a new one...")
 
                     # Create the new resource
                     if namespaced:
@@ -433,12 +434,12 @@ class KubernetesLibrary:
                             plural=plural,
                             body=policy_body
                         )
-                    print(f"New resource '{policy_name}' created successfully.")
+                    logger.warning(f"New resource '{policy_name}' created successfully.")
             else:
                 raise  # Re-raise any non-404 exceptions
 
         except Exception as e:
-            print(f"Error applying resource '{policy_name}': {e}")
+            logger.error(f"Error applying resource '{policy_name}': {e}")
 
     def apply_mlsysops_propagation_policies(self):
         """
@@ -448,7 +449,7 @@ class KubernetesLibrary:
             # Extract cluster names where the cluster status is True (ready)
             cluster_names = [name for name, status in self.get_karmada_clusters().items() if status.lower() == 'true']
 
-            print(f"Applying PropagationPolicy with cluster names: {cluster_names}")
+            logger.info(f"Applying PropagationPolicy with cluster names: {cluster_names}")
 
             env = Environment(loader=FileSystemLoader(searchpath="./"))  # Load from "templates" dir
 
@@ -471,7 +472,7 @@ class KubernetesLibrary:
                 )
 
             except Exception as e:
-                print(f"Error applying Cluster-Wide PropagationPolicy: {e}")
+                logger.error(f"Error applying Cluster-Wide PropagationPolicy: {e}")
 
             # Apply Simple PropagationPolicy
             try:
@@ -493,10 +494,10 @@ class KubernetesLibrary:
                 )
 
             except Exception as e:
-                print(f"Error applying Simple PropagationPolicy: {e}")
+                logger.error(f"Error applying Simple PropagationPolicy: {e}")
 
         except Exception as e:
-            print(f"Error applying PropagationPolicies: {e}")
+            logger.error(f"Error applying PropagationPolicies: {e}")
 
 if __name__ == "__main__":
 

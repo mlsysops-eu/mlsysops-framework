@@ -4,7 +4,7 @@ from botocore.config import Config
 from boto3.exceptions import S3UploadFailedError
 from dotenv import load_dotenv
 import os
-import logging
+from agents.mlsysops.logger_util import logger
 
 load_dotenv(verbose=True, override=True)
 
@@ -29,18 +29,18 @@ class S3Manager:
         """
         try:
             self.s3_client.head_bucket(Bucket=self.bucket_name)
-            print(f"Bucket '{self.bucket_name}' already exists.")
+            logger.warning(f"Bucket '{self.bucket_name}' already exists.")
         except ClientError as e:
             # If a 404 error is thrown, then the bucket does not exist.
             error_code = int(e.response['Error']['Code'])
             if error_code == 404:
                 try:
                     self.s3_client.create_bucket(Bucket=self.bucket_name)
-                    print(f"Bucket '{self.bucket_name}' created successfully.")
+                    logger.info(f"Bucket '{self.bucket_name}' created successfully.")
                 except ClientError as ce:
-                    print("Error creating bucket:", ce)
+                    logger.info("Error creating bucket:", ce)
             else:
-                print("Error checking bucket:", e)
+                logger.error("Error checking bucket:", e)
 
     def upload_file(self, file_name, object_name=None):
         """Upload a file to an S3 bucket
@@ -59,7 +59,7 @@ class S3Manager:
                 data = f.read()
                 self.s3_client.put_object(Bucket=self.bucket_name, Key=object_name, Body=data, ContentLength=len(data))
         except ClientError as e:
-            logging.error(e)
+            logger.error(str(e))
             return False
         return True
 
@@ -76,9 +76,9 @@ class S3Manager:
             body = response['Body'].read()
             with open(download_path, 'wb') as f:
                 f.write(body)
-            print(f"File '{object_name}' downloaded from bucket '{self.bucket_name}' to '{download_path}'.")
+            logger.info(f"File '{object_name}' downloaded from bucket '{self.bucket_name}' to '{download_path}'.")
         except ClientError as e:
-            print("Error downloading file:", e)
+            logger.error("Error downloading file:", e)
 
     def delete_file(self, object_name):
         """
@@ -88,9 +88,9 @@ class S3Manager:
         """
         try:
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_name)
-            print(f"File '{object_name}' deleted from bucket '{self.bucket_name}'.")
+            logger.info(f"File '{object_name}' deleted from bucket '{self.bucket_name}'.")
         except ClientError as e:
-            print("Error deleting file:", e)
+            logger.error("Error deleting file:", e)
     
     def list_files(self):
         """
@@ -100,15 +100,15 @@ class S3Manager:
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name)
             if 'Contents' in response:
                 files = [obj['Key'] for obj in response['Contents']]
-                print("Files in bucket:")
+                logger.debug("Files in bucket:")
                 for f in files:
-                    print(" -", f)
+                    logger.debug(" -", f)
                 return files
             else:
-                print("No files found in bucket.")
+                logger.debug("No files found in bucket.")
                 return []
         except ClientError as e:
-            print("Error listing files:", e)
+            logger.error("Error listing files:", e)
             return []
 
 # Example usage:

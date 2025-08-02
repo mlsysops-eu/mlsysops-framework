@@ -33,10 +33,10 @@ class ManagementModeBehaviour(CyclicBehaviour):
         # wait for a message for 10 seconds
         msg = await self.receive(timeout=10)
         if msg:
-            print(str(msg._sender).split("/")[0])
-            print(msg.to)
-            print("Ping received with content: {}".format(msg.body))
+            logger.debug(str(msg._sender).split("/")[0])
+            logger.debug(msg.to)
+            logger.debug("Ping received with content: {}".format(msg.body))
 
         else:
-            print("Did not received any message after 10 seconds")
+            logger.debug("Did not received any message after 10 seconds")
             await asyncio.sleep(10)

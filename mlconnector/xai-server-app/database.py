@@ -9,6 +9,7 @@ import urllib.parse
 from manage_s3 import S3Manager
 from dotenv import load_dotenv
 import os
+from agents.mlsysops.logger_util import logger
 
 load_dotenv(verbose=True, override=True,dotenv_path='/.env')
 manager = S3Manager(
@@ -30,7 +31,7 @@ file_path = None
 def proccessURL(url:str):
     global parsed_url, gitlab_host, path_parts, repo_path, branch, file_path
     parsed_url = urlparse(url)
-    print(parsed_url)
+    logger.info(parsed_url)
     gitlab_host = f"{parsed_url.scheme}://{parsed_url.netloc}"
     path_parts = parsed_url.path.strip("/").split("/")
     repo_path = "/".join(path_parts[:2])
@@ -46,10 +47,10 @@ def getProjectID():
         projects = response.json()
         project_id = next((p["id"] for p in projects if p["path_with_namespace"] == repo_path), None)
         if not project_id:
-            print(f"Project '{repo_path}' not found. Check the repository name.")
+            logger.info(f"Project '{repo_path}' not found. Check the repository name.")
             exit()
     else:
-        print(f"Failed to fetch projects: {response.status_code} - {response.text}")
+        logger.critical(f"Failed to fetch projects: {response.status_code} - {response.text}")
         exit()
     return project_id
 
@@ -106,7 +107,7 @@ def getModelDataById(modelId:str):
         model_file = downloadFile(responseData["trained_model"][0]["modelname"])
         return model_file, csv_data, featurs_names
     else:
-        print(f"Error: {modelData.status_code}")
+        logger.error(f"Error: {modelData.status_code}")
         return None, None, None
 
 def getModelByManager(modelId:str):
@@ -118,4 +119,4 @@ def getModelByManager(modelId:str):
     manager.download_file(model_pkl_name,output_pkl_file)
     return output_pkl_file, pd.read_csv(output_csv_path)
 
-#print(getModelDataById("d11356fc-48c0-43d1-bc27-2723395f1dfe"))
+#logger(getModelDataById("d11356fc-48c0-43d1-bc27-2723395f1dfe"))

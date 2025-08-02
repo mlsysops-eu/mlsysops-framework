@@ -2,6 +2,7 @@ import os
 import docker
 import yaml
 import requests
+from agents.mlsysops.logger_util import logger
 
 
 def generate_entry_file(file_list):
@@ -88,7 +89,7 @@ if __name__ == "__main__":
         file_kind="model",
         model_id="{model_id}"
     )
-    print("Upload response:", result)
+    logger("Upload response:", result)
 """
 
 def generate_dockerfile():
@@ -112,7 +113,7 @@ def generate_dockerfile():
         """
     with open("/code/utils/train/Dockerfile", "w") as file:
         file.write(dockerfile_content)
-    print("Dockerfile generated successfully!")
+    logger.info("Dockerfile generated successfully!")
 
 
 def build_and_push_image(modelid, registry_url, image_name, registry_username, registry_password, training_data, training_code):
@@ -130,24 +131,24 @@ def build_and_push_image(modelid, registry_url, image_name, registry_username, r
     client = docker.from_env()
 
     try:
-        print("Building Docker image...")
+        logger.debug("Building Docker image...")
         image, build_logs = client.images.build(path="/code/utils/train/", tag=image_name)
         for log in build_logs:
-            print(log.get("stream", "").strip())
+            logger.debug(log.get("stream", "").strip())
     except docker.errors.BuildError as e:
-        print(f"Error building image: {e}")
+        logger.error(f"Error building image: {e}")
         return
 
-    print("Pushing Docker image...")
+    logger.debug("Pushing Docker image...")
     #registry_url, image_tag = image_name.split("/", 1)
     client.login(username=registry_username, password=registry_password, registry=registry_url)
 
     try:
         push_logs = client.images.push(image_name, stream=True, decode=True)
         for log in push_logs:
-            print(log)
+            logger.debug(log)
     except docker.errors.APIError as e:
-        print(f"Error pushing image: {e}")
+        logger.critical(f"Error pushing image: {e}")
 
 
 def generate_yaml(

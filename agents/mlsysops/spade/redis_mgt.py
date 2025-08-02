@@ -65,20 +65,20 @@ class RedisManager:
     def push(self, q_name, value):
         if self.redis_conn:
             self.redis_conn.rpush(q_name, value)
-            print(f"'{value}' added to the queue '{q_name}'.")
+            logger.debug(f"'{value}' added to the queue '{q_name}'.")
         else:
-            print("Redis connection not established.")
+            logger.debug("Redis connection not established.")
 
     def pop(self, q_name):
         if self.redis_conn:
             value = self.redis_conn.lpop(q_name)
             if value:
-                #print(f"'{value.decode()}' removed from the queue '{q_name}'.")
+                #logger(f"'{value.decode()}' removed from the queue '{q_name}'.")
                 logger.debug(f" Info removed from '{q_name}'.")
                 return value.decode()
-            print(f"The queue '{q_name}' is empty.")
+            logger.debug(f"The queue '{q_name}' is empty.")
         else:
-            print("Redis connection not established.")
+            logger.debug("Redis connection not established.")
 
     def is_empty(self, q_name):
         return self.redis_conn.llen(q_name) == 0 if self.redis_conn else True
@@ -91,39 +91,39 @@ class RedisManager:
     def pub_ping(self, message):
         if self.redis_conn:
             self.redis_conn.publish(self.channel_name, message)
-            print(f"'{message}' published to the channel '{self.channel_name}'.")
+            logger.debug(f"'{message}' published to the channel '{self.channel_name}'.")
         else:
-            print("Redis connection not established.")
+            logger.debug("Redis connection not established.")
 
     def subs_ping(self):
         if self.redis_conn:
             pubsub = self.redis_conn.pubsub()
             pubsub.subscribe(self.channel_name)
-            print(f"Subscribed to the channel '{self.channel_name}'.")
+            logger.debug(f"Subscribed to the channel '{self.channel_name}'.")
             for message in pubsub.listen():
                 if message and message['type'] == 'message':
-                    print(f"Message received: {message['data'].decode()}")
+                    logger.debug(f"Message received: {message['data'].decode()}")
         else:
-            print("Redis connection not established.")
+            logger.info("Redis connection not established.")
 
     # --- Dictionary (Hash Map) Methods ---
     def update_dict_value(self, dict_name, key, value):
         if self.redis_conn:
             self.redis_conn.hset(dict_name, key, value)
-            print(f"Value for key '{key}' updated to '{value}' in dictionary '{dict_name}'.")
+            logger.debug(f"Value for key '{key}' updated to '{value}' in dictionary '{dict_name}'.")
         else:
-            print("Redis connection not established.")
+            logger.debug("Redis connection not established.")
 
     def get_dict_value(self, dict_name, key):
         if self.redis_conn:
             value = self.redis_conn.hget(dict_name, key)
             return value.decode() if value else None
-        print("Redis connection not established.")
+        logger.debug("Redis connection not established.")
 
     def get_dict(self, dict_name):
         if self.redis_conn:
             return {k.decode(): v.decode() for k, v in self.redis_conn.hgetall(dict_name).items()}
-        print("Redis connection not established.")
+        logger.debug("Redis connection not established.")
 
     def remove_key(self, dict_name, key):
         return bool(self.redis_conn.hdel(dict_name, key)) if self.redis_conn else False

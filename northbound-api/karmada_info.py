@@ -1,6 +1,7 @@
 import subprocess
 import json
 import os
+from agents.mlsysops.logger_util import logger
 
 def get_karmada_pods(cluster_name):
     """
@@ -26,7 +27,7 @@ def get_karmada_pods(cluster_name):
         return pods
 
     except subprocess.CalledProcessError as e:
-        print(f"Error executing kubectl command: {e.stderr}")
+        logger.error(f"Error executing kubectl command: {e.stderr}")
         return None
 
 if __name__ == "__main__":
@@ -38,10 +39,10 @@ if __name__ == "__main__":
 
     # Print the result
     if pods:
-        print("Pods retrieved successfully:")
+        logger.info("Pods retrieved successfully:")
         for pod in pods.get("items", []):
             pod_name = pod["metadata"].get("name", "Unknown")
             pod_status = pod["status"].get("phase", "Unknown")
-            print(f"Pod name: {pod_name}, Status: {pod_status}")
+            logger.info(f"Pod name: {pod_name}, Status: {pod_status}")
     else:
-        print("Failed to retrieve pods. Make sure the cluster name is correct and kubectl is configured.")
+        logger.error("Failed to retrieve pods. Make sure the cluster name is correct and kubectl is configured.")

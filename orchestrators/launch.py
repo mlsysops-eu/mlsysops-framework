@@ -5,6 +5,7 @@ import time
 import yaml
 import json
 import sys
+from agents.mlsysops.logger_util import logger
 
 # VM definitions
 vms = [
@@ -32,7 +33,7 @@ if len(sys.argv) > 1 and sys.argv[1] != 'skip' or len(sys.argv) == 1:
     # 1. Launch the VMs
     for vm in vms:
         name = vm["name"]
-        print(f"Launching VM: {name}")
+        logger.info(f"Launching VM: {name}")
         try:
             subprocess.run([
                 "incus", "launch", image, f"{remote}{name}",
@@ -44,15 +45,15 @@ if len(sys.argv) > 1 and sys.argv[1] != 'skip' or len(sys.argv) == 1:
                 "--profile", profile
             ], check=True)
         except subprocess.CalledProcessError:
-            print(f"Failed to launch {name}", file=sys.stderr)
+            logger.error(f"Failed to launch {name}", file=sys.stderr)
             continue
     
     # 2. Wait a bit for VMs to boot and acquire IPs
-    print("Waiting 20 seconds for VMs to initialize networking...")
+    logger.info("Waiting 20 seconds for VMs to initialize networking...")
     time.sleep(20)
 
 # 3. Fetch all instance info
-print("📡 Fetching VM information from Incus...")
+logger.info("📡 Fetching VM information from Incus...")
 output = subprocess.check_output([
     "incus", "list", remote, "--format", "json", "--project", project
 ]).decode()
@@ -88,7 +89,7 @@ for inst in instances:
             break
 
     if not ip_address:
-        print(f"No usable IP found for {name}", file=sys.stderr)
+        logger.info(f"No usable IP found for {name}", file=sys.stderr)
         continue
 
     host_entry = {
@@ -122,4 +123,4 @@ for inst in instances:
 with open("inv.yml", "w") as f:
     yaml.dump(inventory, f, sort_keys=False)
 
-print("Inventory written to inv.yml")
+logger.info("Inventory written to inv.yml")

@@ -2,6 +2,7 @@ import os
 
 import yaml
 from jinja2 import Template, Environment, PackageLoader, select_autoescape
+from agents.mlsysops.logger_util import logger
 
 
 def render_template(template_file, context):
@@ -52,7 +53,7 @@ def create_cluster_yaml(input_file, cluster_name, descriptions_path=""):
     cluster_yaml = template.render(cluster_context)
     with open(cluster_yaml_filename, 'w') as output_file:
         output_file.write(cluster_yaml)
-    print(f"Cluster YAML written to {cluster_yaml_filename}")
+    logger.info(f"Cluster YAML written to {cluster_yaml_filename}")
 
 
 def create_worker_node_yaml(input_file, cluster_name, descriptions_path=""):
@@ -104,7 +105,7 @@ def create_worker_node_yaml(input_file, cluster_name, descriptions_path=""):
         worker_yaml_filename = os.path.join(descriptions_path, f"{worker_name}.yaml")
         with open(worker_yaml_filename, 'w') as output_file:
             output_file.write(worker_yaml)
-        print(f"Worker YAML written to {worker_yaml_filename}")
+        logger.info(f"Worker YAML written to {worker_yaml_filename}")
 
 
 def create_app_yaml(input_file,cluster_name=None):
@@ -155,7 +156,7 @@ def create_app_yaml(input_file,cluster_name=None):
     app_yaml_filename = "mlsysops-test-app-description.yaml"
     with open(app_yaml_filename, 'w') as output_file:
         output_file.write(app_yaml)
-    print(f"Application YAML written to {app_yaml_filename}")
+    logger.info(f"Application YAML written to {app_yaml_filename}")
 
 
 def create_continuum_yaml(input_file, descriptions_path=""):
@@ -203,4 +204,4 @@ def create_continuum_yaml(input_file, descriptions_path=""):
     continuum_yaml_content = template.render(continuum_context)
     with open(continuum_yaml_filename, 'w') as output_file:
         output_file.write(continuum_yaml_content)
-    print(f"Continuum YAML written to {continuum_yaml_filename}")
+    logger.info(f"Continuum YAML written to {continuum_yaml_filename}")

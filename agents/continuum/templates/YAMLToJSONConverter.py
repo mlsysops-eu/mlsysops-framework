@@ -2,7 +2,7 @@ import yaml
 import json
 from jsonschema import validate, ValidationError
 import argparse
-
+from agents.mlsysops.logger_util import logger
 
 def convert_yaml_crd_to_json(yaml_file: str, json_file: str):
     """
@@ -53,10 +53,10 @@ def convert_yaml_crd_to_json(yaml_file: str, json_file: str):
         with open(json_file, 'w') as f:
             json.dump(full_schema, f, indent=4)
 
-        print(f"JSON schema successfully written to {json_file}")
+        logger.info(f"JSON schema successfully written to {json_file}")
 
     except Exception as e:
-        print(f"Error occurred: {e}")
+        logger.info(f"Error occurred: {e}")
 
 def validate_yaml_against_schema(yaml_file: str, json_schema_file: str):
     """
@@ -80,11 +80,11 @@ def validate_yaml_against_schema(yaml_file: str, json_schema_file: str):
 
         # Validate the YAML data against the JSON schema
         validate(instance=yaml_data, schema=schema)
-        print(f"The YAML file '{yaml_file}' is valid according to the schema '{json_schema_file}'.")
+        logger.info(f"The YAML file '{yaml_file}' is valid according to the schema '{json_schema_file}'.")
     except ValidationError as ve:
-        print(f"Validation Error: {ve.message}")
+        logger.error(f"Validation Error: {ve.message}")
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
 
 #example usage
 if __name__ == "__main__":
@@ -101,12 +101,12 @@ if __name__ == "__main__":
     if args.command == "convert":
         # Convert the YAML CRD schema to a JSON schema
         if not args.schema:
-            print("Error: You must specify an output file for the JSON schema using --schema.")
+            logger.warning("Error: You must specify an output file for the JSON schema using --schema.")
         else:
             convert_yaml_crd_to_json(args.input, args.schema)
     elif args.command == "validate":
         # Validate a YAML file against a JSON schema
         if not args.schema:
-            print("Error: You must specify the JSON schema file for validation using --schema.")
+            logger.warning("Error: You must specify the JSON schema file for validation using --schema.")
         else:
             validate_yaml_against_schema(args.input, args.schema)

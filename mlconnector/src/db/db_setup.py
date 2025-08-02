@@ -6,7 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
-
+from agents.mlsysops.logger_util import logger
 
 load_dotenv(verbose=True, override=True)
 
@@ -43,5 +43,5 @@ async def get_db():
             await db.commit()  # Commit transaction
         except Exception as e:
             await db.rollback()  # Rollback in case of error
-            print(f"Error in database transaction: {e}")
+            logger.error(f"Error in database transaction: {e}")
             raise
