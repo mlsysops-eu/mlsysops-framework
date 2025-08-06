@@ -2,14 +2,19 @@ MLSysOpsApp:
   name: test-application
   cluster_placement:
     cluster_id:
-      - mls04
+      - mls01
   components:
     - metadata:
         name: server-app
         uid: server-app-v1
       node_placement:
+<<<<<<<< HEAD:northbound-api/mlsysops-test-app-description.yaml
         node: mls04
       restart_policy: on_failure
+========
+        node: mls01
+      restart_policy: OnFailure
+>>>>>>>> e3625f0 (feat: Fix various errors with CLI, agents and NB API):mlsysops-cli/mlsysops-test-app-description.yaml
       containers:
         - image: harbor.nbfc.io/mlsysops/test-app:latest
           image_pull_policy: IfNotPresent
@@ -37,7 +42,7 @@ MLSysOpsApp:
     - metadata:
         name: client-app
         uid: client-app-v1
-      restart_policy: on_failure
+      restart_policy: OnFailure
       containers:
         - image: harbor.nbfc.io/mlsysops/test-app:latest
           image_pull_policy: IfNotPresent

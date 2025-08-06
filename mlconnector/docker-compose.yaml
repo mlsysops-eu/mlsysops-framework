@@ -64,7 +64,6 @@ services:
     #        - api_network
 
     app:
-        #image: registry.mlsysops.eu/usecases/augmenta-demo-testbed/side-api:0.0.1
         build: ./src
         container_name: api
         env_file:

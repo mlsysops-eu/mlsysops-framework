@@ -68,6 +68,14 @@ jobs:
     uses: ./.github/workflows/build-northbound-api.yml
     secrets: inherit
 
+  build-mlconnector:
+    name: Build MLConnector container Image
+    if: | 
+      contains(github.event.pull_request.labels.*.name, 'ok-to-test') &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-build-containers')
+    uses: ./.github/workflows/build-mlconnector.yml
+    secrets: inherit
+
   build-test-app:
     #needs: [build-agent-pkg]
     name: Build testing application containers 
