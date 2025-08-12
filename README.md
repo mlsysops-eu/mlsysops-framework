@@ -1,41 +1,41 @@
 # MLSysOps Framework
 
-The *MLSysOps Framework* is the open‑source outcome of the EU‑funded MLSysOps
-Horizon Europe project (Grant ID 101092912), running from Jan 2023 to Dec 2025.
-Its aim is to deliver an AI‑enabled, agent‑based platform for autonomic,
-cross‑layer management of compute, storage, and network resources across cloud,
+The *MLSysOps Framework* is the open-source outcome of the EU-funded MLSysOps
+Horizon Europe project (Grant ID 101092912), running from Jan 2023 to Dec 2025.
+Its aim is to deliver an AI-enabled, agent-based platform for autonomic,
+cross-layer management of compute, storage, and network resources across cloud,
 edge, and IoT environments.
 
 ## Key Objectives
 
-- Provide an *open, AI‑ready framework* for scalable, trustworthy,
+- Provide an *open, AI-ready framework* for scalable, trustworthy,
   explainable system operation across heterogeneous infrastructures.
 - Enable *continual ML learning* and retraining during runtime via
   hierarchical agents.
 - Support *portable, efficient execution* using container innovation and
   modular, FaaS-inspired offloading.
-- Promote *green, resource‑efficient, and secure operations* while
+- Promote *green, resource-efficient, and secure operations* while
   maintaining `QoS`/`QoE` targets.
-- Facilitate realistic evaluation using real-world deployments in smart‑city
-  and precision‑agriculture scenarios.
+- Facilitate realistic evaluation using real-world deployments in smart-city
+  and precision-agriculture scenarios.
 
 ## Core Components
 
 - Hierarchical Agent Architecture: Interfaces with orchestration/control
-  systems and exposes an ML‑model API for plug‑and‑play explainable/re-trainable
+  systems and exposes an ML-model API for plug-and-play explainable/retrainable
   models.
 
 - Telemetry & Control Knobs: Collects metrics across the continuum and adjusts
   configuration (e.g., compute, network, storage, accelerator usage)
   dynamically.
 
-- Distributed FaaS‑style Executor: Enables function offloading across tiers to
+- Distributed FaaS-style Executor: Enables function offloading across tiers to
   optimize latency, energy, and performance.
 
 - Explainable ML & Reinforcement Learning Module: Offers transparent decisions,
   highlighting input factors influencing agent actions.
 
-- Use-cases: Includes real applications focusing on smart cities and agriculture.
+- Use cases: Includes real applications focusing on smart cities and agriculture.
 
 ## Repository Contents
 
@@ -55,6 +55,14 @@ edge, and IoT environments.
 - `kubectl`, `karmada`
 - Python 3.10+
 - Access to a 4-node testbed environment
+
+### Quick Start
+
+Install the CLI tool:
+
+```bash
+pip install mlsysops-cli
+
 
 ### Quick Start
 
