@@ -42,9 +42,7 @@ spec:
             protocol: "TCP"
         env:
         - name: POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
+          value: {{ KARMADA_HOST_IP }}
         command: ["/bin/sh", "-c"]
         args:
           - |

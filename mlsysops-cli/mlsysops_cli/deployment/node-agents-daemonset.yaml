@@ -38,6 +38,9 @@ spec:
               value: "mysecret"
             - name: DESCRIPTION_PATH
               value: "/etc/mlsysops/descriptions"
+            - name: MLS_OTEL_NODE_EXPORTER_FLAGS
+              value: cpu,meminfo
+
           resources:
             requests:
               memory: "128Mi"
