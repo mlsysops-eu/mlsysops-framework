@@ -41,13 +41,14 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP
             - name: EJABBERD_DOMAIN
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
+              value: {{ KARMADA_HOST_IP }}
             - name: NODE_PASSWORD
               value: "1234"
             - name: DESCRIPTION_PATH
               value: "/etc/mlsysops/descriptions"
+            - name: MLS_OTEL_MIMIR_EXPORT_ENDPOINT
+              value: http://square2.atsquare.gr:9009/api/v1/push
+
           resources:
             requests:
               memory: "128Mi"
