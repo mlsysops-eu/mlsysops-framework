@@ -29,7 +29,7 @@ class FailoverBehavior(OneShotBehaviour):
         # Retrieve all apps and their statuses from Redis
         status_data = self.r.get_dict(self.r.dict_name)
         if not status_data:
-            logger.debug("No Apps running on the frameworkF")
+            logger.debug("No Apps running on the framework")
             return
 
         # Filter for deployed apps (case-insensitive)

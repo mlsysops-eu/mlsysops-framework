@@ -1,2 +1,6 @@
 values.yaml
 .idea/
+
+__pycache__/
+*.pyc
+*.log

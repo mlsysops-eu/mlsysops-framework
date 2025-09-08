@@ -79,6 +79,7 @@ class ML_process_Behaviour(CyclicBehaviour):
 
         try:
             await kubernetes_asyncio.config.load_kube_config(config_file=karmada_api_kubeconfig)
+            logger.info(f" Karmada api config Loaded with external kubeconfig: {karmada_api_kubeconfig}")
         except kubernetes_asyncio.config.ConfigException:
             logger.error(f"Error loading karmada api config with external kubeconfig: {karmada_api_kubeconfig}")
             return
@@ -94,19 +95,19 @@ class ML_process_Behaviour(CyclicBehaviour):
 
             q_info = self.r.pop(self.r.ml_q)
             q_info = q_info.replace("'", '"')
-            print(q_info)
+            logger.debug(q_info)
             data_queue = json.loads(q_info)
-            if 'MLSysOpsApplication' not in data_queue:
+            if 'MLSysOpsApp' not in data_queue:
                 # probably it is removal
-                print(f"fffff {data_queue.keys()}")
+                logger.debug(f"DataKeys {data_queue.keys()}")
                 for key in data_queue.keys():
                     model_id = key
             else:
-                model_id = data_queue["MLSysOpsApplication"]["mlsysops-id"]
-                data_queue['MLSysOpsApplication']['name'] = data_queue['MLSysOpsApplication']['name'] + "-" + model_id
+                model_id = data_queue["MLSysOpsApp"]["components"][0]["metadata"]["uid"]
+                data_queue['MLSysOpsApp']['name'] = data_queue['MLSysOpsApp']['name'] + "-" + model_id
                 try:
-                    comp_name = data_queue["MLSysOpsApplication"]["components"][0]["Component"]["name"]
-                    cluster_id = data_queue["MLSysOpsApplication"]["clusterPlacement"]["clusterID"][0]
+                    comp_name = data_queue["MLSysOpsApp"]["components"][0]["Component"]["name"]
+                    cluster_id = data_queue["MLSysOpsApp"]["clusterPlacement"]["clusterID"][0]
 
                     self.r.update_dict_value("ml_location", model_id, cluster_id)
                 except KeyError:
@@ -116,7 +117,7 @@ class ML_process_Behaviour(CyclicBehaviour):
             group = "mlsysops.eu"
             version = "v1"
             plural = "mlsysopsapps"
-            namespace = "default"
+            namespace = "mlsysops"
             name = model_id
 
             if self.r.get_dict_value("endpoint_hash", model_id) == "To_be_removed":
@@ -133,7 +134,7 @@ class ML_process_Behaviour(CyclicBehaviour):
                     logger.debug(f"Custom Resource '{name}' deleted successfully.")
                     await self.message_queue.put({
                             "event": "application_removed",
-                            "payload": data_dict
+                            "payload": data_queue
                         }
                     )
                     self.r.update_dict_value("endpoint_hash", model_id, "Removed")
@@ -161,10 +162,10 @@ class ML_process_Behaviour(CyclicBehaviour):
                     await self.message_queue.put(
                         {
                             "event": "application_submitted",
-                            "payload": file_content
+                            "payload": data_queue
                         }
                     )
-                    
+
                     logger.debug(f"Creating or updating Custom Resource: {name}")
                     try:
                         current_resource = await custom_api.get_namespaced_custom_object(
