@@ -4,3 +4,18 @@ values.yaml
 __pycache__/
 *.pyc
 *.log
+
+### macOS ###
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/

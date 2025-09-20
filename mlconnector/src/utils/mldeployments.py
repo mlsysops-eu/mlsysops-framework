@@ -5,6 +5,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from pathlib import Path
+
+import asyncio
 
 from fastapi import HTTPException
 from models.mldeployment import MLDeployment
@@ -24,6 +27,9 @@ from textwrap import dedent
 from utils.manage_s3 import S3Manager
 from sqlalchemy import update
 #myuuid = uuid.uuid4()
+from pathlib import Path
+from datetime import datetime, timezone
+import re
 
 load_dotenv(verbose=True, override=True)
 
@@ -34,7 +40,6 @@ s3_manager = S3Manager(
     os.getenv("AWS_SECRET_ACCESS_KEY"),
     os.getenv("AWS_ACCESS_URL")
 )
-
 def extract_feature_names(feature_list):
     type_mapping = {
         'cont': "float",
@@ -99,11 +104,11 @@ def generate_schema_code(flag=0, feature_list_str=None):
                 for key, val in feature_dict.items()
             }}
             DataModel = create_model("DataModel", **fields)
-            DynamicSchema = create_model("DynamicSchema", data=(DataModel, ...), explanation=(bool, ...))
+            DynamicSchema = create_model("DynamicSchema", data=(List[DataModel], ...), is_fun=(bool, False), explanation=(bool, False))
         """)
     elif flag == 1:
         schema_code = dedent("""
-            DynamicSchema = create_model("DynamicSchema", data_link=(str, ...), explanation=(bool, ...))
+            DynamicSchema = create_model("DynamicSchema", data_link=(str, ...), is_fun=(bool, False), explanation=(bool, False))
         """)
     
     return schema_code
@@ -176,10 +181,34 @@ async def update_deployment(
     await db.refresh(existing_deployment)
     return existing_deployment
 
+async def delete_deployments(db: AsyncSession, deployment_id: str) -> bool:
+    existing_deployment = await get_deployment_by_id(db=db, deployment_id=deployment_id)
+    if not existing_deployment:
+        return False
+    
+    await db.delete(existing_deployment)
+    await db.commit()
+
+    base = os.getenv("NORTHBOUND_API_ENDPOINT") or os.getenv("NOTHBOUND_API_ENDPOINT")
+    url = f"{base.rstrip('/')}/ml/remove/{deployment_id}"
+    headers = {"Accept": "application/json"}
+
+    try:
+        # Run blocking requests.delete in a worker thread
+        r = await asyncio.to_thread(requests.delete, url, headers=headers, timeout=20)
+        if r.status_code == 200:
+            print("Deployment %s removed from Northbound.", deployment_id)
+        else:
+            print("Northbound delete failed (%s): %s", r.status_code, r.text[:500])
+    except requests.RequestException:
+        print("Error calling Northbound delete for %s at %s", deployment_id, url)
+
+    return True
+
 async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, create_new=False):
     model = await get_model_by_id(db, model_id=deployment.modelid)
     file_model = await get_model_files(db, modelid=deployment.modelid, filekind="model")
-    #file_require = await get_model_files(db, modelid=deployment.modelid, filekind="data")
+    file_code = await get_model_files(db, modelid=deployment.modelid, filekind="code")
     if(deployment.deployment_id ==""):
         deployment_id = str(uuid.uuid4())
     else:
@@ -196,14 +225,23 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
     if model is None:
         raise HTTPException(status_code=404, detail="No model details found with that model_id")
     else:
-        image_name = "registry.mlsysops.eu/usecases/augmenta-demo-testbed/"+deployment.modelid+":0.0.1"
+        image_name = os.getenv("DOCKER_REGISTRY_URL")+"/hackathon/"+deployment.modelid+":0.0.1"
         
         # download model file...
+        if file_model is None or len(file_model) == 0:
+            raise HTTPException(status_code=404, detail="No model file found for that model_id")
         local_model_path = prepare_model_artifact(s3_manager,  file_model[0].filename)
+        # print(file_code)
+        if file_code:
+            #raise HTTPException(status_code=404, detail="No function file found for that model_id")
+            # download from S3
+            s3_manager.download_file(object_name=file_code[0].filename, download_path=os.path.join("/code/utils/api","predict.py"))
+            #print(f"Local code path: {local_code_path}")
+        #print(f"Local model path: {file_code[0].filename}")
         build_and_push_image(
             #model.trained_model[0]['modelname'], 
             file_model[0].filename, 
-            "registry.mlsysops.eu",
+            os.getenv("DOCKER_REGISTRY_URL"),
             image_name, 
             os.getenv("DOCKER_USERNAME"), 
             os.getenv("DOCKER_PASSWORD"),
@@ -225,8 +263,8 @@ async def create_deployment(db: AsyncSession, deployment: MLDeploymentCreate, cr
             port=8000
         )
        
-        #deployment_json = json.dumps(new_deployment)
-        #print(str(new_deployment))
+        deployment_json = json.dumps(new_deployment)
+        print(str(new_deployment))
         
         #con = await create_redis_connection()
         #await con.rpush(os.getenv("DEPLOYMENT_QUEUE"), [str(deployment_json)])

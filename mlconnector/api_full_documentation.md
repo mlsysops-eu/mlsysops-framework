@@ -647,11 +647,12 @@ reg = Ridge(alpha=1.0, random_state=0)
 reg.fit(X, y)
 ...
 
-# It is important that all models are saved with a .pkl extension
-# Serialize  with pickle to a .pkl file
+# Serialize  with pickle to a .pkl file or any other format
 output_path = "diabetes_ridge.pkl"
 with open(output_path, "wb") as f:
     pickle.dump(reg, f)
+# joblib.dump(bundle, model_path) (Using joblib)
+# or you  can load the model in the custom function (see inference section)
 
 ```
 ## 2. Register ML model with
@@ -719,9 +720,12 @@ The above step should return a model_id that will be used in the next steps. Her
 - Model file (pickled file saved in step one above)
 - Training data. This will be used for explainability and drift detection. (Note, it has to be the exact same data used to train the model, otherwise you will get wrong results)
 - Requirements file that defines the environment the model was trained in.
+- If you will use a different predict function (See inference section).
 
 Upload these one by one using the example bellow;
 Note: file_kind can be `model`, `data`, `code`, and `env`
+ 
+
 ```python
 import requests
 
@@ -729,7 +733,7 @@ files = {
     "file": open("model.pkl", "rb"),
     "file_kind": (None, "model")
 }
-resp = requests.post("BASE_URL/model/1234/upload", files=files)
+resp = requests.post("BASE_URL/model/{model_id}/upload", files=files)
 print(resp.json())
 ```
 ## 3. Deployment
@@ -775,20 +779,59 @@ curl -X GET "BASE_URL/deployment/get/status/dep-iris-001"
 
 ## 4. Inference Endpoint (including Explainability)
 
-### 4.1 Predict Call
+### 4.1 Inference
 
-Assuming deployment created with `deployment_id = dep-iris-001`:
+Once the ML application is ready, the response will contain the inference endpoint.
 
-```bash
-curl -X POST "BASE_URL/deployment/dep-iris-001/predict" \
-     -H "Content-Type: application/json" \
-     -d '{
-           "data": [[5.1, 3.5, 1.4, 0.2]],
-           "explain": true
-         }'
+```python
+url = ”BASE_URL/prediction"
+headers = {
+    "accept": "application/json",
+    "Content-Type": "application/json",
+}
+payload = {
+    "data": [{…}],
+    "is_fun": False,
+    "explanation": False
+}
+resp = requests.post(url, json=payload, headers=headers)
 ```
+  - `data` is list of dictionaries in the format of `feature:value`
+  - `is_fun` If set to `True` the inference application will use a custom predict function. This has to specified by the application owner. See example below.
 
-**Response:**
+  <table style="width:100%; border-collapse:collapse; font-size:12px;">
+  <tr>
+    <th style="text-align:left; border:1px solid #e0e0e0; padding:6px;">scikilearn</th>
+    <th style="text-align:left; border:1px solid #e0e0e0; padding:6px;">pytorch</th>
+  </tr>
+  <tr>
+    <td style="vertical-align:top; border:1px solid #e0e0e0; padding:6px;">
+<pre><code>import joblib
+
+def predict(path, df):
+    &quot;&quot;&quot;Minimal sklearn: load bundle &amp; predict.&quot;&quot;&quot;
+    b = joblib.load(path)              # {&#x27;pipeline&#x27;: fitted_estimator, ...}
+    return b[&quot;pipeline&quot;].predict(df).tolist()
+</code></pre>
+    </td>
+    <td style="vertical-align:top; border:1px solid #e0e0e0; padding:6px;">
+<pre><code>import torch, numpy as np
+
+def predict(path, df, feats=None, mean=None, scale=None):
+    &quot;&quot;&quot;Minimal PyTorch (TorchScript).&quot;&quot;&quot;
+    m = torch.jit.load(path, map_location=&quot;cpu&quot;).eval()   # one-file scripted model
+    X = df[feats].to_numpy(np.float32) if feats else df.to_numpy(np.float32)
+    if mean is not None and scale is not None:              # optional scaling
+        X = (X - np.asarray(mean, np.float32)) / np.asarray(scale, np.float32)
+    with torch.no_grad():
+        y = m(torch.from_numpy(X)).argmax(1).cpu().numpy()
+    return y.tolist()
+</code></pre>
+  </tr>
+</table>
+
+  - `explanation` If set to True, then the response includes explanations. 
+**Example response:**
 ```json
 {
   "prediction": [0],

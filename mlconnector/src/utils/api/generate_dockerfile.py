@@ -6,6 +6,7 @@ import subprocess
 import pickle
 from pkg_resources import Requirement
 from io import StringIO
+from typing import Any, Dict
 
 from utils.manage_s3 import S3Manager
 
@@ -43,6 +44,10 @@ from io import BytesIO
 import base64
 import urllib.parse
 from datetime import datetime, timezone
+import importlib.util
+import sys
+from pathlib import Path
+from predict import predict
 
 from mlstelemetry import MLSTelemetry
 
@@ -105,12 +110,16 @@ async def make_prediction(request: DynamicSchema):
     }}
     current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
     try:
-        loaded_model = joblib.load("{model}")
-        print("Model loaded successfully!")
         if data_source == 0:
-            data_dict = request.data.dict()
-            df = pd.DataFrame([data_dict])
-            result_pred = loaded_model.predict(df)
+            #data_dict = request.data.dict()
+            data_dict = [m.model_dump(by_alias=True) for m in request.data]
+            df = pd.DataFrame(data_dict)
+            if request.is_fun:
+                result_pred = predict("{model}", df)
+            else:
+                loaded_model = joblib.load("{model}")
+                print("Model loaded successfully!")
+                result_pred = loaded_model.predict(df)
             data = {{
                 "ownerid": owner,
                 "deploymentid": "{deploymentid}",
@@ -126,7 +135,7 @@ async def make_prediction(request: DynamicSchema):
             except ValueError:
                 print("No JSON response returned.")
             #if request.explanation:
-            #    explanation_res = get_single_explanation(model_id,data_dict)
+            #    explanation_res = get_single_explanation(model_id,request.data)
             #    if explanation_res:
             #        return {{"inference": str(result_pred), "explanation":explanation_res}}
             #    else:
@@ -318,63 +327,67 @@ def build_and_push_image(model, registry_url, image_name, registry_username, reg
     app["MLSysOpsApplication"]["components"] = [{"Component": comp}]
     return app"""
 
+
 def generate_json(
     deployment_id: str,
     image: str,
-    placement: dict,
+    placement: Dict[str, Any],
     app_name: str = "ml-app-1",
-    port: int = 8000
-):
-    app = {
-        "MLSysOpsApplication": {
+    port: int = 8000,
+) -> Dict[str, Any]:
+    app: Dict[str, Any] = {
+        "MLSysOpsApp": {
             "name": app_name,
-            "mlsysops-id": deployment_id
         }
     }
 
-    # Only add clusterPlacement if clusterID is not a wildcard
-    cluster_id = placement.get("clusterID", "")
+    # cluster_placement (optional)
+    cluster_id = placement.get("clusterID") or placement.get("cluster_id") or ""
     if cluster_id and cluster_id != "*":
-        app["MLSysOpsApplication"]["clusterPlacement"] = {
-            "clusterID": [cluster_id],
-            "instances": 1
+        app["MLSysOpsApp"]["cluster_placement"] = {
+            "cluster_id": [cluster_id]
         }
 
-    # Build the component block
-    component = {
-        "Component": {
+    # component base
+    component: Dict[str, Any] = {
+        "metadata": {
             "name": "ml-comp",
-            "uid": deployment_id
-        }
+            "uid": deployment_id,
+        },
+        "restart_policy": "OnFailure",
+        "containers": [
+            {
+                "image": image,
+                "image_pull_policy": "IfNotPresent",
+                "platform_requirements": {
+                    "cpu": {
+                        "requests": "1",
+                        "limits": "2",
+                        "architecture": ["amd64"],
+                    }
+                },
+                "ports": [{"container_port": port}],
+            }
+        ],
     }
 
-    # Always consider continuumLayer, but only add node if it's not "*"
-    node_conf = {}
+    # node_placement (optional)
     node_name = placement.get("node", "")
+    continuum = placement.get("continuum") or placement.get("continuum_layer") or ""
+
+    node_placement: Dict[str, Any] = {}
     if node_name and node_name != "*":
-        node_conf["node"] = node_name
+        node_placement["node"] = node_name
+    if continuum and continuum != "*":
+        node_placement["continuum_layer"] = [continuum]
 
-    continuum = placement.get("continuum", "")
-    if continuum:
-        node_conf["continuumLayer"] = [continuum]
+    if node_placement:
+        component["node_placement"] = node_placement
 
-    if node_conf:
-        component["nodePlacement"] = node_conf
-
-    # Add the remaining fields
-    component["restartPolicy"] = "OnFailure"
-    component["containers"] = [
-        {
-            "image": image,
-            "imagePullPolicy": "IfNotPresent",
-            "ports": [
-                {"containerPort": port}
-            ]
-        }
-    ]
-
-    app["MLSysOpsApplication"]["components"] = [component]
+    # attach component
+    app["MLSysOpsApp"]["components"] = [component]
     return app
+
 
 
 def generate_yaml(
