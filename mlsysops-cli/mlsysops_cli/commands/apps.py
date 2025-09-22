@@ -186,7 +186,7 @@ def get_app_performance(app_id: str):
             if rows:
                 table_kv(rows, title=f"Metrics for {app_id}")
             else:
-                # your API sometimes returns {"message": "..."} when no data
+                # your API sometimes returns {"message": "..."} when no data.json
                 if isinstance(metrics, dict) and metrics.get("message"):
                     warn(metrics["message"])
                 else:

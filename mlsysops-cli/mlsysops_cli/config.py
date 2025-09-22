@@ -1,7 +1,7 @@
 import os
 
 # One host for everything
-IP = os.getenv("MLS_API_IP", "172.25.27.243")
+IP = os.getenv("MLS_API_IP", "95.217.218.188")
 
 # Ports: 8000 for general, 8090 for ML
 PORT_APP = int(os.getenv("MLS_API_PORT", "8000"))

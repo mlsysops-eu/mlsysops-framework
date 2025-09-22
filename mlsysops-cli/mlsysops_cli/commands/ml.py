@@ -10,7 +10,7 @@ from mlsysops_cli.utils.alias import AliasedGroup
 from mlsysops_cli.config import BASE_ML
 @click.group(help="ML registry, training, deployments, and inference")
 def ml():
-    pass
+    click.echo("⚠️ The ML subcommands are under development, some features may not work right now.\n")
 
 # ----------------- helpers -----------------
 def _post_json(url, payload):
