@@ -1,0 +1,67 @@
+MLSysOpsApp:
+  name: mlsysops-hackathon-app
+  cluster_placement:
+    cluster_id:
+      - "group1-cluster"
+  components:
+    - metadata:
+        name: detector-app
+        uid: detector-app-v1
+      node_placement:
+        node: group1-node1
+      containers:
+        - image: harbor.nbfc.io/mlsysops/hackathon/detector:0.1.2
+          command: [ "python3", "detector.py", "--output", "./", "--mode", "stream", "--input", "rtsp://camera-app.mlsysops.svc.cluster.local:8554/video_stream", "--tcp-forward" ]
+          env:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=detector-app, service.version=0.3.3"
+            - name: OTEL_SERVICE_NAME
+              value: "detector-app"
+            - name: TCP_IP
+              value: "classifier-app.mlsysops.svc.cluster.local"
+              # value: "10.64.83.10"
+            - name: NODE_IP
+              value_from:
+                field_ref:
+                  field_path: status.hostIP
+            - name: TELEMETRY_ENDPOINT
+              value: "$(NODE_IP):43170"
+    - metadata:
+        name: classifier-app
+        uid: classifier-app-v1
+      node_placement:
+        node: group1-node1
+      containers:
+        - image: harbor.nbfc.io/mlsysops/hackathon/classifier:0.1.2
+          command: [ "python3","main.py" ]
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "classifier-app"
+            - name: NODE_IP
+              value_from:
+                field_ref:
+                  field_path: status.hostIP
+            - name: TIMM_MODE
+              value: resnet18
+            - name: NODE_HOSTNAME  # Custom environment variable
+              value_from:
+                field_ref:
+                  field_path: spec.nodeName  # Retrieves the node hostname
+            - name: TELEMETRY_ENDPOINT
+              value: "$(NODE_IP):43170"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=classifier-app_$(NODE_HOSTNAME), service.version=0.1.0, service.experimentid=test, service.hostname=$(NODE_HOSTNAME)"
+          ports:
+            - container_port: 5005
+              protocol: TCP
+      qos_metrics:
+        - application_metric_id: frame_classify_latency
+          target: 50
+          relation: lower_or_equal
+  component_interactions:
+    - component_name1: detector-app
+      type: egress
+      component_name2: camera-app
+    - component_name1: detector-app
+      type: egress
+      component_name2: classifier-app
