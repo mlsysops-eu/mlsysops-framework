@@ -1,0 +1,32 @@
+{
+  "modelname": "HousePricePredictor",
+  "modelkind": "regression",
+  "hyperparameter": [
+    {"parameter": "n_estimators", "value": 200},
+    {"parameter": "max_depth", "value": 10}
+  ],
+  "modelperformance": [
+    {"metric": "r2_score", "order": 1, "threshold": 0.85},
+    {"metric": "mae", "order": 2, "threshold": 20000}
+  ],
+  "trainingresource": [
+    {"resource_name": "CPU", "value": 4, "deploy": "local"},
+    {"resource_name": "GPU", "value": 1, "deploy": "cluster"}
+  ],
+  "runresource": [
+    {"resource_name": "CPU", "value": 2, "deploy": "cloud"}
+  ],
+  "featurelist": [
+    {"feature_name": "num_rooms", "type": "integer", "kind": 1, "units": 0},
+    {"feature_name": "square_meters", "type": "float", "kind": 1, "units": 2},
+    {"feature_name": "city", "type": "categorical", "kind": 2, "units": 0}
+  ],
+  "inference": [
+    {"type": "input_format", "value": "JSON"},
+    {"type": "output_format", "value": "float"}
+  ],
+  "modeltags": ["housing", "regression", "xgboost"],
+  "drift_detection": [
+    {"is_true": 1, "method": 2}
+  ]
+}
