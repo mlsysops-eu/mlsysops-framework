@@ -171,7 +171,13 @@ spec:
                     enum:
                       - containerd
                       - docker
-                      - emb_serve
+                      - embserve
+                      - kata
+                      - kata-qemu
+                      - kata-clh
+                      - kata-fc
+                      - urunc
+                      - nvidia
                   containers:
                     type: array
                     items:
@@ -210,6 +216,8 @@ spec:
                                     enum:
                                       - arm64
                                       - amd64
+                                      - arm-v7
+                                      - arm-v8
                                 frequency:
                                   type: number
                                   description: required frequency in Hz.

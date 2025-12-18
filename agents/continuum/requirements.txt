@@ -1,4 +1,3 @@
-mlsysops
 mlstelemetry
 opentelemetry-exporter-otlp
 opentelemetry-api
@@ -15,3 +14,4 @@ kubernetes
 redis
 kubernetes_asyncio
 watchdog
+ruamel.yaml

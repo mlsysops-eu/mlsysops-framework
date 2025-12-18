@@ -18,13 +18,14 @@
 
 import asyncio
 import signal
-import logging 
+import logging
 from kubernetes import client
 import kubernetes_asyncio
 from mlsysops.events import MessageEvents
 import copy
 
 from mlsysops.logger_util import logger
+
 
 class ResourceWatcher:
     def __init__(self, list_func, resource_description, notification_queue, query_kwargs=None, crd_plural=None):
@@ -33,33 +34,38 @@ class ResourceWatcher:
         self.notification_queue = notification_queue
         self.query_kwargs = query_kwargs or {}
         self.crd_plural = crd_plural
-        self._stop_event = asyncio.Event()        
+        self._stop_event = asyncio.Event()
         self._watch_stream = None
-    
+
     async def get_resource_version(self):
         resp = None
-        
+
         try:
             resp = await self.list_func(**self.query_kwargs)
-        
+
         except kubernetes_asyncio.client.exceptions.ApiException as e:
             logger.debug(f"Unhandled ApiException: {e}")
             await asyncio.sleep(1)
+            return None
         except Exception as e:
             logger.debug(f"Unhandled Exception: {e}")
             await asyncio.sleep(1)
-        
+            return None
+
         # Handle both dict (CustomObjectsApi) and model object (CoreV1Api)
-        if self.resource_description == 'CRD':
-            return resp['metadata']['resourceVersion']
-        else:
-            return resp.metadata.resource_version
+        try:
+            if self.resource_description == 'CRD':
+                return resp.get('metadata', {}).get('resourceVersion') if isinstance(resp, dict) else None
+            else:
+                return getattr(resp.metadata, 'resource_version', None)
+        except Exception:
+            return None
 
     async def run(self):
         resource_version = None
         if self.resource_description == 'CRD':
             logger.info(f'CRD plural {self.crd_plural}')
-            
+
         while not self._stop_event.is_set():
             try:
                 w = kubernetes_asyncio.watch.Watch()
@@ -70,17 +76,36 @@ class ResourceWatcher:
                     timeout_seconds=60,
                     **self.query_kwargs
                 )
-                
+
                 async with w.stream(self.list_func, **stream_kwargs) as stream:
                     async for event in stream:
                         operation = event['type']
                         obj = event['object']
+
+                        # Handle BOOKMARK events: only update resource_version, no name/uid present.
+                        if operation == 'BOOKMARK':
+                            try:
+                                if self.resource_description == 'CRD':
+                                    rv = obj.get('metadata', {}).get('resourceVersion')
+                                else:
+                                    rv = getattr(obj.metadata, 'resource_version', None)
+                                if rv:
+                                    resource_version = rv
+                            except Exception:
+                                pass
+                            continue
+
                         metadata = self._extract_metadata(obj)
+                        if not metadata or not metadata.get('resourceVersion'):
+                            logger.debug(f"Skipping event without usable metadata: type={operation}")
+                            continue
+
                         resource_version = metadata['resourceVersion']
                         name = metadata.get('name')
                         uid = metadata.get('uid')
-                        
-                        logger.info(f"Event: {operation} - {self.resource_description}: {name}, plural {self.crd_plural}")
+
+                        logger.info(
+                            f"Event: {operation} - {self.resource_description}: {name}, plural {self.crd_plural}")
 
                         msg = {
                             'operation': operation,
@@ -178,18 +203,25 @@ class ResourceWatcher:
         logger.debug("Watcher shutting down...")
 
     def _extract_metadata(self, obj):
-        if self.resource_description == 'CRD':
-            metadata = obj['metadata']
-            return {
-                'name': metadata['name'],
-                'resourceVersion': metadata['resourceVersion']
-            }
-        else:
-            metadata = obj.metadata
-            return {
-                'name': metadata.name,
-                'resourceVersion': metadata.resource_version
-            }
+        try:
+            if self.resource_description == 'CRD':
+                # obj is dict-like when using CustomObjectsApi
+                metadata = obj.get('metadata', {}) if isinstance(obj, dict) else {}
+                return {
+                    'name': metadata.get('name'),
+                    'uid': metadata.get('uid'),
+                    'resourceVersion': metadata.get('resourceVersion')
+                }
+            else:
+                # obj is a model object when using CoreV1Api
+                md = getattr(obj, 'metadata', None)
+                return {
+                    'name': getattr(md, 'name', None) if md else None,
+                    'uid': getattr(md, 'uid', None) if md else None,
+                    'resourceVersion': getattr(md, 'resource_version', None) if md else None
+                }
+        except Exception:
+            return None
 
     async def close_watch(self):
         if self._watch_stream:

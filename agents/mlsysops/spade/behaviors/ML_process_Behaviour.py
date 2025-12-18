@@ -18,6 +18,8 @@ import json
 import os
 import time
 import yaml
+from ruamel.yaml import YAML
+
 from spade.behaviour import OneShotBehaviour
 # Make sure to import the ML check behavior from its module.
 from .Check_ml_deployment_Behaviour import Check_ml_deployment_Behaviour
@@ -25,14 +27,13 @@ from datetime import datetime
 
 from mlstelemetry import MLSTelemetry
 from ...logger_util import logger
+from jinja2 import Template, PackageLoader, Environment, select_autoescape
 
 import kubernetes_asyncio
 from kubernetes_asyncio.client.api import CustomObjectsApi
 from kubernetes_asyncio.client import ApiException
-
+import traceback
 mlsTelemetryClient = MLSTelemetry("continuum", "agent")
-
-os.environ['TELEMETRY_ENDPOINT'] = "karmada.mlsysops.eu:4317"
 
 sleep_time = 1
 
@@ -41,7 +42,7 @@ from spade.behaviour import CyclicBehaviour
 
 def transform_description(input_dict):
     # Extract the name and other fields under "MLSysOpsApplication"
-    ml_sys_ops_data = input_dict.pop("MLSysOpsApplication", {})
+    ml_sys_ops_data = input_dict.pop("MLSysOpsApp", {})
     app_name = ml_sys_ops_data.pop("name", "")
 
     # Create a new dictionary with the desired structure
@@ -59,7 +60,78 @@ def transform_description(input_dict):
     # Convert the updated dictionary to a YAML-formatted string
     yaml_output = yaml.dump(updated_dict, default_flow_style=False)
 
-    return yaml_output
+    return yaml_output, updated_dict
+
+def create_svc_manifest(name_suffix=None,selector=""):
+    """Create manifest for service-providing component using Jinja template.
+       Returns:
+           manifest (str): The rendered service manifest as a string.
+       """
+
+    loader = PackageLoader("mlsysops", "templates")
+    env = Environment(
+        loader=loader,
+        autoescape=select_autoescape(enabled_extensions=("j2"))
+    )
+    template = env.get_template('ml-component-service.j2')
+    name = f"ml-{name_suffix}"
+    # Render the template with the context data
+    manifest = template.render({
+        'name': name,
+        'type': "ClusterIP",
+        'selector': selector,
+        "ml_comp_port": "8000",
+    })
+
+    yaml = YAML(typ='safe',pure=True)
+    manifest_dict = yaml.load(manifest)
+
+    return manifest_dict
+
+async def create_svc(name_suffix=None,svc_manifest=None,selector=None):
+    """Create a Kubernetes service.
+
+    Note: For testing it deletes the service if already exists.
+
+    Args:
+        svc_manifest (dict): The Service manifest.
+
+    Returns:
+        svc (obj): The instantiated V1Service object.
+    """
+    async with kubernetes_asyncio.client.ApiClient() as api_client:
+        namespace = "mlsysops"
+        core_api = kubernetes_asyncio.client.CoreV1Api(api_client)
+
+        if svc_manifest is None:
+            svc_manifest = create_svc_manifest(name_suffix,selector)
+        resp = None
+        try:
+            logger.info('Trying to read service if already exists')
+            resp = await core_api.read_namespaced_service(
+                name=svc_manifest['metadata']['name'],
+                namespace=namespace)
+        except ApiException as exc:
+            if exc.status != 404:
+                logger.error('Unknown error reading service: %s', exc)
+                return None
+        if resp:
+            try:
+                logger.info('Trying to delete service if already exists')
+                await core_api.delete_namespaced_service(
+                    name=svc_manifest['metadata']['name'],
+                    namespace=namespace)
+            except ApiException as exc:
+                logger.error('Failed to delete service: %s', exc)
+        try:
+            logger.info(f'Trying to create service {namespace}')
+            logger.debug(svc_manifest)
+            svc_obj = await core_api.create_namespaced_service(body=svc_manifest,
+                                                         namespace=namespace)
+            return svc_obj
+        except ApiException as exc:
+            logger.error('Failed to create service: %s', exc)
+            return None
 
 class ML_process_Behaviour(CyclicBehaviour):
     """
@@ -95,55 +167,54 @@ class ML_process_Behaviour(CyclicBehaviour):
 
             q_info = self.r.pop(self.r.ml_q)
             q_info = q_info.replace("'", '"')
-            logger.debug(q_info)
             data_queue = json.loads(q_info)
+            logger.debug(data_queue)
             if 'MLSysOpsApp' not in data_queue:
-                # probably it is removal
-                logger.debug(f"DataKeys {data_queue.keys()}")
-                for key in data_queue.keys():
-                    model_id = key
+                model_id = list(data_queue.keys())[0]
             else:
                 model_id = data_queue["MLSysOpsApp"]["components"][0]["metadata"]["uid"]
-                data_queue['MLSysOpsApp']['name'] = data_queue['MLSysOpsApp']['name'] + "-" + model_id
+                # data_queue['MLSysOpsApp']['name'] = data_queue['MLSysOpsApp']['name'] + "-" + model_id
+                data_queue['MLSysOpsApp']['name'] = model_id
+
                 try:
-                    comp_name = data_queue["MLSysOpsApp"]["components"][0]["Component"]["name"]
-                    cluster_id = data_queue["MLSysOpsApp"]["clusterPlacement"]["clusterID"][0]
+                    comp_name = data_queue["MLSysOpsApp"]["components"][0]["metadata"]["name"]
+                    cluster_id = data_queue["MLSysOpsApp"]["cluster_placement"]["cluster_id"][0]
 
                     self.r.update_dict_value("ml_location", model_id, cluster_id)
                 except KeyError:
                     cluster_id = self.r.get_dict_value("ml_location", model_id)
-                    print("CLUSTER ID " + str(cluster_id))
 
             group = "mlsysops.eu"
             version = "v1"
             plural = "mlsysopsapps"
             namespace = "mlsysops"
             name = model_id
-
-            if self.r.get_dict_value("endpoint_hash", model_id) == "To_be_removed":
+            queue_state = self.r.get_dict_value("endpoint_hash", model_id)
+            logger.debug(f"Queue state: {queue_state}")
+            if queue_state == "To_be_removed":
                 try:
                     # Delete the existing custom resource
-                    logger.debug(f"Deleting Custom Resource: {name}")
                     await custom_api.delete_namespaced_custom_object(
                         group=group,
                         version=version,
                         namespace=namespace,
                         plural=plural,
-                        name="ml-app-" + model_id
+                        name=name
                     )
-                    logger.debug(f"Custom Resource '{name}' deleted successfully.")
-                    await self.message_queue.put({
-                            "event": "application_removed",
-                            "payload": data_queue
-                        }
-                    )
+                    # await self.message_queue.put({
+                    #         "event": "application_removed",
+                    #         "payload": data_queue
+                    #     }
+                    # )
                     self.r.update_dict_value("endpoint_hash", model_id, "Removed")
                     self.r.remove_key("endpoint_hash", model_id)
+                    logger.debug(f"Custom Resource '{name}' deleted successfully.")
+
                 except ApiException as e:
                     if e.status == 404:
-                        print(f"Custom Resource '{name}' not found. Skipping deletion.")
+                        logger.debug(f"Custom Resource '{name}' not found. Skipping deletion.")
                     else:
-                        print(f"Error deleting Custom Resource '{name}': {e}")
+                        logger.debug(f"Error deleting Custom Resource '{name}': {e}")
                         raise
             else:
                 try:
@@ -155,16 +226,16 @@ class ML_process_Behaviour(CyclicBehaviour):
                     self.r.update_dict_value("endpoint_hash", model_id, str(info))
 
                     # Transform and parse the description
-                    file_content = transform_description(data_queue)
+                    file_content, updated_dict = transform_description(data_queue)
                     yaml_handler = yaml.safe_load(file_content)
                     cr_spec = yaml_handler
 
-                    await self.message_queue.put(
-                        {
-                            "event": "application_submitted",
-                            "payload": data_queue
-                        }
-                    )
+                    # await self.message_queue.put(
+                    #     {
+                    #         "event": "application_submitted",
+                    #         "payload": data_queue
+                    #     }
+                    # )
 
                     logger.debug(f"Creating or updating Custom Resource: {name}")
                     try:
@@ -187,7 +258,6 @@ class ML_process_Behaviour(CyclicBehaviour):
                         )
                         logger.debug(f"Custom Resource '{name}' updated successfully.")
                     except ApiException as e:
-                        logger.debug(f"Error processing Custom Resource: {e}")
                         if e.status == 404:
                             logger.debug(f"creating Custom Resource: {name} {group} {version} {namespace} {plural} {cr_spec}")
                             # Resource does not exist; create it
@@ -199,6 +269,10 @@ class ML_process_Behaviour(CyclicBehaviour):
                                 body=cr_spec
                             )
                             logger.debug(f"Custom Resource '{name}' created successfully.")
+                            # Create ML Component Service
+                            await create_svc(name_suffix=model_id,
+                                             selector=f"{model_id}")
+
                         else:
                             logger.error(f"Error processing Custom Resource: {e}")
 
@@ -208,6 +282,7 @@ class ML_process_Behaviour(CyclicBehaviour):
 
                 except Exception as e:
                     logger.error(f"Error during deployment of '{name}': {e}")
+                    logger.error(traceback.format_exc())
                     self.r.update_dict_value("endpoint_hash", model_id, "Deployment_Failed")
 
             await asyncio.sleep(1)

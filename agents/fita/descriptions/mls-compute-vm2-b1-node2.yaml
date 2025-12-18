@@ -1,0 +1,17 @@
+MLSysOpsNode:
+  name: mls-compute-vm2-b1-node2
+  cluster_id: mls-test-manage
+  continuum_layer: far_edge
+  sensors:
+    - temperature:
+      model: "dummy" # NOTE: fill in or remove
+  environment:
+    node_type: native
+    os: zephyr
+    container_runtime: 
+      - embserve
+  hardware:
+    cpu:
+      architecture: arm-v7
+    memory: "4" # Change if needed
+    disk: "120" # Change if needed

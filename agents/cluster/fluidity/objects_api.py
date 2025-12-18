@@ -21,6 +21,7 @@ CRUD operations to Fluidity custom objects at the Kubernetes cluster.
 from __future__ import print_function
 import logging
 import os
+import traceback
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -46,7 +47,6 @@ class FluidityObjectsApi():
                 config.load_incluster_config()
             else:
                 config.load_kube_config()
-
         self.cr_api = client.CustomObjectsApi() #: custom resources API client
 
     def list_fluidity_object(self, plural, field_select=None, label_select=None):
@@ -86,13 +86,13 @@ class FluidityObjectsApi():
                 cr_body)
         except ApiException as exc:
             logger.exception('%s creation failed: %s', crd_info['kind'], exc)
+            logger.exception(traceback.format_exc())
             raise FluidityApiException from exc
 
     def get_fluidity_object(self, plural, name):
         """Retrieve custom fluidity resource object"""
         _, crd_info = get_crd_info(plural)
         version = crd_info['version']
-        
         try:
             cri = self.cr_api.get_namespaced_custom_object(
                 API_GROUP,
@@ -102,7 +102,7 @@ class FluidityObjectsApi():
                 name)
             return cri
         except ApiException as exc:
-            logger.exception('%s retrieval failed: %s', crd_info['kind'], exc)
+            logger.error('%s retrieval failed: %s', crd_info['kind'], exc)
             raise FluidityApiException from exc
 
     def update_fluidity_object(self, plural, name, cr_body):

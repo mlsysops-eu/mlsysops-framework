@@ -13,8 +13,8 @@ from jinja2 import Template
 import subprocess
 from mlsysops_cli import deployment
 from mlsysops_cli.deployment.descriptions_util import create_cluster_yaml, create_worker_node_yaml,create_continuum_yaml
-
-
+import glob
+import traceback
 def parse_yaml_from_file(path_obj: Path, template_variables: dict = {}) -> list | None:
     """
     Parses a YAML file from a Path object (e.g. importlib.resources.files(...)) using Jinja2 templates
@@ -610,8 +610,8 @@ def run_deploy_all(path, inventory_path):
 def deploy_core_services():
     print("🔧 Deploying core services (ejabberd, redis, API service)...")
     _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
-    client_k8s = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"),
-                                   context="karmada-host")
+    client_k8s = KubernetesLibrary("apps", "v1",
+                                   os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml"), context="karmada-host")
     _apply_namespace_and_rbac(client_k8s)
 
     xmpp_path = files(deployment).joinpath("ejabberd-deployment.yaml")
@@ -656,7 +656,13 @@ def deploy_continuum_agents(path, inventory_path):
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("continuum-agent-daemonset.yaml")
-    for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
+    for r in parse_yaml_from_file(daemonset_path,
+                  {
+                                      "OTEL_EXPORT_IP": os.getenv("MLS_OTEL_CONTINUUM_EXPORT_IP", None),
+                                      "OTEL_EXPORT_PORT": os.getenv("MLS_OTEL_CONTINUUM_EXPORT_PORT", "4317"),
+                                      "CONTAINER_IMAGE": os.getenv("CONTINUUM_CONTAINER_IMAGE","harbor.nbfc.io/mlsysops/continuum-agent"),
+                                      "KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")
+                                  }):
         client_k8s.create_or_update(r)
 
 def deploy_cluster_agents(path, inventory_path):
@@ -695,7 +701,10 @@ def deploy_cluster_agents(path, inventory_path):
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("cluster-agents-daemonset.yaml")
-    for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
+    for r in parse_yaml_from_file(daemonset_path, {
+                "CONTAINER_IMAGE": os.getenv("CLUSTER_CONTAINER_IMAGE", "harbor.nbfc.io/mlsysops/cluster-agent"),
+                "KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")
+            }):
         client_karmada.create_or_update(r)
 
 def deploy_node_agents(path, inventory_path):
@@ -733,7 +742,10 @@ def deploy_node_agents(path, inventory_path):
 
     # DaemonSet YAML
     daemonset_path = files(deployment).joinpath("node-agents-daemonset.yaml")
-    for r in parse_yaml_from_file(daemonset_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP"), "REDIS_HOST": os.getenv("KARMADA_HOST_IP")}):
+    for r in parse_yaml_from_file(daemonset_path, {
+                "CONTAINER_IMAGE": os.getenv("NODE_CONTAINER_IMAGE", "harbor.nbfc.io/mlsysops/node-agent"),
+                "KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP"), "REDIS_HOST": os.getenv("KARMADA_HOST_IP")
+            }):
         client_karmada.create_or_update(r)
 
 def _apply_namespace_and_rbac(client_instance):
@@ -746,3 +758,69 @@ def _apply_namespace_and_rbac(client_instance):
     rbac_path = files(deployment).joinpath("mlsysops-rbac.yaml")
     for r in parse_yaml_from_file(rbac_path):
         client_instance.create_or_update(r)
+
+
+ ####### FITA Extension ########
+def deploy_fita_agents(fita_description_path: str):
+    """
+    Deploy FITA agents using a daemonset YAML file and node descriptions, following deploy.py pattern.
+
+    - Iterates over fita_description_path, reading *.yaml files with top-level MLSysOpsNode entries.
+    - For each valid file, renders the FITA DaemonSet template (from file) replacing FITA_NODE_NAME and
+      KARMADA_HOST_IP, and applies resources using the same synchronous client approach.
+    - Ensures required ConfigMaps exist (from directory or empty as needed).
+    """
+    try:
+        _check_required_env_vars("KARMADA_HOST_IP", "KUBECONFIG")
+
+        # Validate path
+        if not fita_description_path or not os.path.isdir(fita_description_path):
+            raise RuntimeError(f"Invalid FITA descriptions path: {fita_description_path}")
+
+
+        # Load kubeconfig for the karmada-apiserver context (sync client, same pattern)
+        client_karmada = KubernetesLibrary("apps", "v1", os.getenv("KUBECONFIG", "/etc/rancher/k3s/k3s.yaml")
+                                           , context="karmada-apiserver")
+
+        # ConfigMap
+        print(f"Using fita node systems decriptions from {fita_description_path}")
+        client_karmada.create_configmap_from_file(fita_description_path, "mlsysops-framework",
+                                                  "fita-system-descriptions")
+
+        # Parse node description files
+        yaml_parser = YAML(typ='safe')
+        node_names = []
+        for file_path in glob.glob(os.path.join(fita_description_path, "*.yaml")):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    doc = yaml_parser.load(f)
+                if isinstance(doc, dict) and "MLSysOpsNode" in doc:
+                    node = doc.get("MLSysOpsNode") or {}
+                    node_name = node.get("name")
+                    if node_name:
+                        node_names.append(node_name)
+                    else:
+                        print(f"Skipping {file_path}: MLSysOpsNode.name missing")
+                else:
+                    print(f"Skipping {file_path}: not an MLSysOpsNode document")
+            except Exception as e:
+                print(f"Failed parsing {file_path}: {e}")
+
+        if not node_names:
+            print("No valid MLSysOpsNode descriptions found; nothing to deploy.")
+            return
+
+        for node_name in node_names:
+            # DaemonSet YAML
+            daemonset_path = files(deployment).joinpath("fita-agent-daemonset.yaml")
+            for r in parse_yaml_from_file(daemonset_path, {
+                    "KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP"),
+                    "REDIS_HOST": os.getenv("KARMADA_HOST_IP"),
+                    "FITA_NODE_NAME": node_name
+                }):
+                client_karmada.create_or_update(r)
+
+        print("FITA agents deployment finished.")
+    except Exception as e:
+        print(f"Failed to deploy FITA agents: {e}")
+        print(traceback.format_exc())

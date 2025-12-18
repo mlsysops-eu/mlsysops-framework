@@ -21,6 +21,7 @@ from copy import deepcopy
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers.polling import PollingObserver
 
 import asyncio
 
@@ -77,7 +78,7 @@ class PolicyController:
             None if no matching policy exists or an error occurs.
         """
         try:
-            # logger.debug(f"Getting policy instance for scope: {scope} and id: {id} name {policy_name}")
+            logger.debug(f"Getting policy instance for scope: {scope} and id: {id} name {policy_name} active policies {self.active_policies}")
             if policy_name is None: # analyze calls
                 if scope == PolicyScopes.APPLICATION.value:
                    return self.active_policies[scope][id].items()
@@ -93,7 +94,7 @@ class PolicyController:
                     return self.active_policies[scope][policy_name]
         except Exception as e:
             logger.error(f"Invalid policy instance: {e}")
-            logger.error(f"active_policies {traceback.format_exc()}")
+            logger.error(f"{traceback.format_exc()}")
             return None
 
     async def start_global_policies(self):
@@ -103,7 +104,8 @@ class PolicyController:
             if policy_template.scope == PolicyScopes.GLOBAL.value:
                 new_policy_object = policy_template.clone()
                 new_policy_object.load_module()
-                new_policy_object.initialize(self.agent)
+                if not new_policy_object.initialize(self.agent):
+                    return
                 # TODO put some check, if the policies handle mechanism that are not available
                 new_analyze_task = AnalyzeClass.AnalyzeTask(
                     id=new_policy_object.name,
@@ -123,6 +125,9 @@ class PolicyController:
                     new_policy_object = policy_template.clone()
                     new_policy_object.load_module()
                     new_policy_object.initialize(self.agent)
+                    if not new_policy_object.initialize(self.agent):
+                        continue
+
                     if not self.active_policies[PolicyScopes.APPLICATION.value].get(application_id):
                         self.active_policies[PolicyScopes.APPLICATION.value][application_id] = {}
 
@@ -184,12 +189,13 @@ class PolicyController:
                     policy_object = Policy(policy_name, file_path)
                     policy_object.load_module()
                     policy_object.validate()
-                    policy_object.initialize(self.agent)
+                    if not policy_object.initialize(self.agent):
+                        continue
 
                     # Add the policy in the module
                     self.state.add_policy(policy_name,policy_object) # add the global policies as templates
 
-                    logger.info(f"Loaded module {policy_name} from {file_path}")
+                    logger.info(f"Loaded policy module {policy_name} from {file_path}")
         except Exception as e:
             logger.error(f"Failed to load policy modules: {e}")
 
@@ -228,7 +234,8 @@ class PolicyController:
                     policy_object = Policy(policy_name, file_path, core=True)
                     policy_object.load_module()
                     policy_object.validate()
-                    policy_object.initialize(self.agent)
+                    if not policy_object.initialize(self.agent):
+                        continue
 
                     # Add the policy in the module
                     self.state.add_policy(policy_name, policy_object) # add the global policies as templates
@@ -239,6 +246,7 @@ class PolicyController:
 
     def handle_policy_change(self,file_path: str, event: FileEvents):
         filename = os.path.basename(file_path)
+        logger.warning(f"Policy change detected: {filename} {event}")
         if filename.startswith("policy-") and filename.endswith(".py"):
             policy_name = filename.split('-')[1].rsplit('.py', 1)[0]
             match event:
@@ -247,11 +255,12 @@ class PolicyController:
                         policy_object = Policy(policy_name, file_path)
                         policy_object.load_module()
                         policy_object.validate()
-                        policy_object.initialize(self.agent)
+                        if not policy_object.initialize(self.agent):
+                            return
 
                         # Add the policy in the module
                         self.state.add_policy(policy_name, policy_object)  # add the global policies as templates
-
+                        logger.warning(f"Added new policy to state: {policy_name} {self.state.policies} and active apps {self.active_policies}")
                         # activate the policy
                         new_policy_object = policy_object.clone()
                         new_policy_object.load_module()
@@ -271,6 +280,11 @@ class PolicyController:
                             for running_application_id in self.active_policies[PolicyScopes.APPLICATION.value].keys():
                                 self.active_policies[PolicyScopes.APPLICATION.value][running_application_id][
                                     new_policy_object.name] = new_policy_object
+                            if len(self.active_policies[PolicyScopes.APPLICATION.value].keys()) == 0:
+                                # no policies add it
+                                for application_id in self.state.applications.keys():
+                                    logger.warning(f"starting application policy for application_id: {application_id}")
+                                    self.agent.current_loop.create_task(self.start_application_policies(application_id))
 
                                 logger.debug(f"Started new Application Policy {new_policy_object.name}")
                         logger.info(f"Loaded new policy from file: {policy_name} {file_path}")
@@ -287,7 +301,7 @@ class PolicyController:
                                         policy_object.load_module()
                                         policy_object.validate()
                                         policy_object.initialize(self.agent)
-                                        logger.info(f"Reloaded module application {policy_name}")
+                                        logger.info(f"Reloaded application policy {policy_name}")
                     except Exception as e:
                         logger.error(f"Error while reloading policy modules: {e}")
                 case FileEvents.DELETED:
@@ -324,14 +338,36 @@ class PolicyController:
         """
         directory = self.state.configuration.policy_directory
 
+        # Decide on observer type:
+        # - Use PollingObserver when running in Kubernetes or when files are symlinks,
+        #   to properly detect updates to symlink targets (ConfigMap mounts).
+        use_polling = False
+        try:
+            # Heuristic: in Kubernetes, this env var is present
+            if os.environ.get("KUBERNETES_SERVICE_HOST"):
+                use_polling = True
+            else:
+                # If any policy file is a symlink, prefer polling for reliability
+                for filename in os.listdir(directory):
+                    if filename.startswith("policy-") and filename.endswith(".py"):
+                        file_path = os.path.join(directory, filename)
+                        if os.path.islink(file_path):
+                            use_polling = True
+                            break
+        except Exception as e:
+            logger.warning(f"Falling back to default observer due to detection error: {e}")
+
         # Set up the event handler and observer
         event_handler = PolicyDirectoryHandler(callback=self.handle_policy_change)
-        self.observer = Observer()
+        self.observer = PollingObserver() if use_polling else Observer()
         self.observer.schedule(event_handler, directory, recursive=False)
 
         # Start the observer in the background (non-blocking)
         self.observer.start()
-        logger.info(f"Started monitoring the policy directory: {directory}")
+        logger.info(
+            f"Started monitoring the policy directory: {directory} "
+            f"(observer={'PollingObserver' if use_polling else 'Observer'})"
+        )
 
     def stop_policy_directory_monitor(self):
         """
@@ -363,3 +399,10 @@ class PolicyDirectoryHandler(FileSystemEventHandler):
     def on_deleted(self, event):
         if not event.is_directory:
             self.callback(event.src_path, FileEvents.DELETED)
+
+    def on_moved(self, event):
+        # Handle atomic replace/rename patterns often used for updates
+        # Prefer the destination path if available.
+        if not event.is_directory:
+            new_path = getattr(event, "dest_path", event.src_path)
+            self.callback(new_path, FileEvents.MODIFIED)

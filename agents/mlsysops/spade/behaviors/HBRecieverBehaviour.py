@@ -29,7 +29,6 @@ class HBReceiverBehaviour(CyclicBehaviour):
         self.r = redis_manager
 
     async def run(self):
-        logger.debug(f"HBReceiverBehaviour")
         msg = await self.receive(timeout=5)
         if msg and msg.get_metadata("performative") == "clus_hb":
             node_jid = str(msg.sender).split("/")[0]

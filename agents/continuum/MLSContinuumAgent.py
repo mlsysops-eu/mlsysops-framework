@@ -130,7 +130,8 @@ class MLSContinuumAgent(MLSAgent):
         """
         try:
             # Extract cluster names where the cluster status is True (ready)
-            cluster_names = [name for name, status in self.clusters.items() if status.lower() == 'true']
+            cluster_names = [name for name, status in self.clusters.items()]
+            print(f"Cluster names: {cluster_names}")
 
             logger.debug(f"Applying PropagationPolicy with cluster names: {cluster_names}")
 
@@ -179,8 +180,29 @@ class MLSContinuumAgent(MLSAgent):
             except Exception as e:
                 logger.error(f"Error applying Simple PropagationPolicy: {e}")
 
+            # Apply resource registry
+            try:
+                name = "mlsysops-resource-registry"
+                simple_template = env.get_template("resource-registry.yaml")
+                rendered_simple_policy = simple_template.render(name=name, cluster_names=cluster_names)
+
+                # Parse YAML to Python dictionary
+                yaml = YAML(typ='safe')
+                simple_policy_body = yaml.load(rendered_simple_policy)
+
+                # Apply the Simple PropagationPolicy
+                await self._apply_resource_registry(
+                    name=name,
+                    body=simple_policy_body,
+                    plural="resourceregistries"
+                )
+
+            except Exception as e:
+                logger.error(f"Error applying resource registries: {e}")
+
         except Exception as e:
             logger.error(f"Error applying PropagationPolicies: {e}")
+            logger.error(traceback.format_exc())
 
     async def _apply_policy(self, policy_name: str, policy_body: dict, plural: str, namespaced: bool = False, namespace: str = None):
         """
@@ -285,6 +307,71 @@ class MLSContinuumAgent(MLSAgent):
         except Exception as e:
             logger.error(f"Error applying resource '{policy_name}': {e}")
 
+    # ... existing code ...
+    async def _apply_resource_registry(self, name: str, body: dict, plural: str):
+        
+        try:
+            # Load the Kubernetes configuration
+            await kubernetes_asyncio.config.load_kube_config(config_file=self.karmada_api_kubeconfig, context='karmada-apiserver')
+
+            async with kubernetes_asyncio.client.ApiClient() as api_client:
+                custom_api = kubernetes_asyncio.client.CustomObjectsApi(api_client)
+
+                # Define API group and version for ResourceRegistry (cluster-scoped)
+                group = "search.karmada.io"
+                version = "v1alpha1"
+
+                resource_name = name
+                resource_body = body
+
+                logger.debug(
+                    f"Applying resource '{resource_name}' with group: {group}, version: {version}, plural: {plural}"
+                )
+
+                try:
+                    # Fetch the current cluster-scoped resource
+                    current_resource = await custom_api.get_cluster_custom_object(
+                        group=group,
+                        version=version,
+                        plural=plural,
+                        name=resource_name
+                    )
+
+                    # Add the required resourceVersion field to the body
+                    resource_version = current_resource["metadata"]["resourceVersion"]
+                    resource_body["metadata"]["resourceVersion"] = resource_version
+
+                    logger.info(f"Resource '{resource_name}' exists. Updating it...")
+
+                    # Perform an update using replace
+                    await custom_api.replace_cluster_custom_object(
+                        group=group,
+                        version=version,
+                        plural=plural,
+                        name=resource_name,
+                        body=resource_body
+                    )
+                    logger.info(f"Resource '{resource_name}' updated successfully.")
+
+                except kubernetes_asyncio.client.exceptions.ApiException as e:
+                    if e.status == 404:
+                        # If the resource doesn't exist, create a new one
+                        logger.info(f"Resource '{resource_name}' not found. Creating a new one...")
+
+                        # Create the new cluster-scoped resource
+                        await custom_api.create_cluster_custom_object(
+                            group=group,
+                            version=version,
+                            plural=plural,
+                            body=resource_body
+                        )
+                        logger.info(f"New resource '{resource_name}' created successfully.")
+                    else:
+                        raise  # Re-raise any non-404 exceptions
+
+        except Exception as e:
+            logger.error(f"Error applying resource '{name}': {e}")
+    # ... existing code ...
     async def ensure_crds(self):
         """Ensure all MLSysOps CRDs are registered.
 
@@ -295,14 +382,34 @@ class MLSContinuumAgent(MLSAgent):
         #: the REST API group name
         API_GROUP = 'mlsysops.eu'
         #: System file directory of CRDs
-        _CRDS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates/'))
+
+        # Use the packaged mlsysops.crds directory instead of local templates
+        try:
+            import importlib.resources as pkg_resources  # Python 3.9+
+            from mlsysops import crds as mlsysops_crds_pkg
+            has_pkg_resources = True
+        except Exception:
+            has_pkg_resources = False
+
+        def _crd_file_path(filename: str) -> str:
+            if has_pkg_resources:
+                # Extract the CRD to a temp file to provide a filesystem path for YAML loader
+                import tempfile, shutil
+                with pkg_resources.files(mlsysops_crds_pkg).joinpath(filename).open('rb') as src:
+                    tmp_dir = tempfile.mkdtemp(prefix="mlsysops-crds-")
+                    dst_path = os.path.join(tmp_dir, filename)
+                    with open(dst_path, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+                    return dst_path
+            # Fallback: relative path resolution if resources package not available
+            return os.path.abspath(os.path.join(os.path.dirname(__file__), 'mlsysops', 'crds', filename))
 
         mlsysops_node_dict = {
             'singular': 'mlsysopsnode',
             'plural': 'mlsysopsnodes',
             'kind': 'MLSysOpsNode',
             'crd_name': f'mlsysopsnodes.{API_GROUP}',
-            'crd_file': f'{_CRDS_DIR}/MLSysOpsNode.yaml',
+            'crd_file': _crd_file_path('MLSysOpsNode.yaml'),
             'version': 'v1'
         }
 
@@ -311,7 +418,7 @@ class MLSContinuumAgent(MLSAgent):
             'plural': 'mlsysopsapps',
             'kind': 'MLSysOpsApp',
             'crd_name': f'mlsysopsapps.{API_GROUP}',
-            'crd_file': f'{_CRDS_DIR}/MLSysOpsApplication.yaml',
+            'crd_file': _crd_file_path('MLSysOpsApplication.yaml'),
             'version': 'v1'
         }
 
@@ -320,7 +427,7 @@ class MLSContinuumAgent(MLSAgent):
             'plural': 'mlsysopscontinuums',
             'kind': 'MLSysOpsContinuum',
             'crd_name': f'mlsysopscontinuums.{API_GROUP}',
-            'crd_file': f'{_CRDS_DIR}/MLSysOpsContinuum.yaml',
+            'crd_file': _crd_file_path('MLSysOpsContinuum.yaml'),
             'version': 'v1'
         }
 
@@ -329,7 +436,7 @@ class MLSContinuumAgent(MLSAgent):
             'plural': 'mlsysopsclusters',
             'kind': 'MLSysOpsCluster',
             'crd_name': f'mlsysopsclusters.{API_GROUP}',
-            'crd_file': f'{_CRDS_DIR}/MLSysOpsCluster.yaml',
+            'crd_file': _crd_file_path('MLSysOpsCluster.yaml'),
             'version': 'v1'
         }
 
@@ -355,8 +462,8 @@ class MLSContinuumAgent(MLSAgent):
                         with open(crd_info['crd_file'], 'r') as data:
                             body = yaml.load(data)
                     except IOError:
-                        logger.error('Resource definition not in dir %s.',
-                                     crd_info['crd_file'])
+                        logger.error('Resource definition not accessible at %s.', crd_info['crd_file'])
+                        continue
                     try:
                         await ext_api.create_custom_resource_definition(body)
                     except ApiException as exc:
@@ -371,7 +478,7 @@ class MLSContinuumAgent(MLSAgent):
         """
         try:
             # Load the kubeconfig file with the specified path
-            await kubernetes_asyncio.config.load_kube_config(config_file=self.karmada_api_kubeconfig)
+            await kubernetes_asyncio.config.load_kube_config(config_file=self.karmada_api_kubeconfig, context='karmada-apiserver')
 
             # Create an API client for the Custom Resources API
             api_client = kubernetes_asyncio.client.CustomObjectsApi()
@@ -387,7 +494,6 @@ class MLSContinuumAgent(MLSAgent):
                 version=version,
                 plural=plural
             )
-
             # Process the response to extract cluster names and details
             clusters = []
             for item in response.get("items", []):
@@ -398,16 +504,6 @@ class MLSContinuumAgent(MLSAgent):
 
             return_object = {}
             for cluster in clusters:
-            # example
-            # [{'name': 'uth-dev-cluster', 'status': [
-            #     {'type': 'Ready', 'status': 'False', 'lastTransitionTime': '2025-04-07T10:24:31Z',
-            #      'reason': 'ClusterNotReachable', 'message': 'cluster is not reachable'}]}, {'name': 'uth-prod-cluster',
-            #                                                                                  'status': [
-            #                                                                                      {'type': 'Ready',
-            #                                                                                       'status': 'True',
-            #  'lastTransitionTime': '2025-05-13T15:48:28Z',
-            #  reason': 'ClusterReady',
-            #  message': 'cluster is healthy and ready to accept workloads'}]}]
                 return_object[cluster['name']] = cluster['status'][0]['status'] # true online, false offline
             return return_object
 

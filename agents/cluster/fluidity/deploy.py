@@ -317,6 +317,12 @@ def create_pod_manifest(comp_spec, old_spec=None):
     if 'host_network' in comp_spec['spec']:
         manifest['spec']['hostNetwork'] = comp_spec['spec']['host_network']
 
+    if 'volumes' in comp_spec['spec']:
+        volumes = transform_dict_keys(comp_spec['spec']['volumes'])
+        manifest['spec']['volumes'] = volumes
+        
+    logger.info(f"new pod manifest {manifest}")
+
     return manifest
 
 

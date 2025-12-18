@@ -69,6 +69,8 @@ processors:
       - key: node_name
         action: insert
         value: '${env:NODE_HOSTNAME}'
+  batch:
+    timeout: 1s
 
 service:
   pipelines:
@@ -76,18 +78,22 @@ service:
       receivers: [otlp,prometheus
         {%- if k8s_cluster_receiver is not none -%} ,k8s_cluster{%- endif -%}
       ]
-      processors: [attributes/add_labels]
+      processors: [attributes/add_labels,batch]
       exporters: [ prometheus,
           {%- if otlp_export_endpoint is not none -%}otlp{%- if mimir_export_endpoint is not none or tempo_export_endpoint is not none -%}, {%- endif -%}{%- endif -%}
           {%- if mimir_export_endpoint is not none -%}prometheusremotewrite{%- if tempo_export_endpoint is not none -%}, {%- endif -%}{%- endif -%}
           {%- if tempo_export_endpoint is not none -%}tempo{%- endif -%}
-      ] {% if loki_export_endpoint is not none %}
+      ]
+    {%- if otlp_export_endpoint is not none or loki_export_endpoint is not none %}
     logs:
       receivers: [ otlp
         {%- if k8s_cluster_receiver is not none -%} ,k8s_cluster, k8s_events{%- endif -%}
       ]
       processors: [ ]
-      exporters: [ loki,otlp ]
-    {%- endif -%}
+      exporters: [
+        {%- if otlp_export_endpoint is not none -%}otlp{%- if loki_export_endpoint is not none -%}, {% endif -%}{%- endif -%}
+        {%- if loki_export_endpoint is not none -%}loki{%- endif -%}
+      ]
+    {%- endif %}
 
 

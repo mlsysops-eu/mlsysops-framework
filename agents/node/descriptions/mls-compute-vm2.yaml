@@ -1,0 +1,17 @@
+MLSysOpsNode:
+  name: mls-compute-vm2 # Change this accordingly. E.g. labnuc05-b1-node8
+  cluster_id: mls-test-manage
+  continuum_layer: far_edge
+  sensors:
+    - temperature:
+      model: "dummy" # NOTE: fill in or remove
+  environment:
+    node_type: native
+    os: zephyr
+    container_runtime: 
+      - containerd
+  hardware:
+    cpu:
+      architecture: amd64
+    memory: "4" # Change if needed
+    disk: "120" # Change if needed

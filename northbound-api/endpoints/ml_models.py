@@ -8,7 +8,7 @@ from mlsysops import logger
 from redis_setup import redis_mgt as rm
 from jsonschema import validate, ValidationError
 import requests
-from MLSysOps_Schemas.mlsysops_model import MlsysopsappSchema, Component
+from schemas.mlsysops_application import MlsysopsappSchema, Component
 import os
 import subprocess
 from kubernetes import client, utils, config

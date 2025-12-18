@@ -30,6 +30,7 @@ from mlsysops.scheduler import PlanScheduler
 from mlsysops.spade.mls_spade import MLSSpade
 from mlsysops.tasks.monitor import MonitorTask
 from mlsysops.data.monitor import MonitorData
+from mlsysops.tasks.watchdog import WatchdogTask
 
 from mlsysops.logger_util import logger
 
@@ -56,14 +57,11 @@ class MLSAgent:
         # ## -------- SPADE ------------------#
         logger.debug("Initializing SPADE...")
         try:
-            logger.debug("in try...")
             self.message_queue = asyncio.Queue()
-            logger.debug("after queue...")
             self.spade_instance = MLSSpade(self.state, self.message_queue)
         except Exception as e:
             logger.error(f"Error initializing SPADE: {e}")
 
-        print("blahblahblah")
         # Telemetry
         self.telemetry_controller = TelemetryController(self)
 
@@ -86,6 +84,11 @@ class MLSAgent:
         self.monitor_task = MonitorTask(self.state, self.monitor_queue,self.state.configuration.monitoring_interval)
         monitor_async_task = asyncio.create_task(self.monitor_task.run())
         self.running_tasks.append(monitor_async_task)
+
+        # Watchdog task (monitors task_log for TTL expiry)
+        self.watchdog_task = WatchdogTask(self.state)
+        watchdog_async_task = asyncio.create_task(self.watchdog_task.run())
+        self.running_tasks.append(watchdog_async_task)
 
         # ##--------- Scheduler --------------#
         logger.debug("Initializing scheduler...")
@@ -133,15 +136,13 @@ class MLSAgent:
         """
         Task to listen for messages from the message queue and act upon them.
         """
-        print("Starting default Message Queue Listener...")
         while True:
             try:
                 # Wait for a message from the queue (default behavior)
                 message = await self.message_queue.get()
-                print(f"Received message: {message}")
-                # Default handling logic (can be extended in subclasses)
+                # Default handling logic (can be overloaded in children classes)
             except Exception as e:
-                print(f"Error in message listener: {e}")
+                logger.error(f"Error in message listener: {e}")
 
     async def send_message_to_node(self, recipient, event, payload):
         """
@@ -185,8 +186,7 @@ class MLSAgent:
         """
         Main process of the MLSAgent.
         """
-        # Apply MLS System description
-        print("In RUN of AGENT")
+
         try:
             if self.state.configuration.continuum_layer == 'cluster':
                 logger.debug(f"Applying system description")
@@ -204,13 +204,13 @@ class MLSAgent:
             logger.error(f"Error executing command: {e}")
 
         await self.policy_controller.load_policy_modules()
-        await self.policy_controller.load_core_policy_modules()
+        if self.state.configuration.enable_core_policies:
+            await self.policy_controller.load_core_policy_modules()
 
         await self.telemetry_controller.apply_configuration_telemetry()
         await self.telemetry_controller.initialize()
 
         try:
-            print("In spade_instance_start")
             await self.spade_instance.start(auto_register=True)
         except Exception as e:
             logger.error(f"Error starting SPADE: {traceback.format_exc()}")
@@ -220,4 +220,3 @@ class MLSAgent:
         self.policy_controller.start_policy_directory_monitor()
 
         return True
-

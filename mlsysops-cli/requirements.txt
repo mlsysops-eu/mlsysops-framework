@@ -1,3 +1,5 @@
 click
 requests
 PyYAML
+jinja2
+kubernetes

@@ -33,7 +33,7 @@ def initialize():
 
 
 
-def initial_plan(context, app_desc, system_description, components_state):
+def initial_plan(context, app_desc, system_description, components_state, nodes_desc):
     """
     Generates an initial deployment plan for application components in a distributed system.
 
@@ -78,16 +78,31 @@ def initial_plan(context, app_desc, system_description, components_state):
             if node_name:
                 logger.info(f'Component {comp_name} is static placed. No initial plan needed')
                 continue
-        if components_state[comp_name]['node_placed'] is not None:
-            logger.info(f'Component {comp_name} already placed in {components_state[comp_name]["node_placed"]}. No initial plan needed')
-            continue
+
+        # get continuum layer
+        continuum_layer = node_placement.get("continuum_layer", None)
+        candidate_nodes = []
+        for node_name, node_desc in nodes_desc.items():
+            logger.debug(f'node_name {node_name} node_desc {node_desc}')
+            if 'spec' not in node_desc:
+                logger.warning(f'node {node_name} does not have spec')
+                continue
+            if 'continuum_layer' in node_desc['spec'] and node_desc['spec']['continuum_layer'] == continuum_layer[0]:
+                logger.warning(f'node {node_name} matches continuum_layer {continuum_layer}')
+                candidate_nodes.append(node_name)
+
+        # if components_state[comp_name]['node_placed'] is not None:
+        #     logger.info(f'Component {comp_name} already placed in {components_state[comp_name]["node_placed"]}. No initial plan needed')
+        #     continue
         # Initial deployment needed for this component
+        if len(candidate_nodes) > 0:
+            context["current_placement"] = random.choice(candidate_nodes)
         plan[comp_name] = [{'action': 'deploy', 'host': context["current_placement"]}]
     return plan, context
 
 async def analyze(context, application_description, system_description, mechanisms, telemetry, ml_connector):
     components_state = mechanisms['fluidity']['state']['applications'][application_description[0]['name']]['components']
-
+    logger.info('analyze: components_state %s', components_state)
     for component in application_description[0]['spec']['components']:
         comp_name = component['metadata']['name']
         node_placement = component.get("node_placement")
@@ -118,8 +133,8 @@ async def plan(context, application_description, system_description, mechanisms,
     # check if in the state the client app has been placed
     # use fluidity state for that
     components_state = mechanisms['fluidity']['state']['applications'][application_description[0]['name']]['components']
-
-    initial_plan_result, new_context = initial_plan(context, application, system_description,components_state)
+    nodes_desc = mechanisms['fluidity']['state']['nodes']
+    initial_plan_result, new_context = initial_plan(context, application, system_description,components_state,nodes_desc)
     if len(initial_plan_result.keys()) > 0:
         # in case an initial plan exists for at least one component, we cannot send non-initial plan payload
         plan_result['deployment_plan'] = initial_plan_result

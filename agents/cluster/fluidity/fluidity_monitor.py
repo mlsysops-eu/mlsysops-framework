@@ -81,10 +81,11 @@ class FluidityMonitor():
             watcher_task = asyncio.create_task(watcher_obj.run())
             await watcher_task
         
-        except Exception as e:
-            logger.error('Unexpected exception encountered: %s', e)
         except asyncio.CancelledError:
             logger.info("Watcher task cancelled cleanly.")
+            raise
+        except Exception as e:
+            logger.error('Unexpected exception encountered: %s', e)
 
         logger.info('Resource checker exiting.')
 
@@ -96,14 +97,14 @@ class FluidityMonitor():
                 crd_plural = resource_description
                 resource_description = 'CRD'
                 logger.info(f'resource_description {resource_description}, crd_plural {crd_plural}')
-                
+
                 list_func = lambda **kwargs: self.crd_api.list_namespaced_custom_object(
                     group=API_GROUP,
                     version=VERSION,
                     namespace=cluster_config.NAMESPACE,
                     plural=crd_plural,
                     **kwargs
-                ) 
+                )
 
             else:
                 logger.info(f'resource_description {resource_description}')
@@ -120,15 +121,15 @@ class FluidityMonitor():
             # Run watcher inside a cancellable task
             watcher_task = asyncio.create_task(watcher_obj.run())
             await watcher_task
+        except asyncio.CancelledError:
+            logger.info("Watcher task cancelled cleanly.")
+            raise
         except kubernetes_asyncio.client.exceptions.ApiException as exc:
             logger.error(f'exception for CRD {crd_plural} encountered: {exc}')
         except Exception as e:
             logger.error(f'Unexpected exception for CRD {crd_plural} encountered: {e}')
-        except asyncio.CancelledError:
-            logger.info("Watcher task cancelled cleanly.")
 
         logger.info('Resource checker exiting.')
-    
     async def run(self):
         """Main thread function."""
         system_task_len = len(CRDS_INFO_LIST)

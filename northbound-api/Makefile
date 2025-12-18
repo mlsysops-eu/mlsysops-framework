@@ -4,7 +4,7 @@ PLATFORMS := linux/arm64/v8,linux/amd64
 DOCKER_BUILDX=docker buildx build
 
 # Default tags (can be overridden from CLI)
-NB_API_TAG ?=  registry.mlsysops.eu/agent/northbound-api
+NB_API_TAG ?=  harbor.nbfc.io/mlsysops/northbound-api
 CI_COMMIT_TAG ?= 0.0.0
 
 # Individual targets

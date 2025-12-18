@@ -22,7 +22,7 @@ spec:
           command: ["sh", "-c", "echo 'Waiting...' && sleep 20"]
       containers:
         - name: cluster-agent
-          image: harbor.nbfc.io/mlsysops/cluster-agent
+          image: {{ CONTAINER_IMAGE }}
           imagePullPolicy: Always
           env:
             - name: NODE_NAME
@@ -39,8 +39,6 @@ spec:
               value: {{ KARMADA_HOST_IP }}
             - name: NODE_PASSWORD
               value: "1234"
-            - name: PYTHONPATH
-              value: "/workdir/fluidity"
             - name: DESCRIPTION_PATH
               value: "/etc/mlsysops/descriptions"
             - name: LOCAL_OTEL_ENDPOINT

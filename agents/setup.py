@@ -28,7 +28,7 @@ setup(
         "watchdog"
     ],
     package_data={
-        "mlsysops": ["templates/*.j2","policies/*.py"],
+        "mlsysops": ["templates/*.j2","policies/*.py", "crds/*.yaml"],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

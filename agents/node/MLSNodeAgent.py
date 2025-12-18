@@ -48,6 +48,9 @@ class MLSNodeAgent(MLSAgent):
         # TODO make it optional
         fluidity_proxy_task = asyncio.create_task(self.fluidity_proxy_message_listener())
         self.running_tasks.append(fluidity_proxy_task)
+        # TODO make it optional
+        vaccel_task = asyncio.create_task(self.vaccel_message_listener())
+        self.running_tasks.append(vaccel_task)
 
         # sending sync request
         await self.send_message_to_node(self.state.configuration.cluster, MessageEvents.NODE_STATE_SYNC.value, {"node": self.state.configuration.node})
@@ -194,3 +197,45 @@ class MLSNodeAgent(MLSAgent):
                 logger.error(f"fluidityproxy_message_listener: Error processing msg: {e}")
                 await asyncio.sleep(1)
         print(f"MLSAGENT::::  stopping fluidity message listener.... ")
+
+    async def vaccel_message_listener(self):
+        """
+        Handles incoming messages from the fluidity proxy message queue, processes the
+        received events, and executes corresponding actions based on event types.
+
+        Raises
+        ------
+        asyncio.CancelledError
+            Raised when the task is cancelled while awaiting.
+        Exception
+            General exception raised if an unexpected error occurs during message
+            processing.
+
+        Returns
+        -------
+        None
+        """
+        logger.debug(f"MLSAGENT Node:::: Starting vaccel proxy message listener.... ")
+        while True:
+            try:
+                msg = await self.mechanisms_controller.queues['vaccel']['outbound'].get()
+
+                event = msg.get("event")
+                data = msg.get("payload")
+                logger.debug(f"Received msg from vaccel event { event }: { data }")
+
+                match event:
+                    case MessageEvents.PLAN_EXECUTED.value:
+                        await self.update_plan_status(data['plan_uid'], "vaccel", data['status'])
+                    case _:
+                        logger.error(f"Received msg from vaccel mechanism with wrong event")
+
+            except asyncio.CancelledError:
+                logger.debug(f"vaccel: CancelledError")
+                break
+            except Exception as e:
+                logger.error(f"vaccel: Error processing msg: {e}")
+                print(self.mechanisms_controller.queues)
+                print(traceback.format_exc())
+                await asyncio.sleep(1)
+        print(f"MLSAGENT::::  stopping vaccel listener.... ")

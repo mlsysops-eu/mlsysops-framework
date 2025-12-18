@@ -19,7 +19,7 @@ import redis
 from ..logger_util import logger
 
 # Fetching environment variables with default values if not set
-redis_host = os.getenv('REDIS_HOST', '172.25.27.72')  # Default to '10.96.12.155'
+redis_host = os.getenv('REDIS_HOST', '10.64.83.239')  # Default to '10.96.12.155'
 redis_port = int(os.getenv('REDIS_PORT', 6379))  # Default to 6379
 redis_db_number = int(os.getenv('REDIS_DB_NUMBER', 0))  # Default to 0
 redis_password = os.getenv('REDIS_PASSWORD', 'secret')  # Uncomment if password is needed
