@@ -21,7 +21,7 @@ spec:
           command: ["sh", "-c", "echo 'Waiting...' && sleep 4"]
       containers:
         - name: nb-api-service
-          image: harbor.nbfc.io/mlsysops/northbound-api
+          image: {{ CONTAINER_IMAGE }}
           ports:
             - containerPort: 8000
               name: http-port

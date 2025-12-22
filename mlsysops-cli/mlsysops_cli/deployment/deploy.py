@@ -619,7 +619,9 @@ def deploy_core_services():
         client_k8s.create_or_update(r)
 
     api_path = files(deployment).joinpath("api-service-deployment.yaml")
-    for r in parse_yaml_from_file(api_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP")}):
+    for r in parse_yaml_from_file(api_path, {"KARMADA_HOST_IP": os.getenv("KARMADA_HOST_IP"),
+                                             "CONTAINER_IMAGE": os.getenv("API_CONTAINER_IMAGE","harbor.nbfc.io/mlsysops/northbound-api")
+                                             }):
         client_k8s.create_or_update(r)
 
     redis_path = files(deployment).joinpath("redis-stack-deployment.yaml")
