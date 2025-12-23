@@ -12,7 +12,7 @@ print(f"Generated Pydantic models at: {generated}")
 
 
 
-from endpoints import applications, infrastructure, management, ml_models
+from endpoints import applications, management, ml_models
 from redis_setup import redis_mgt as rm
 
 app = FastAPI(title="MLSysOps NorthBound API",
