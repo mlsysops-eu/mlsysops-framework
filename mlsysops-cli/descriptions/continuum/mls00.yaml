@@ -1,0 +1,4 @@
+MLSysOpsContinuum:
+  continuum_id: mls00
+  clusters:
+    - mls01

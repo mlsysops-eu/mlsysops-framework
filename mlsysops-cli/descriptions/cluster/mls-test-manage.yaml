@@ -1,0 +1,6 @@
+MLSysOpsCluster:
+  name: mls-test-manage
+  cluster_id: mls-test-manage
+  nodes:
+    - mls-compute-vm2
+    - mls-compute-vm3

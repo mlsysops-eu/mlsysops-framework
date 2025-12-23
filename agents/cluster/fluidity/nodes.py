@@ -90,6 +90,7 @@ def append_host_to_list(entry_dict, hosts, remove=False):
     
     # At this point we did not find the entry, so we append it to the list.
     hosts.append(entry_dict)
+    return True
 
 def get_node_internal_ip(node_name):
     """Get the cluster-internal IP of a node.

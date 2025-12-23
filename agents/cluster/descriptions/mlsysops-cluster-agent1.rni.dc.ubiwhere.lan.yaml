@@ -1,0 +1,7 @@
+MLSysOpsCluster:
+  name: mlsysops-cluster-agent1
+  cluster_id: mlsysops-cluster-agent1.rni.dc.ubiwhere.lan
+  nodes:
+    - mlsysops-worker1.rni.dc.ubiwhere.lan
+    - mlsysops-worker2.rni.dc.ubiwhere.lan
+    - mlsysops-worker3.rni.dc.ubiwhere.lan

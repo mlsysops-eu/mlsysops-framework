@@ -15,6 +15,7 @@
 
 import asyncio
 import time
+import traceback
 from datetime import datetime
 from typing import Any, Optional, Dict, List
 from mlstelemetry import MLSTelemetry
@@ -136,8 +137,9 @@ class MonitorTask:
                             await self.__data.add_entry(entry)
 
                         except Exception as e:
-                            #logger.error(f"Error fetching telemetry for metric '{metric_name}': {str(e)}")
-                            pass
+                            logger.warning(f"Error fetching telemetry for metric '{metric_name}'")
+                            logger.warning(traceback.format_exc())
+
                     # Fetch mechanisms state
                     for mechanism_key, mechanism_object in self.state.active_mechanisms.items():
                         mechanism_object['state'] = mechanism_object['module'].get_state()

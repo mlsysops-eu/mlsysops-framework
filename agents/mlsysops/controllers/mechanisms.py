@@ -16,6 +16,7 @@
 import importlib
 import os
 import asyncio
+import traceback
 
 from mlsysops.data.state import MLSState
 from mlsysops.logger_util import logger
@@ -114,3 +115,4 @@ class MechanismsController:
                     logger.debug(f"{self._state.active_mechanisms[mechanism_name]}")
                 except Exception as e:
                     logger.error(f"Failed to load module {mechanism_name} from {file_path}: {e}")
+                    logger.error(traceback.format_exc())

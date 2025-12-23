@@ -1,0 +1,6 @@
+MLSysOpsCluster:
+  name: mls01
+  cluster_id: mls01
+  nodes:
+    - mls02
+    - mls03

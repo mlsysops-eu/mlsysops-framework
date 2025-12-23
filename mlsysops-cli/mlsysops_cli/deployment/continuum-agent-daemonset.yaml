@@ -24,7 +24,7 @@ spec:
       containers:
         - name: continuum-agent
           imagePullPolicy: Always
-          image: harbor.nbfc.io/mlsysops/continuum-agent
+          image: {{ CONTAINER_IMAGE }}
           env:
             - name: KARMADA_API_KUBECONFIG
               value: /etc/kubeconfigs/karmada-api.kubeconfig
@@ -41,13 +41,17 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP
             - name: EJABBERD_DOMAIN
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.hostIP
+              value: {{ KARMADA_HOST_IP }}
             - name: NODE_PASSWORD
               value: "1234"
             - name: DESCRIPTION_PATH
               value: "/etc/mlsysops/descriptions"
+            {% if OTEL_EXPORT_IP and OTEL_EXPORT_PORT %}
+            - name: MLS_OTEL_CONTINUUM_EXPORT_IP
+              value: "{{ OTEL_EXPORT_IP }}"
+            - name: MLS_OTEL_CONTINUUM_EXPORT_PORT
+              value: "{{ OTEL_EXPORT_PORT }}"
+            {% endif %}
           resources:
             requests:
               memory: "128Mi"

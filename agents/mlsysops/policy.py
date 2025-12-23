@@ -20,6 +20,7 @@ import time
 import ast
 
 import asyncio
+import traceback
 
 from .logger_util import logger
 
@@ -37,6 +38,11 @@ class Policy:
         # Check if it was initialized
         try:
             policy_initial_context = self.module.initialize().copy()
+            node_name = policy_initial_context.get("node_name",None)
+            if node_name is not None:
+                if node_name != agent.state.configuration.node:
+                    logger.debug(f"Policy {self.name} is not configured for node {agent.state.configuration.node}")
+                    return False
             self.context.update(policy_initial_context)
 
             # Add telemetry metrics
@@ -54,8 +60,10 @@ class Policy:
 
             logger.debug(f"Policy {self.name} initialized {self.context}")
             self.scope = self.context['scope']
+            return True
         except Exception as e:
             logger.error(f"Failed to initialize policy {self.name}: {e}")
+        return False
 
     def update_context(self,context):
         self.context = context
@@ -69,6 +77,7 @@ class Policy:
             analyze_result,updated_context = await self.module.analyze(self.context,application_description, system_description, mechanisms, telemetry, ml_connector)
         except Exception as e:
             logger.error(f"Error in policy analyze {self.name}: {e}")
+            logger.error(traceback.format_exc())
             return False
         self.update_context(updated_context)
         self.last_analyze_run = time.time()
@@ -80,6 +89,7 @@ class Policy:
             new_plan, updated_context = await self.module.plan(self.context,application_description, system_description, mechanisms, telemetry, ml_connector)
         except Exception as e:
             logger.error(f"Error in policy plan {self.name}: {e}")
+            logger.error(traceback.format_exc())
             return {}
         self.update_context(updated_context)
         return new_plan

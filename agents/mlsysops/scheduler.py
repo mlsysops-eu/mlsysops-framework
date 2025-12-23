@@ -74,27 +74,34 @@ class PlanScheduler:
 
                             should_discard = False
 
-                            # if was executed a plan earlier, then discard it.
-                            if asset in mechanisms_touched:
+                            # if was executed a plan earlier, for a specific mechanism and a specific application, then discard it.
+                            # TODO: double check, touched by the same policy
+                            if asset in mechanisms_touched and mechanisms_touched[asset]['application_id'] == plan.application_id:
                                 should_discard = True
 
                             task_log = self.state.get_task_log(plan.uuid)
 
                             # Check if there is a pending task log from previous runs
                             if task_log:
+                                logger.test(
+                                    f"|1| Debug:planuid:{str(plan.uuid)} {task_log} for plan {plan.application_id}")
                                 if (task_log['status'] == Status.PENDING.value
-                                        and task_log['mechanism'][asset] == Status.PENDING.value):
+                                        and task_log['mechanism'][asset] == Status.PENDING.value
+                                        and task_log['application_id'] == plan.application_id):
+                                    logger.test(f"|2| Debug2:planuid:{str(plan.uuid)} {task_log} for plan {plan.application_id}")
                                     should_discard = True
 
                             # check if the application has been removed for this application scoped plan
                             if (plan.application_id not in self.state.applications and
                                 plan.application_id not in self.state.active_mechanisms): # TODO easy way to do for now. different mechanism scope
+                                logger.error("should discard")
                                 should_discard = True
 
                             # TODO: check for fluidity debug
                             # Check if it is core, should override the discard mechanism
                             if not plan.core and should_discard:
                                 logger.test(f"|1| Plan planuid:{str(plan.uuid)} status:Discarded")
+                                logger.error(f"True is: {plan.core} should discard: {should_discard}")
                                 self.state.update_task_log(plan.uuid,updates={"status": "Discarded"})
                                 continue
 
@@ -106,7 +113,8 @@ class PlanScheduler:
                                 mechanisms_touched[asset] = {
                                     "timestamp": time.time(),
                                     "plan_uid": plan.uuid,
-                                    "plan": command
+                                    "plan": command,
+                                    "application_id": plan.application_id
                                 }
 
                             # start execution task

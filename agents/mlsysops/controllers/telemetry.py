@@ -159,6 +159,10 @@ class TelemetryController(BaseController):
                     if self.agent.state.configuration.node_exporter_enabled:
                         node_exporter_pod_port = int(os.getenv("MLS_NODE_EXPORTER_PORT", "9200"))
                         node_exporter_flags = os.getenv("MLS_OTEL_NODE_EXPORTER_FLAGS", "os")
+                        if node_exporter_flags == "os":
+                            # check for agent configuration
+                            if self.agent.state.configuration.node_exporter_collectors is not None:
+                                node_exporter_flags = self.agent.state.configuration.node_exporter_collectors
                         pod_name = await deploy_node_exporter_pod(self.agent.state.hostname,node_exporter_flags,node_exporter_pod_port)
                         self.node_exporter_pod_list.append({
                             "node": self.agent.state.hostname,
@@ -196,6 +200,10 @@ class TelemetryController(BaseController):
                     if self.agent.state.configuration.node_exporter_enabled:
                         node_exporter_pod_port = int(os.getenv("MLS_NODE_EXPORTER_PORT", "9200"))
                         node_exporter_flags = os.getenv("MLS_OTEL_NODE_EXPORTER_FLAGS", "os")
+                        if node_exporter_flags == "os":
+                            # check for agent configuration
+                            if self.agent.state.configuration.node_exporter_collectors is not None:
+                                node_exporter_flags = self.agent.state.configuration.node_exporter_collectors
                         payload = {"node": self.agent.state.hostname, "port": node_exporter_pod_port, "flags": node_exporter_flags}
                         await self.agent.send_message_to_node(self.agent.state.configuration.cluster,mlsysops.events.MessageEvents.NODE_EXPORTER_DEPLOY.value,payload)
                     return
@@ -216,7 +224,6 @@ class TelemetryController(BaseController):
                             tempo_export_endpoint=os.getenv("MLS_OTEL_TEMPO_EXPORT_ENDPOINT"),
                             local_endpoint_metrics_expiration=str(scrape_interval + 5) + "s",
                             otel_collector_selector="continuum-otel-collector"
-
                         )
 
                         self.local_config = parsed_otel_config
@@ -230,6 +237,10 @@ class TelemetryController(BaseController):
                     if self.agent.state.configuration.node_exporter_enabled:
                         node_exporter_pod_port = int(os.getenv("MLS_NODE_EXPORTER_PORT", "9200"))
                         node_exporter_flags = os.getenv("MLS_OTEL_NODE_EXPORTER_FLAGS", "os")
+                        if node_exporter_flags == "os":
+                            # check for agent configuration
+                            if self.agent.state.configuration.node_exporter_collectors is not None:
+                                node_exporter_flags = self.agent.state.configuration.node_exporter_collectors
                         pod_name = await deploy_node_exporter_pod(self.agent.state.hostname, node_exporter_flags,
                                                                   node_exporter_pod_port)
                         self.node_exporter_pod_list.append({

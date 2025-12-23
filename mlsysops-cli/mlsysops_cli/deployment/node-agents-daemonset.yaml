@@ -23,7 +23,7 @@ spec:
           command: ["sh", "-c", "echo 'Waiting...' && sleep 35"]
       containers:
         - name: node-agent
-          image: harbor.nbfc.io/mlsysops/node-agent
+          image: {{ CONTAINER_IMAGE }}
           imagePullPolicy: Always
           env:
             - name: NODE_NAME

@@ -1,5 +1,5 @@
 
-FROM harbor.nbfc.io/proxy_cache/library/python:3.11.5-slim-bookworm
+FROM python:3.11.5-slim-bookworm
 
 # Add curl for healthcheck
 RUN apt-get update && \
@@ -39,8 +39,12 @@ COPY . /code
 
 
 EXPOSE 8090
-RUN chmod +x /code/startup.sh
+# RUN chmod +x /code/startup.sh
 
-CMD ["/code/startup.sh"]
-# CMD ["/bin/bash","-c","sudo ./startup.sh"]
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8090"]
+# normalize line endings + exec bit
+RUN sed -i 's/\r$//' /code/startup.sh && \
+    awk 'NR==1{sub(/^\xef\xbb\xbf/,"")}1' /code/startup.sh > /tmp/s.sh && mv /tmp/s.sh /code/startup.sh && \
+    chmod +x /code/startup.sh
+
+# call the interpreter explicitly
+CMD ["/bin/sh", "/code/startup.sh"]

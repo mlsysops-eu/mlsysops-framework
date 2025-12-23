@@ -25,19 +25,21 @@ from ...logger_util import logger
 
 def get_pod_info(comp_name, model_id, api_client):
     """Query Karmada proxy API to find the pod with the given component name."""
-    path = "/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/default/pods"
+    path = "/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/mlsysops/pods"
     try:
         response = api_client.call_api(
             resource_path=path, method="GET", auth_settings=["BearerToken"],
             response_type="json", _preload_content=False
         )
         pods = json.loads(response[0].data.decode("utf-8"))
-
+        logger.debug(f"Found {len(pods.get('items', []))} pods in the namespace.")
         for pod in pods.get("items", []):
-            if pod["metadata"]["name"].startswith(comp_name) and pod["status"]["phase"] == "Running" \
-                    and model_id in pod["metadata"]["labels"].get("mlsysops.eu/app"):
-                logger.debug(f"Found running pod: {pod['metadata']['name']} on host: {pod['spec']['nodeName']}")
-                return pod["metadata"]["name"], pod["spec"]["nodeName"], pod['metadata']['labels']['mlsysops.eu/app']
+            logger.debug(f"Checking pod: {pod['metadata']['name']}")
+            if 'mlsysops.eu/app' in pod["metadata"]["labels"]:
+                if pod["status"]["phase"] == "Running" \
+                        and model_id in pod["metadata"]["labels"].get("mlsysops.eu/app"):
+                    logger.debug(f"Found running pod: {pod['metadata']['name']} on host: {pod['spec']['nodeName']}")
+                    return pod["metadata"]["name"], pod["spec"]["nodeName"], pod['metadata']['labels']['mlsysops.eu/app']
 
     except ApiException as exc:
         logger.error(f"Failed to fetch pods: {exc}")
@@ -84,38 +86,6 @@ def get_node_ip(host, api_client):
         logger.error(f"Failed to resolve IP for node: {host}")
     return node_ip
 
-
-# def get_node_ip(host):
-#     # Get a list of the nodes
-#     nodes = get_k8s_nodes()
-#     node_ip = None
-#     for node in nodes:
-#         node_name = node.metadata.name
-#         if node.metadata.name == host:
-#             internal_ip = None
-#             external_ip = None
-#             addresses = node.status.addresses
-#             print('Addresses ' + addresses)
-#             for address in addresses:
-#                 if address.type == "ExternalIP":
-#                     external_ip = address.address
-#                     print(f"Node: {node_name}, External IP: {external_ip}")
-#                 elif address.type == "InternalIP":
-#                     internal_ip = address.address
-#                     print(f"Node: {node_name}, Internal IP: {internal_ip}")
-#             if external_ip == None:
-#                 print('External IP not found for node that should be accessible externally.')
-#                 if internal_ip == None:
-#                     print('Internal IP not found for node that should be accessible externally.')
-#                 else:
-#                     node_ip = internal_ip
-#             else:
-#                 node_ip = external_ip
-#             break
-#     return node_ip
-
-
-
 class Check_ml_deployment_Behaviour(OneShotBehaviour):
 
     def __init__(self, redis_manager, model_id, comp_name, core_api):
@@ -131,6 +101,7 @@ class Check_ml_deployment_Behaviour(OneShotBehaviour):
 
         # Load Karmada kubeconfig and create Kubernetes API client
         karmada_api_kubeconfig = os.getenv("KARMADA_API_KUBECONFIG", "kubeconfigs/karmada-api.kubeconfig")
+        logger.debug(f"Loading Karmada kubeconfig: {karmada_api_kubeconfig}")
         try:
             config.load_kube_config(config_file=karmada_api_kubeconfig)
             api_client = client.ApiClient()
@@ -148,7 +119,7 @@ class Check_ml_deployment_Behaviour(OneShotBehaviour):
                 logger.debug(f"Found pod: {pod_name} running on host: {host}")
                 break
 
-        svc_path = f"/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/default/services/{self.comp_name}"
+        svc_path = f"/apis/search.karmada.io/v1alpha1/proxying/karmada/proxy/api/v1/namespaces/mlsysops/services/ml-{self.model_id}"
         logger.debug(f"Fetching service details from Karmada proxy API: {svc_path}")
         try:
             response = api_client.call_api(
@@ -185,54 +156,3 @@ class Check_ml_deployment_Behaviour(OneShotBehaviour):
             self.r.update_dict_value("endpoint_hash", self.model_id, str(info))
 
         await asyncio.sleep(2)
-
-        # while True:
-        #     pod_name = None
-        #     # Waits until it reads a pod with the given name
-        #     pod_name, host = get_pod_name(self.comp_name)
-        #     # Retrieve svc endpoint info
-        #     if pod_name is None:
-        #         logger.debug('Failed to get status of comp with name ' + str(self.comp_name))
-        #         await asyncio.sleep(5)
-        #     else:
-        #         break
-        #
-        # svc_obj = None
-        # try:
-        #     svc_obj = self.core_api.read_namespaced_service(
-        #         name=self.comp_name,
-        #         namespace=config.NAMESPACE)
-        # except ApiException as exc:
-        #     if exc.status != 404:
-        #         print('Unknown error reading service: ' + exc)n
-        #         return None
-        #
-        # # Retrieve svc endpoint info
-        # if svc_obj is None:
-        #     print('Failed to read svc with name ' + self.comp_name)
-        #     # Add handling
-        #
-        # # Retrieve the assigned VIP:port
-        # local_endpoint = svc_obj.spec.cluster_ip + ':' + str(svc_obj.spec.ports[0].port)
-        # if svc_obj.spec.ports[0].node_port:
-        #     global_endpoint_port = str(svc_obj.spec.ports[0].node_port)
-        # else:
-        #     global_endpoint_port = None
-        #
-        # if self.model_id != None:
-        #     timestamp = datetime.now()
-        #     info = {
-        #         'status': 'deployed',
-        #         'timestamp': str(timestamp),
-        #         'local_endpoint': local_endpoint
-        #     }
-        #
-        #     node_ip = get_node_ip(host)
-        #     if global_endpoint_port and node_ip:
-        #         info['global_endpoint'] = node_ip + ':' + global_endpoint_port
-        #
-        #     print('Going to push to redis_conf endpoint_queue the value ' + str(info))
-        #     # NOTE: PLACEHOLDER FOR REDIS - YOU CAN CHANGE THIS WITH ANOTHER TYPE OF COMMUNICATION
-        #     self.r.update_dict_value('endpoint_hash', self.model_id, str(info))
-        #
-        # await asyncio.sleep(2)

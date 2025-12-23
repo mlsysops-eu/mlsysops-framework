@@ -1,11 +1,13 @@
 apiVersion: search.karmada.io/v1alpha1
 kind: ResourceRegistry
 metadata:
-  name: proxy-resources
+  name: {{ name }}
 spec:
   targetCluster:
     clusterNames:
-      - uth-prod-cluster
+        {% for cluster in cluster_names %}
+        - {{ cluster }}
+        {% endfor %}
   resourceSelectors:
     - apiVersion: v1
       kind: Pod

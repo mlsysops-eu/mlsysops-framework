@@ -3,10 +3,12 @@ from datetime import datetime
 import yaml
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 import json
+from fastapi.encoders import jsonable_encoder
+from mlsysops import logger
 from redis_setup import redis_mgt as rm
 from jsonschema import validate, ValidationError
 import requests
-from MLSysOps_Schemas.mlsysops_schemas import app_schema
+from schemas.mlsysops_application import MlsysopsappSchema, Component
 import os
 import subprocess
 from kubernetes import client, utils, config
@@ -15,9 +17,9 @@ from kubernetes.client.rest import ApiException
 
 from typing import Annotated, List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-
+from starlette import status
 # JSON schema with enum validation for the city
-schema = app_schema
+
 
 os.environ["LOCAL_OTEL_ENDPOINT"] = "http://172.25.27.4:9464/metrics"
 os.environ["TELEMETRY_ENDPOINT"] = "172.25.27.4:4317"
@@ -31,29 +33,6 @@ kubeconfigs = [
     os.getenv("UTH_PROD_KUBECONFIG", "/root/.kube/uth-prod.kubeconfig"),
 ]
 
-
-# Define Pydantic Model for Validation using v2 syntax
-class ComponentModel(BaseModel):
-    Component: Dict[str, Any]
-    externalAccess: Optional[bool] = None
-    nodePlacement: Optional[Dict[str, Any]] = None
-    restartPolicy: Optional[str] = None
-    containers: Optional[Annotated[List[Dict[str, Any]], Field(min_items=1)]] = None
-
-
-class MLSysOpsApplicationModel(BaseModel):
-    name: str = Field(..., title="Application Name")
-    mlsysops_id: str = Field(..., alias="mlsysops-id", title="MLSysOps ID")
-    clusterPlacement: Optional[Dict[str, Any]] = None
-    components: Annotated[List[ComponentModel], Field(min_items=1)]
-
-
-class RootModel(BaseModel):
-    MLSysOpsApplication: MLSysOpsApplicationModel
-
-
-class RootModel(BaseModel):
-    MLSysOpsApplication: MLSysOpsApplicationModel
 
 
 def get_pods_from_kubeconfigs():
@@ -171,14 +150,6 @@ def remove_none_fields(data):
         return data
 
 
-def validate_yaml(json_data):
-    try:
-        validate(instance=json_data, schema=schema)
-        return None
-    except ValidationError as e:
-        return e.message
-    except Exception as e:
-        return str(e)
 
 
 router = APIRouter()
@@ -196,36 +167,48 @@ last_connection_time = None
 
 
 @router.post("/deploy_ml", tags=["ML-models"])
-async def deploy_ml(payload: RootModel):
+async def deploy_ml(request: Request, payload: MlsysopsappSchema):
     # Convert Pydantic object to dict
 
-    parsed_data = payload.dict(by_alias=True)
-    parsed_data = remove_none_fields(parsed_data)
+    redis_mgr: rm.RedisManager = request.app.state.redis
+    try:
+        app_id = payload.MLSysOpsApp.name
 
-    # Validate YAML structure
-    validation_error = validate_yaml(parsed_data)
+        components: List[Component] = payload.MLSysOpsApp.components or []
+        comp_names = [comp.metadata.name for comp in components]
+        logger.debug("Deploying app_id=%s with components=%s", app_id, comp_names)
+
+    except Exception as exc:
+        logger.error("Error converting payload to dict: %s", exc)
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid payload format: {exc}"
+        )
 
     try:
-        internal_uid = parsed_data["MLSysOpsApplication"]["mlsysops-id"]
-    except KeyError:
-        print("The mlsysops-id is not specified in the model description")
+        encoded = jsonable_encoder(payload)
+        encoded_clean = _remove_none_fields(encoded)
+        payload_json = json.dumps(encoded_clean)
 
-    if validation_error is None and internal_uid != "0":
+        redis_mgr.push("ml_deployment_queue", payload_json)
+        timestamp = datetime.now()
+        info = {
+            'status': 'pending',
+            'timestamp': str(timestamp)
+        }
 
-        try:
-            r.push("ml_deployment_queue", json.dumps(parsed_data))
-            timestamp = datetime.now()
-            info = {
-                'status': 'pending',
-                'timestamp': str(timestamp)
-            }
-            r.update_dict_value('endpoint_hash', internal_uid, str(info))
-            return {"status": "success", "message": "Deployment request added to queue"}
-        except Exception as e:
-            print(f"Error checking the app in Redis: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-    else:
-        raise HTTPException(status_code=400, detail=validation_error)
+        redis_mgr.update_dict_value("app_data_hash", app_id, str(info))
+
+
+    except Exception as exc:
+        logger.error("Error storing application in Redis: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Redis store error: {exc}"
+        )
+
+    return {"app_id": app_id, "status": "ML model queued successfully"}
 
 
 "----------------------------------------------------------------------------------------"
@@ -312,3 +295,13 @@ async def remove_ml_model(model_uid: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating status for app_id '{model_uid}': {e}")
+
+def _remove_none_fields(obj: Any) -> Any:
+    """
+    Recursively drop keys/values that are None in dicts or None items in lists.
+    """
+    if isinstance(obj, dict):
+        return {k: _remove_none_fields(v) for k, v in obj.items() if v is not None}
+    if isinstance(obj, list):
+        return [_remove_none_fields(item) for item in obj if item is not None]
+    return obj

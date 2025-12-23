@@ -34,8 +34,6 @@ This is used for internal communication of the varrious services. You can setup 
 - `POSTGRES_DB`: PostgreSQL database name (default, `mlmodel`)
 - `POSTGRES_USER`: PostgreSQL username (default, `postgres`)
 - `POSTGRES_PASSWORD`: PostgreSQL password (default, `strongpassword`)
-- `PGADMIN_DEFAULT_EMAIL`: pgAdmin default login email (default, `user@mail.com`)
-- `PGADMIN_DEFAULT_PASSWORD`: pgAdmin default login password (default, `strongpassword`)
 - `DB_HOST_NAME`: Database host (e.g., `database`, This corresponds to the name of the container)
 - `DB_PORT`: Database port (default: `5432`)
 - `DB_DRIVER`: Database driver string (default, `postgresql+asyncpg`)  **NOTE:** Only use an async driver

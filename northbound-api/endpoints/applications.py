@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from kubernetes.client import ApiException
 
-from MLSysOps_Schemas.mlsysops_model import MlsysopsappSchema, Component
+from schemas.mlsysops_application import MlsysopsappSchema, Component
 from redis_setup import redis_mgt as rm  # Your RedisManager class
 
 router = APIRouter()

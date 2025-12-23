@@ -36,7 +36,7 @@ class ApplicationController:
         self.agent = agent
         self.application_tasks_running = {}
 
-    def  __del__(self):
+    def __del__(self):
         """
         Cancels and clears all running application tasks upon deletion.
 
@@ -64,7 +64,7 @@ class ApplicationController:
             application_id=application_data["name"],
             application_description=application_data
         )
-        
+
         self.agent.state.add_application(new_application.application_id, new_application)
 
         # Update the monitoring list for the application's metrics
@@ -76,7 +76,7 @@ class ApplicationController:
                     await self.agent.monitor_task.add_metric(metric_name)
 
         # Start an analyze task for this application
-        analyze_object = AnalyzeTask(new_application.application_id,self.agent.state, "application")
+        analyze_object = AnalyzeTask(new_application.application_id, self.agent.state, "application")
         analyze_task = asyncio.create_task(analyze_object.run())
 
         self.application_tasks_running[new_application.application_id] = analyze_task
@@ -112,17 +112,9 @@ class ApplicationController:
             None
         """
         if data['name'] in self.application_tasks_running:
-            self.agent.state.update_application(data['name'],data)
+            self.agent.state.update_application(data['name'], data)
         else:
             logger.error(f'No application {data["name"]} found.')
 
     async def run(self):
-        """
-        Continuously checks the state for new applications and handles them.
-        """
-        while True:
-            for app_id, app_object in MLSState.applications.items():
-                print(f'Application {app_id}')
-
-            # Check periodically (adjust the sleep interval as needed)
-            await asyncio.sleep(10)
+        pass

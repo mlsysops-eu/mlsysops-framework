@@ -100,8 +100,10 @@ async def delete_deployment(
     
     if existing_deployment is None:
         raise HTTPException(status_code=404, detail="Deployment was not found")
-    await db.delete(existing_deployment)
-    await db.commit()
+    
+    await utl.delete_deployments(db=db, deployment_id=deployment_id)
+    #await db.delete(existing_deployment)
+    #await db.commit()
     
     # Return a message indicating successful deletion
     return {"message": "Deployment was deleted successfully"}

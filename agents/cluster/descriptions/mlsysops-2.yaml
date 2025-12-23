@@ -1,0 +1,6 @@
+MLSysOpsCluster:
+  name: mlsysops-2
+  cluster_id: mlsysops-2
+  nodes:
+    - 48b02d764794
+    - 48b02d15cf09

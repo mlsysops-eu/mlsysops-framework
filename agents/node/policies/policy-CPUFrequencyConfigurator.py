@@ -70,7 +70,8 @@ def initialize():
         },
         "latest_timestamp": None,
         "core": False,
-        "scope": "global"
+        "scope": "global",
+        "node_name": "mls-compute-vm3"
     }
 
     return initialContext

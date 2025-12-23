@@ -1,4 +1,3 @@
-mlsysops
 mlstelemetry
 opentelemetry-exporter-otlp
 opentelemetry-api
@@ -18,3 +17,5 @@ jsonschema
 redis
 watchdog
 deepdiff
+dataclass_struct
+sismic

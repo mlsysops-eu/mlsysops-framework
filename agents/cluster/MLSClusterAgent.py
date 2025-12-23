@@ -125,16 +125,17 @@ class MLSClusterAgent(MLSAgent):
                         self.telemetry_controller.remote_remove_node_exporter_pod(data['node'])
                     case mlsysops.events.MessageEvents.NODE_STATE_SYNC.value:
                         # logger.debug(f"Going to send {self.nodes_state[data['node']]} to node {data['node']}")
-                        await self.send_message_to_node(
-                            data['node'],
-                            MessageEvents.NODE_STATE_SYNC.value,
-                            self.nodes_state[data['node']])
+                        if data['node'] in self.nodes_state.keys():
+                            await self.send_message_to_node(
+                                data['node'],
+                                MessageEvents.NODE_STATE_SYNC.value,
+                                self.nodes_state[data['node']])
                     case _:
                         logger.error(f"Unhandled event type: {event}")
 
             except Exception as e:
                 logger.error(f"Error processing message in message_queue_listener: {e}")
-        logger.debug("Started Message Queue Listener...")
+                logger.error(traceback.format_exc())
 
     async def fluidity_message_listener(self):
         """

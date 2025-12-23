@@ -60,6 +60,7 @@ from deploy import cleanup_pods, delete_running_pods, check_for_hosts_to_delete,
                    extend_pod_env_template, create_svc_object, create_svc_manifest, \
                    create_pod_manifest, change_comp_spec, validate_host
 
+import traceback
 
 def check_diff(d1, d2):
     diff = DeepDiff(d1, d2)
@@ -210,14 +211,14 @@ def create_cr(cr_dict, cr_kind):
     updated_dict = {
         "apiVersion": "mlsysops.eu/v1",
         "kind": cr_kind,
+        "name": cr_name,
         "metadata": {
             "name": cr_name
         }
     }
 
     updated_dict.update(cr_dict)
-    logger.info(f'Updated dict {updated_dict}')
-    
+
     resp = None
     try:
         logger.info('Trying to read cr_kind %s with name %s if already exists', cr_kind, cr_name)
@@ -281,6 +282,7 @@ def apply_cluster_description(fpath=None, file=None):
     updated_dict = {
         "apiVersion": "mlsysops.eu/v1",
         "kind": crd_info['kind'],
+        "name": cr_name,
         "metadata": {
             "name": cr_name
         }
@@ -293,15 +295,18 @@ def apply_cluster_description(fpath=None, file=None):
     try:
         resp = cr_api.get_fluidity_object(plural, cr_name)
     except FluidityApiException:
-        logger.error('Retrieving %s failed', cr_name)
+        pass
 
     if resp:
+        logger.info('Retrieved %s', resp)
         return resp['metadata']['name']
 
     try:
+        logger.warning(f'Trying to create {updated_dict} plural {plural}')
         crs = cr_api.create_fluidity_object(plural, updated_dict)
     except FluidityApiException:
         logger.error('Creating %s failed', cr_name)
+        logger.error(traceback.format_exc())
         return None
     
     return updated_dict['metadata']['name']
@@ -522,7 +527,7 @@ class FluidityAppController():
                     continue
 
                 name = data.get("name")
-
+                logger.warning(f"Got {message}")
                 if event is None or data is None or name is None:
                     logger.info('Ignoring message: One of event/data/name is missing.')
                     continue
@@ -698,7 +703,7 @@ class FluidityAppController():
                     case 'MODIFIED':
                         match resource:
                             case 'mlsysopsapps':
-                                res, comp_dict = await self._handle_upd_app(name, spec)
+                                res, comp_dict = await self._handle_upd_app(name, spec,uid)
                                 if res:
                                     status = Status.COMPLETED.value
                                 else:
@@ -739,7 +744,7 @@ class FluidityAppController():
 
                         if initial_plan:
                             plan.pop('initial_plan')
-
+                            logger.warning(f"Plan in fluidity: {plan}")
                             for comp_name in plan:
                                 if comp_name not in self.apps_dict[name]['components']:
                                     logger.error(f"Component {comp_name} not in internal app structure. Ignoring")
@@ -753,7 +758,7 @@ class FluidityAppController():
 
                                     # Validate new host
                                     if not validate_host(comp_spec['pod_template'], comp_spec, action_entry['host'], self.nodes):
-                                        logger.error(f"Host {action_entry['host']} did not pass eligibility check")
+                                        logger.error(f"Host {action_entry['host']} did not pass eligibility check.-")
                                         status = Status.FAILED.value
                                         break
                                         
@@ -789,25 +794,25 @@ class FluidityAppController():
                             # for all app components 
                             initial_deployment_pending = False
 
-                            for comp_name in self.apps_dict[name]['components']:
-                                comp_spec = self.apps_dict[name]['components'][comp_name]
+                            # for comp_name in self.apps_dict[name]['components']:
+                            #     comp_spec = self.apps_dict[name]['components'][comp_name]
+                            #
+                            #     if 'hosts' not in comp_spec or comp_spec['hosts'] == []:
+                            #         initial_deployment_pending = True
+                            #         break
+                            #
+                            # if initial_deployment_pending:
+                            #     logger.info('Initial deployment not executed for all components - ignoring')
+                            #     status = Status.FAILED.value
+                            # else:
+                            plan.pop('initial_plan')
+                            self.apps_dict[name]['curr_plan']['curr_deployment'] = plan
 
-                                if 'hosts' not in comp_spec or comp_spec['hosts'] == []:
-                                    initial_deployment_pending = True
-                                    break
-                            
-                            if initial_deployment_pending:
-                                logger.info('Initial deployment not executed for all components - ignoring')
-                                status = Status.FAILED.value
+                            res, comp_dict = await self._handle_upd_app(name, spec, plan_uid)
+                            if res:
+                                status = Status.COMPLETED.value
                             else:
-                                plan.pop('initial_plan')
-                                self.apps_dict[name]['curr_plan']['curr_deployment'] = plan
-
-                                res, comp_dict = await self._handle_upd_app(name, spec, plan_uid)
-                                if res:
-                                    status = Status.COMPLETED.value  
-                                else:
-                                    status = Status.FAILED.value
+                                status = Status.FAILED.value
 
                         # This event will include one or more entries that specify individual events
                         # for each aspect of the produced plan
@@ -1098,7 +1103,7 @@ class FluidityAppController():
                     
                     # Validate new host
                     if not validate_host(comp_spec['pod_template'], comp_spec, move_target_host, self.nodes):
-                        logger.error(f"Host {move_target_host} did not pass eligibility check")
+                        logger.error(f"Host {move_target_host} did not pass eligibility check.")
                         return False, {}
 
                     res = append_host_to_list({'host': move_src_host, 'status': 'INACTIVE'}, comp_spec['hosts'], remove=True)
@@ -1117,7 +1122,7 @@ class FluidityAppController():
                         remove = False
                         # Validate new host
                         if not validate_host(comp_spec['pod_template'], comp_spec, host, self.nodes):
-                            logger.error(f"Host {host} did not pass eligibility check")
+                            logger.error(f"Host {host} did not pass eligibility check..")
                             return False, {}
 
                     res = append_host_to_list({'host': host, 'status': status}, comp_spec['hosts'], remove=remove)
@@ -1134,7 +1139,7 @@ class FluidityAppController():
                     # We also need
                     # Validate new spec
                     if not validate_host(entry['new_spec'], comp_spec, entry['host'], self.nodes):
-                        logger.error(f"Host {entry['host']} did not pass eligibility check")
+                        logger.error(f"Host {entry['host']} did not pass eligibility check...")
                         return False, {}
 
                     result, updated_spec = change_comp_spec(self.apps_dict[app_name], entry, comp_spec,
@@ -1239,7 +1244,7 @@ async def main(inbound_queue=None, outbound_queue=None, cluster_description=None
         logger.info('Namespace does not exist.')
         create_mls_namespace(cluster_config.NAMESPACE)    
 
-    ensure_crds()
+    # ensure_crds()
     hostname = os.getenv("NODE_NAME",socket.gethostname())
     working_dir = os.getcwd()
 
@@ -1250,6 +1255,7 @@ async def main(inbound_queue=None, outbound_queue=None, cluster_description=None
 
     if not cluster_config.CLUSTER_ID:
         logger.error("Error on applying cluster description")
+        logger.error(traceback.format_exc())
         sys.exit(0)
     
     logger.info(f'Current namespace {cluster_config.NAMESPACE}')

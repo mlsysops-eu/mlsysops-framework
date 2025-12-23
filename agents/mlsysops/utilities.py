@@ -16,6 +16,7 @@
 
 from .logger_util import logger
 import operator
+import re
 
 def evaluate_condition(a, b, operator: str) -> bool:
     """
@@ -251,3 +252,36 @@ def node_matches_requirements(node, comp_spec):
                 return False
 
     return True
+
+def parse_analyze_interval(interval: str) -> int:
+    """
+    Parses an analyze interval string in the format 'Xs|Xm|Xh|Xd' and converts it to seconds.
+
+    Args:
+        interval (str): The analyze interval as a string (e.g., "5m", "2h", "1d").
+
+    Returns:
+        int: The interval in seconds.
+
+    Raises:
+        ValueError: If the format of the interval string is invalid.
+    """
+    # Match the string using a regex: an integer followed by one of s/m/h/d
+    match = re.fullmatch(r"(\d+)([smhd])", interval)
+    if not match:
+        raise ValueError(f"Invalid analyze interval format: '{interval}'")
+
+    # Extract the numeric value and the time unit
+    value, unit = int(match.group(1)), match.group(2)
+
+    # Convert to seconds based on the unit
+    if unit == "s":  # Seconds
+        return value
+    elif unit == "m":  # Minutes
+        return value * 60
+    elif unit == "h":  # Hours
+        return value * 60 * 60
+    elif unit == "d":  # Days
+        return value * 24 * 60 * 60
+    else:
+        raise ValueError(f"Unsupported time unit '{unit}' in interval: '{interval}'")

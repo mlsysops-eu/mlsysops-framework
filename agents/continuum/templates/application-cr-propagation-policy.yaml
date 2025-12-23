@@ -14,6 +14,9 @@ spec:
     - apiVersion: rbac.authorization.k8s.io/v1
       kind: RoleBinding
       namespace: default
+    - apiVersion: v1
+      kind: Service
+      namespace: mlsysops-framework
   conflictResolution: Overwrite
   placement:
     clusterAffinity:

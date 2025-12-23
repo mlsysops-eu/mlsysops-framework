@@ -1,0 +1,77 @@
+statechart:
+  name: Cluster Agent FSM
+  description: States of the cluster agent.
+  preamble: |
+    timestamp = 0
+  root state:
+    name: App
+    initial: S1
+
+    states:
+      - name: S1
+        transitions:
+        - target: S2
+          event: lamppost_appears
+          action: |
+            send_command("start_image")
+
+      - name: S2
+        transitions:
+        # - target: S3
+        #   event: image_LP
+        #   action: |
+        #     send_command("NONE")
+        - target: S5
+          event: noise_LP
+          action: |
+            send_command("stop_image")
+        - target : S1
+          event: lamppost_disappears
+          action: |
+            send_command("stop_image")
+
+      # - name: S3
+      #   transitions:
+      #   # - target: S2
+      #   #   event: image_HP
+      #   #   action: |
+      #   #     send_command("NONE")
+      #   - target: S5
+      #     event: noise_LP
+      #     action: |
+      #       send_command("stop_image")
+      #   - target: S1
+      #     event: lamppost_disappears
+      #     action: |
+      #       send_command("stop_image")
+
+      # - name: S4
+      #   transitions:
+      #     - target: S2
+      #       event: noise_HP
+      #       action: |
+      #         send_command("NONE")
+      #     - target: S5
+      #       event: image_LP
+      #       action: |
+      #         send_command("stop_image")
+      #     - target: S1
+      #       event: lamppost_disappears
+      #       action: |
+      #         send_command("stop_image")
+
+      - name: S5
+        transitions:
+        - target: S1
+          event: lamppost_disappears
+          action: |
+            send_command("NONE")
+        - target: S2
+          event: noise_inference_from_LP_to_HP
+          action: |
+            send_command("start_image")
+
+
+
+      - name: S6 #return to state 1
+

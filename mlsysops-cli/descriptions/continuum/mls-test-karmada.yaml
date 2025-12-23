@@ -1,0 +1,4 @@
+MLSysOpsContinuum:
+  continuum_id: mls-test-karmada
+  clusters:
+    - mls-test-manage

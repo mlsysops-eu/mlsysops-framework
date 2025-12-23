@@ -31,19 +31,22 @@ from fluidity.internal_payload import FluidityEvent
 from mlsysops import MessageEvents
 import mlsysops
 from mlsysops.logger_util import logger
+import mlstelemetry
+import time
 
 queues = {"inbound": None, "outbound": None}
 
 
 class FluidityMechanism:
 
-    state: Dict = field(default_factory=dict)
     inbound_queue = None
     outbound_queue = None
     internal_queue_inbound = None
     internal_queue_outbound = None
     state = None
+    relocation_state = {}
     fluidity_proxy_plans = {}
+    mls_client = mlstelemetry.MLSTelemetry("cluster_agent", "fluidity_mechanism")
 
     def __init__(self, mlsysops_inbound_queue=None, mlsysops_outbound_queue=None, agent_state=None):
         self.inbound_queue = mlsysops_inbound_queue
@@ -108,7 +111,7 @@ class FluidityMechanism:
                 # Listen to fluidity messages
                 message = await self.internal_queue_inbound.get()
 
-                # Log or save message for debugging
+                # # Log or save message for debugging
                 with open("fluidity_dump.json", "w") as file:
                     file.write(json.dumps(message, skipkeys=True, indent=4, default=str, ensure_ascii=False, sort_keys=True,
                                           separators=(',', ': ')))
@@ -230,12 +233,14 @@ class FluidityMechanism:
                     if app_name:
                         # Build or merge components into the application
                         components_data = {}
+                        logger.debug(f"Building components for application {components}")
                         for component in components:
                             metadata = component.get("metadata", {})
                             metadata_name = metadata.get("name")
                             metadata_uid = metadata.get("uid")
                             qos_metrics = component.get("qos_metrics", [])
-                            if metadata_name and metadata_uid:
+
+                            if metadata_name:
                                 components_data[metadata_name] = {
                                     "uid": metadata_uid,
                                     "qos_metrics": qos_metrics,
@@ -259,7 +264,32 @@ class FluidityMechanism:
                     payload = message.get("payload", {})
                     app_name = payload.get("name")
                     del self.state["applications"][app_name]
+                elif event == MessageEvents.POD_DELETED.value:
+                    # Handle pod modified event
+                    payload = message.get("payload", {})
+                    pod_spec = payload.get("spec", "{}")
+                    pod_metadata = pod_spec.get("metadata", {})
+                    pod_labels = pod_metadata.get("labels", {})
+                    pod_state = pod_spec.get("status", {}).get("phase", "Unknown")
+                    node_name = pod_spec.get("spec", {}).get("node_name", None)
 
+                    # Extract labels
+                    app_name = pod_labels.get("mlsysops.eu/app")
+                    component_name = pod_labels.get("mlsysops.eu/component")
+                    if app_name and app_name in self.state["applications"] and component_name:
+                        # Update the application component state
+                        app = self.state["applications"][app_name]
+                        components = app.get("components", {})
+
+                        components.setdefault(component_name, {}).update({
+                            "labels": pod_labels,
+                            "state": "Deleted",
+                            "node_placed": None
+                        })
+
+                        # Test log
+                        logger.test(
+                            f"|10| Fluidity mechanism planuid:{pod_labels.get('mlsysops.eu/planUID', '-')} pod deleted status:Success")
                 elif event == MessageEvents.POD_MODIFIED.value:
                     # Handle pod modified event
                     payload = message.get("payload", {})
@@ -273,6 +303,7 @@ class FluidityMechanism:
                     app_name = pod_labels.get("mlsysops.eu/app")
                     component_name = pod_labels.get("mlsysops.eu/component")
                     component_uid = pod_labels.get("mlsysops.eu/componentUID")
+                    plan_uid = pod_labels.get("mlsysops.eu/planUID", None)
 
                     if app_name and app_name in self.state["applications"] and component_name:
                         # Update the application component state
@@ -285,6 +316,36 @@ class FluidityMechanism:
                             "node_placed": node_name
                         })
 
+                        if plan_uid and plan_uid in self.relocation_state and component_name in self.relocation_state[
+                            plan_uid]:
+                            logger.debug(f"Pod name {pod_metadata['name']}")
+                            logger.debug(f"Pod state {pod_state}")
+                            logger.debug(f"Host name {node_name}")
+
+                            start_timestamp = self.relocation_state[plan_uid][component_name]['start']
+                            # Get timestamp of modification event of the new pod
+                            curr_timestamp = time.perf_counter()
+                            diff = curr_timestamp - start_timestamp
+
+                            # If the new Pod is deployed successfully on the new host, record the delay
+                            if pod_state == 'Running' and node_name == self.relocation_state[plan_uid][component_name][
+                                'dst']:
+                                logger.info(f"Relocation delay is {diff}")
+                                self.mls_client.pushMetric("relocation_delay", "gauge", diff,
+                                                           {"comp_name": component_name})
+                                logger.debug(f"Removing {component_name} from relocation state of plan {plan_uid}")
+
+                                # Remove entry from dictionary
+                                del self.relocation_state[plan_uid][component_name]
+                                if self.relocation_state[plan_uid] == {}:
+                                    logger.debug(f"relocation_state for plan {plan_uid} is empty.")
+                                    del self.relocation_state[plan_uid]
+                            # If the Pod is in Pending state, we measure the delay until the call to kubernetes is done
+                            elif pod_state == 'Pending' and node_name == \
+                                    self.relocation_state[plan_uid][component_name]['dst']:
+                                logger.debug(f"New Pod start delay is {diff}")
+                                self.mls_client.pushMetric("deployment_delay", "gauge", diff,
+                                                           {"comp_name": component_name})
                         # Test log
                         logger.test(
                             f"|3| Fluidity mechanism planuid:{pod_labels.get('mlsysops.eu/planUID','-')} pod modification status:Success")
@@ -311,6 +372,7 @@ class FluidityMechanism:
                             logger.warning(f"Node name is missing for component '{component_name}' in app '{app_name}'.")
                     else:
                         logger.warning("Invalid or missing app/component labels in pod_modified event payload.")
+
             except CancelledError:
                 logger.debug("Cancelled error in internal_message_listener")
                 break
@@ -333,26 +395,26 @@ def initialize(inbound_queue=None, outbound_queue=None, agent_state=None):
 async def apply(plan):
     global fluidity_mechanism_instance
 
-    try:
-        # Validate the payload using Pydantic
-        FluidityPlanPayload(**plan)
-    except ValidationError as e:
-        # Print validation errors if any
-        logger.error(f"Plan Validation failed: {e}")
-
-        msg = {
-            "event": MessageEvents.PLAN_EXECUTED.value,
-            'payload': {
-                'name': plan['plan_uid'],
-            }
-        }
-
-        # forward the message to MLS agent
-        await fluidity_mechanism_instance.inbound_queue.put(msg)
-        logger.test(f"|1| Fluidity mechanism planuid:{plan['plan_uid']} failed validation status:Failed")
-        logger.test(plan)
-        logger.test(e)
-        return
+    # try:
+    #     # Validate the payload using Pydantic
+    #     FluidityPlanPayload(**plan)
+    # except ValidationError as e:
+    #     # Print validation errors if any
+    #     logger.error(f"Plan Validation failed: {e}")
+    #
+    #     msg = {
+    #         "event": MessageEvents.PLAN_EXECUTED.value,
+    #         'payload': {
+    #             'name': plan['plan_uid'],
+    #         }
+    #     }
+    #
+    #     # forward the message to MLS agent
+    #     await fluidity_mechanism_instance.inbound_queue.put(msg)
+    #     logger.test(f"|1| Fluidity mechanism planuid:{plan['plan_uid']} failed validation status:Failed")
+    #     logger.test(plan)
+    #     logger.test(e)
+    #     return
 
     msg = {
         "event": MessageEvents.PLAN_SUBMITTED.value,
@@ -361,6 +423,28 @@ async def apply(plan):
     try:
         await fluidity_mechanism_instance.internal_queue_outbound.put(msg)
         logger.test(f"|1| Fluidity mechanism forwarded planuid:{plan['plan_uid']} to Fluidity status:True")
+        for comp in plan['deployment_plan']:
+            if comp == 'initial_plan':
+                continue
+            # If 'move' action in a plan for a given component,
+            # Store the new plan info (plan_uid, plan creation timestamp, component names, src/dst nodes)
+            for action_entry in plan['deployment_plan'][comp]:
+                if action_entry['action'] == 'move':
+                    if plan['plan_uid'] not in fluidity_mechanism_instance.relocation_state:
+                        logger.debug(f"Creating entry for plan_uid {plan['plan_uid']}")
+                        fluidity_mechanism_instance.relocation_state[plan['plan_uid']] = {}
+
+                    curr_timestamp = time.perf_counter()
+
+                    src = action_entry['src_host']
+                    dst = action_entry['target_host']
+
+                    logger.debug(f"Found move action for component {comp} from {src} to {dst}")
+                    fluidity_mechanism_instance.relocation_state[plan['plan_uid']][comp] = {
+                        'start': curr_timestamp,
+                        'src': src,
+                        'dst': dst
+                    }
 
     except Exception as e:
         logger.debug("Error in sending message to fluidity")
